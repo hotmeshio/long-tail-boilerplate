@@ -8,7 +8,7 @@ async function main() {
   const lt = await start({
     database: {
       host: process.env.POSTGRES_HOST || 'localhost',
-      port: parseInt(process.env.POSTGRES_PORT || '5432'),
+      port: parseInt(process.env.POSTGRES_PORT || '5433'),
       user: process.env.POSTGRES_USER || 'postgres',
       password: process.env.POSTGRES_PASSWORD || 'password',
       database: process.env.POSTGRES_DB || 'myapp',
@@ -24,7 +24,7 @@ async function main() {
     },
 
     server: {
-      port: parseInt(process.env.PORT || '3000'),
+      port: parseInt(process.env.PORT || '3030'),
     },
 
     // Uncomment to enable MCP tool orchestration with escalation support:
