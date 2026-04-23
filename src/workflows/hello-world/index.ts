@@ -2,7 +2,7 @@
  * Hello World — minimal durable workflow.
  *
  * Demonstrates:
- *   - Durable timer (sleepFor)
+ *   - Durable timer (sleep)
  *   - Proxy activity with IAM context
  *   - Return envelope structure
  */
@@ -20,7 +20,7 @@ const { greet } = Durable.workflow.proxyActivities<ActivitiesType>({
 export async function helloWorkflow(envelope: LTEnvelope): Promise<any> {
   const { name = 'World', delaySeconds = 1 } = envelope.data;
 
-  await Durable.workflow.sleepFor(`${delaySeconds} seconds`);
+  await Durable.workflow.sleep(`${delaySeconds} seconds`);
 
   const result = await greet({ name });
 

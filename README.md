@@ -1,11 +1,11 @@
 # Long Tail Boilerplate
 
-Durable workflows with IAM, a built-in dashboard, and MCP tool orchestration. Add PostgreSQL and go.
+Write functions. They checkpoint to Postgres. If the process crashes, they resume where they left off. Every execution carries identity — who started it, whose credentials govern it. A dashboard ships with the package.
 
 ## Quick Start
 
 ```bash
-# 1. Start Postgres
+# 1. Start Postgres + MinIO
 docker compose up -d
 
 # 2. Install dependencies
@@ -14,28 +14,40 @@ npm install
 # 3. Configure
 cp .env.example .env
 
-# 4. Run
+# 4. Seed the admin account
+npm run seed
+
+# 5. Run
 npm run dev
 ```
 
-Dashboard: [http://localhost:3000](http://localhost:3000)
-API: [http://localhost:3000/api](http://localhost:3000/api)
+Dashboard: [http://localhost:3030](http://localhost:3030)
+API: [http://localhost:3030/api](http://localhost:3030/api)
+MinIO Console: [http://localhost:9002](http://localhost:9002)
 
 ## First Login
 
-Generate a token:
+The seed script creates a `superadmin` / `changeme` account. Use it to log into the dashboard or generate a token:
 
 ```bash
 npx ts-node scripts/token.ts
 ```
 
-Use the token to authenticate API calls or log into the dashboard.
+To customize the seed account:
+
+```bash
+npx ts-node scripts/seed.ts --user admin --password s3cret
+```
 
 ## Project Structure
 
 ```
 src/
   index.ts                    # Entry point — configures and starts Long Tail
+  activities/
+    image.ts                  # 12 sharp-based image operations
+  mcp-servers/
+    image-tools.ts            # MCP server wrapping image activities
   workflows/
     hello-world/
       index.ts                # Minimal durable workflow
@@ -43,6 +55,8 @@ src/
     content-review/
       index.ts                # Workflow with escalation
       activities.ts           # Content analysis activity
+scripts/
+  seed.ts                     # Creates superadmin account
 ```
 
 ## Adding a Workflow
@@ -86,6 +100,41 @@ const lt = await start({
 });
 ```
 
+## Custom MCP Servers
+
+Activities can be exposed as MCP tools. See `src/mcp-servers/image-tools.ts` for a full example.
+
+Register your server factory in `src/index.ts`:
+
+```typescript
+import { createImageToolsServer } from './mcp-servers/image-tools';
+
+const lt = await start({
+  // ...
+  mcp: {
+    serverFactories: {
+      'image-tools': createImageToolsServer,
+    },
+  },
+});
+```
+
+### TypeScript and `McpServer.tool()`
+
+The MCP SDK's `.tool()` and `.registerTool()` methods use deeply nested Zod generics that cause the TypeScript compiler to run out of memory. Use `registerMcpTool` from `@hotmeshio/long-tail` instead — it wraps the call to avoid the type explosion while preserving runtime validation:
+
+```typescript
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { registerMcpTool } from '@hotmeshio/long-tail';
+
+const server = new McpServer({ name: 'my-tools', version: '1.0.0' });
+
+registerMcpTool(server, 'my_tool', 'Description', { input: z.string() }, async (args: any) => ({
+  content: [{ type: 'text', text: args.input }],
+}));
+```
+
 ## Escalation
 
 Return `type: 'escalation'` to pause the workflow and create a human task:
@@ -118,6 +167,10 @@ export async function myActivity(input: any) {
 }
 ```
 
+## File Storage (MinIO)
+
+The boilerplate includes MinIO for S3-compatible file storage. Docker Compose starts it on port 9002. Set `LT_STORAGE_BACKEND=s3` in `.env` to enable it (see `.env.example` for all S3 config options).
+
 ## Configuration
 
 All options in `src/index.ts` are documented in the [Long Tail docs](https://github.com/hotmeshio/long-tail).
@@ -138,4 +191,3 @@ All options in `src/index.ts` are documented in the [Long Tail docs](https://git
 - **Live events** — real-time event stream via Socket.IO (zero config)
 - **MCP tools** — optional AI-powered tool orchestration with compiled pipelines
 
-No Redis. No Kafka. No app server. Just Postgres.

@@ -1,4 +1,26 @@
 services:
+  app:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "${PORT:-3030}:3030"
+    env_file: .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      LT_S3_ENDPOINT: http://minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./vitest.config.ts:/app/vitest.config.ts
+
   postgres:
     image: postgres:16
     environment:

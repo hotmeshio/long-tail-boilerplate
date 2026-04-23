@@ -3,3 +3,7 @@ build
 .env
 .env.*
 !.env.example
+.test-tmp
+.claude
+
+CLAUDE.md

@@ -3,6 +3,8 @@ import { start } from '@hotmeshio/long-tail';
 
 import * as helloWorld from './workflows/hello-world';
 import * as contentReview from './workflows/content-review';
+import * as screenshotResearch from './workflows/screenshot-research';
+import { createImageToolsServer } from './mcp-servers/image-tools';
 
 async function main() {
   const lt = await start({
@@ -17,6 +19,7 @@ async function main() {
     workers: [
       { taskQueue: 'default', workflow: helloWorld.helloWorkflow },
       { taskQueue: 'default', workflow: contentReview.reviewContent },
+      { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch },
     ],
 
     auth: {
@@ -27,8 +30,11 @@ async function main() {
       port: parseInt(process.env.PORT || '3030'),
     },
 
-    // Uncomment to enable MCP tool orchestration with escalation support:
-    // escalation: { strategy: 'mcp' },
+    mcp: {
+      serverFactories: {
+        'image-tools': createImageToolsServer,
+      },
+    },
   });
 
   process.on('SIGTERM', () => lt.shutdown());

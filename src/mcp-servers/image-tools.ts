@@ -10,12 +10,13 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
+import { registerMcpTool } from '@hotmeshio/long-tail';
 import * as image from '../activities/image';
 
 export function createImageToolsServer(): McpServer {
   const server = new McpServer({ name: 'image-tools', version: '1.0.0' });
 
-  server.tool(
+  registerMcpTool(server,
     'get_image_info',
     'Get image metadata: dimensions, format, file size, megapixels.',
     { path: z.string().describe('Path to the image file') },
@@ -24,7 +25,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'resize_image',
     'Resize an image. Preserves aspect ratio by default.',
     {
@@ -39,7 +40,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'crop_image',
     'Crop a rectangular region from an image.',
     {
@@ -55,7 +56,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'rotate_image',
     'Rotate an image by a given angle (degrees, counter-clockwise).',
     {
@@ -69,7 +70,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'flip_image',
     'Flip an image horizontally or vertically.',
     {
@@ -82,7 +83,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'grayscale_image',
     'Convert an image to grayscale.',
     {
@@ -94,7 +95,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'blur_image',
     'Apply Gaussian blur to an image.',
     {
@@ -107,7 +108,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'adjust_image',
     'Adjust brightness and saturation. Values > 1 increase, < 1 decrease.',
     {
@@ -121,7 +122,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'compress_image',
     'Compress an image to reduce file size.',
     {
@@ -135,7 +136,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'convert_format',
     'Convert an image to a different format.',
     {
@@ -148,7 +149,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'add_border',
     'Add a solid-color border around an image.',
     {
@@ -162,7 +163,7 @@ export function createImageToolsServer(): McpServer {
     }),
   );
 
-  server.tool(
+  registerMcpTool(server,
     'pixelate_image',
     'Apply a pixelation/mosaic effect to an image.',
     {
