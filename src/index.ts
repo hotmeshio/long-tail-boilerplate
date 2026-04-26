@@ -4,6 +4,10 @@ import { start } from '@hotmeshio/long-tail';
 import * as helloWorld from './workflows/hello-world';
 import * as contentReview from './workflows/content-review';
 import * as screenshotResearch from './workflows/screenshot-research';
+import { assemblyLine } from './workflows/assembly-line';
+import { workstation } from './workflows/assembly-line/worker';
+import { stepIterator } from './workflows/assembly-line/iterator';
+import { reverter } from './workflows/assembly-line/reverter';
 import { createImageToolsServer } from './mcp-servers/image-tools';
 
 async function main() {
@@ -20,6 +24,10 @@ async function main() {
       { taskQueue: 'default', workflow: helloWorld.helloWorkflow },
       { taskQueue: 'default', workflow: contentReview.reviewContent },
       { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch },
+      { taskQueue: 'assembly-line', workflow: assemblyLine },
+      { taskQueue: 'assembly-line', workflow: workstation },
+      { taskQueue: 'assembly-line', workflow: stepIterator },
+      { taskQueue: 'assembly-line', workflow: reverter },
     ],
 
     auth: {

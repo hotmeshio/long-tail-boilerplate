@@ -12,11 +12,12 @@
     "token": "ts-node scripts/token.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config tests/integration/vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hotmeshio/hotmesh": "^0.14.3",
-    "@hotmeshio/long-tail": "^0.1.7",
+    "@hotmeshio/long-tail": "^0.1.8",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",
