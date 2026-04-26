@@ -367,7 +367,7 @@ This project is designed for iterative development with Claude Code. Here's how 
 
 ### Postgres
 
-Runs on port 5433 (mapped from container port 5432). Stores all workflow state, checkpoints, escalations, and IAM data.
+Runs on port 5416 (mapped from container port 5432). Stores all workflow state, checkpoints, escalations, and IAM data.
 
 ### MinIO
 
