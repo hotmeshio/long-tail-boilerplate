@@ -21,7 +21,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.14.3",
+    "@hotmeshio/hotmesh": "^0.14.4",
     "@hotmeshio/long-tail": "^0.1.12",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
