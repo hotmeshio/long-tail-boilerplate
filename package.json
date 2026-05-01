@@ -13,11 +13,16 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config tests/integration/vitest.config.ts",
+    "test:throughput:echo": "ts-node tests/throughput/01-echo.ts",
+    "test:throughput:signal": "ts-node tests/throughput/02-signal.ts",
+    "test:throughput:chain": "ts-node tests/throughput/03-chain.ts",
+    "test:throughput:factory": "ts-node tests/throughput/04-factory.ts",
+    "test:throughput:sustained": "ts-node tests/throughput/05-factory-sustained.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@hotmeshio/hotmesh": "^0.14.3",
-    "@hotmeshio/long-tail": "^0.1.8",
+    "@hotmeshio/long-tail": "^0.1.12",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",

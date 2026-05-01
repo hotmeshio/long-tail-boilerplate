@@ -21,13 +21,22 @@ async function main() {
     },
 
     workers: [
-      { taskQueue: 'default', workflow: helloWorld.helloWorkflow },
-      { taskQueue: 'default', workflow: contentReview.reviewContent },
-      { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch },
-      { taskQueue: 'assembly-line', workflow: assemblyLine },
-      { taskQueue: 'assembly-line', workflow: workstation },
-      { taskQueue: 'assembly-line', workflow: stepIterator },
-      { taskQueue: 'assembly-line', workflow: reverter },
+      //do not uncomment
+      // { taskQueue: 'default', workflow: helloWorld.helloWorkflow },
+      // { taskQueue: 'default', workflow: contentReview.reviewContent },
+      // { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch },
+      // { taskQueue: 'assembly-line', workflow: assemblyLine },
+      // { taskQueue: 'assembly-line', workflow: workstation },
+      // { taskQueue: 'assembly-line', workflow: stepIterator },
+      // { taskQueue: 'assembly-line', workflow: reverter },
+      // Readonly observers — hike project workflows (data lives in external Postgres)
+      // Using named functions so we can detect if they're incorrectly invoked
+      { taskQueue: 'long-tail-examples', workflow: 'basicSignal', connection: { readonly: true } },
+      // { taskQueue: 'order-tracking', workflow: function orderIngestion() { console.error('[READONLY VIOLATION] orderIngestion was called!'); }, connection: { readonly: true } },
+      // { taskQueue: 'order-tracking', workflow: function orderSequencer() { console.error('[READONLY VIOLATION] orderSequencer was called!'); }, connection: { readonly: true } },
+      // { taskQueue: 'order-tracking', workflow: function stationWorker() { console.error('[READONLY VIOLATION] stationWorker was called!'); }, connection: { readonly: true } },
+      // { taskQueue: 'order-tracking', workflow: function orderTracker() { console.error('[READONLY VIOLATION] orderTracker was called!'); }, connection: { readonly: true } },
+      // { taskQueue: 'order-tracking', workflow: function helloWorkflow() { console.error('[READONLY VIOLATION] helloWorkflow was called!'); }, connection: { readonly: true } },
     ],
 
     auth: {
