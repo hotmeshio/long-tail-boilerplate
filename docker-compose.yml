@@ -7,17 +7,16 @@ services:
       - "${PORT:-3030}:3030"
     env_file: .env
     environment:
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
     depends_on:
-      postgres:
-        condition: service_healthy
       minio:
         condition: service_healthy
     volumes:
       - ./src:/app/src
       - ./scripts:/app/scripts
+      - ./tests:/app/tests
       - ./tsconfig.json:/app/tsconfig.json
       - ./vitest.config.ts:/app/vitest.config.ts
 
@@ -30,6 +29,27 @@ services:
       - "${PG_PORT:-5416}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - work_mem=16MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - wal_buffers=16MB
+      - -c
+      - max_wal_size=1GB
+      - -c
+      - checkpoint_completion_target=0.9
+      - -c
+      - effective_cache_size=512MB
+      - -c
+      - synchronous_commit=off
+      - -c
+      - max_connections=200
+    shm_size: 512m
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

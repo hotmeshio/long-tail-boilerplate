@@ -1,0 +1,75 @@
+app:
+  id: yamltest
+  version: '1'
+  graphs:
+    - subscribes: yamltest.signal.test
+      publishes: yamltest.signal.done
+      expire: 300
+
+      input:
+        schema:
+          type: object
+          properties:
+            orderId:
+              type: string
+
+      output:
+        schema:
+          type: object
+          properties:
+            orderId:
+              type: string
+            humanResult:
+              type: string
+
+      activities:
+        trigger:
+          type: trigger
+          stats:
+            id: '{$self.input.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        work:
+          type: worker
+          topic: yamltest.signal.test
+          input:
+            schema:
+              type: object
+            maps:
+              orderId: '{trigger.output.data.orderId}'
+          output:
+            schema:
+              type: object
+
+        wait:
+          type: hook
+          hook:
+            type: object
+            properties:
+              id: { type: string }
+              result: { type: string }
+          job:
+            maps:
+              orderId: '{trigger.output.data.orderId}'
+              humanResult: '{$self.hook.data.result}'
+
+        done:
+          type: hook
+
+      transitions:
+        trigger:
+          - to: work
+        work:
+          - to: wait
+        wait:
+          - to: done
+
+      hooks:
+        yamltest.signal.ack:
+          - to: wait
+            conditions:
+              match:
+                - expected: '{$job.metadata.jid}'
+                  actual: '{$self.hook.data.id}'
