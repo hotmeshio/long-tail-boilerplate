@@ -1,9 +1,9 @@
 app:
-  id: yamltest
-  version: '1'
+  id: signal02
+  version: '20'
   graphs:
-    - subscribes: yamltest.signal.test
-      publishes: yamltest.signal.done
+    - subscribes: signal02.signal.test
+      publishes: signal02.signal.done
       expire: 300
 
       input:
@@ -33,7 +33,7 @@ app:
 
         work:
           type: worker
-          topic: yamltest.signal.test
+          topic: signal02.signal.test
           input:
             schema:
               type: object
@@ -67,7 +67,7 @@ app:
           - to: done
 
       hooks:
-        yamltest.signal.ack:
+        signal02.signal.ack:
           - to: wait
             conditions:
               match:

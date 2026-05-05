@@ -5,12 +5,23 @@ services:
       target: dev
     ports:
       - "${PORT:-3030}:3030"
+    deploy:
+      resources:
+        limits:
+          cpus: '8'
+          memory: 4G
+        reservations:
+          cpus: '4'
+          memory: 2G
     env_file: .env
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
+      NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
     depends_on:
+      postgres:
+        condition: service_healthy
       minio:
         condition: service_healthy
     volumes:
@@ -27,6 +38,14 @@ services:
       POSTGRES_PASSWORD: password
     ports:
       - "${PG_PORT:-5416}:5432"
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 2G
+        reservations:
+          cpus: '2'
+          memory: 1G
     volumes:
       - pgdata:/var/lib/postgresql/data
     command:

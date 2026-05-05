@@ -14,7 +14,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import http from 'http';
 
-import { postgres_options } from './config';
+import { postgres_options } from '../../modules/config';
 
 const COUNT = parseInt(process.argv[2] || '500', 10);
 const CONCURRENCY = parseInt(process.argv[3] || '10', 10);
@@ -25,7 +25,7 @@ function getConnection() {
 
 function fetchJson(path: string): Promise<any> {
   return new Promise((resolve, reject) => {
-    http.get(`http://localhost:${process.env.PORT || 3030}${path}`, (res) => {
+    http.get(`http://localhost:${process.env.PORT || 3000}${path}`, (res) => {
       let data = '';
       res.on('data', (c) => (data += c));
       res.on('end', () => { try { resolve(JSON.parse(data)); } catch { resolve({}); } });
@@ -37,10 +37,10 @@ async function main() {
   const connection = getConnection();
 
   const hotMesh = await HotMesh.init({
-    appId: 'yamltest',
+    appId: 'echo01',
     engine: { connection },
     workers: [{
-      topic: 'yamltest.echo',
+      topic: 'echo01.echo',
       connection,
       callback: async (data) => ({
         metadata: { ...data.metadata },
@@ -54,7 +54,7 @@ async function main() {
 
   const yaml = readFileSync(join(__dirname, 'yaml/01-echo.yaml'), 'utf-8');
   await hotMesh.deploy(yaml);
-  await hotMesh.activate('1');
+  await hotMesh.activate('3');
 
   console.log(`01-echo | ${COUNT} workflows | concurrency=${CONCURRENCY}\n`);
 
@@ -63,7 +63,7 @@ async function main() {
     const batch = Math.min(CONCURRENCY, COUNT - i);
     await Promise.all(
       Array.from({ length: batch }, (_, j) =>
-        hotMesh.pub('yamltest.echo', { message: `msg-${i + j}` }),
+        hotMesh.pub('echo01.echo', { message: `msg-${i + j}` }),
       ),
     );
   }
@@ -73,7 +73,7 @@ async function main() {
   console.log('Polling for completion...');
   for (let tick = 0; tick < 240; tick++) {
     await new Promise((r) => setTimeout(r, 500));
-    const result = await fetchJson('/api/mcp-runs?app_id=yamltest&limit=1&offset=0&status=running');
+    const result = await fetchJson('/api/mcp-runs?app_id=echo01&limit=1&offset=0&status=running');
     const running = result?.total ?? 0;
     const elapsed = (performance.now() - t0) / 1000;
     process.stdout.write(`  running=${running}  ${elapsed.toFixed(1)}s\r`);

@@ -13,7 +13,7 @@ docker compose up -d --build   # all services running
 All tests run inside the Docker container:
 
 ```bash
-docker compose exec app npx ts-node tests/throughput/<test>.ts [args]
+docker compose exec long-tail npx ts-node tests/throughput/<test>.ts [args]
 ```
 
 ## Test Progression
@@ -25,7 +25,7 @@ docker compose exec app npx ts-node tests/throughput/<test>.ts [args]
 **YAML:** `yaml/01-echo.yaml` (app: yamltest)
 
 ```bash
-docker compose exec app npx ts-node tests/throughput/01-echo.ts 1000 10
+docker compose exec long-tail npx ts-node tests/throughput/01-echo.ts 1000 10
 ```
 
 **Measured:** ~300/sec sustained, 3.3ms avg on local Docker.
@@ -37,7 +37,7 @@ docker compose exec app npx ts-node tests/throughput/01-echo.ts 1000 10
 **YAML:** `yaml/02-signal.yaml` (app: yamltest)
 
 ```bash
-docker compose exec app npx ts-node tests/throughput/02-signal.ts 5
+docker compose exec long-tail npx ts-node tests/throughput/02-signal.ts 5
 ```
 
 ### 03 — Chain (Sequential Stations)
@@ -47,7 +47,7 @@ docker compose exec app npx ts-node tests/throughput/02-signal.ts 5
 **YAML:** `yaml/03-chain.yaml` (app: yamltest)
 
 ```bash
-docker compose exec app npx ts-node tests/throughput/03-chain.ts 10
+docker compose exec long-tail npx ts-node tests/throughput/03-chain.ts 10
 ```
 
 ### 04 — Factory Floor (Real Escalations)
@@ -61,10 +61,10 @@ the workflow. The resolve worker runs transactionally after the hook resumes.
 
 ```bash
 # Single workflow — watch each station
-docker compose exec app npx ts-node tests/throughput/04-factory.ts 1
+docker compose exec long-tail npx ts-node tests/throughput/04-factory.ts 1
 
 # Multiple workflows
-docker compose exec app npx ts-node tests/throughput/04-factory.ts 10
+docker compose exec long-tail npx ts-node tests/throughput/04-factory.ts 10
 ```
 
 **Flow per station:**

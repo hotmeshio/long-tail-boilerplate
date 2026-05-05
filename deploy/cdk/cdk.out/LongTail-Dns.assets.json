@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "767b5f0a65ec98cda629f883ae64cf8c7bcbbee32bde9825dc48c517fe6798a7": {
+      "displayName": "LongTail-Dns Template",
+      "source": {
+        "path": "LongTail-Dns.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "162216049230-us-west-1-6d88bd98": {
+          "bucketName": "cdk-hnb659fds-assets-162216049230-us-west-1",
+          "objectKey": "767b5f0a65ec98cda629f883ae64cf8c7bcbbee32bde9825dc48c517fe6798a7.json",
+          "region": "us-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-file-publishing-role-162216049230-us-west-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

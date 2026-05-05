@@ -18,41 +18,31 @@
  *   npx ts-node tests/throughput/04-factory.ts [count]
  */
 
-import http from 'http';
+try { require('dotenv/config'); } catch {}
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const API_PORT = process.env.PORT || '3030';
+const BASE_URL = process.env.REMOTE_URL || `http://localhost:${process.env.PORT || 3030}`;
+const isRemote = !!process.env.REMOTE_URL;
+const PASSWORD = isRemote ? process.env.REMOTE_PASSWORD! : 'l0ngt@1l';
 
 const STATIONS = ['qc_inspector', 'packaging', 'shipping', 'loading_dock', 'final_signoff'];
 const COUNT = parseInt(process.argv[2] || '1', 10);
 
 // ── HTTP helpers ────────────────────────────────────────────────────────────
 
-function api(method: string, path: string, body?: any, token?: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const opts: http.RequestOptions = {
-      hostname: 'localhost',
-      port: API_PORT,
-      path: `/api${path}`,
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-    };
-    const req = http.request(opts, (res) => {
-      let data = '';
-      res.on('data', (c) => (data += c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { resolve({ raw: data, status: res.statusCode }); }
-      });
-    });
-    req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
-    req.end();
+async function api(method: string, path: string, body?: any, token?: string): Promise<any> {
+  const res = await fetch(`${BASE_URL}/api${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
   });
+  const data = await res.json();
+  if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${JSON.stringify(data)}`);
+  return data;
 }
 
 function sleep(ms: number) {
@@ -117,9 +107,9 @@ function buildManifest(): any[] {
       type: 'worker',
       tool_source: 'mcp',
       topic: 'factory.floor',
-      workflow_name: 'claim_and_resolve',
+      workflow_name: 'resolve_escalation',
       mcp_server_id: 'long-tail-human-queue',
-      mcp_tool_name: 'claim_and_resolve',
+      mcp_tool_name: 'resolve_escalation',
       input_mappings: {},
       output_fields: [],
     });
@@ -156,7 +146,7 @@ function buildManifest(): any[] {
 async function main() {
   // 1. Login
   console.log('1. Login');
-  const { token } = await api('POST', '/auth/login', { username: 'superadmin', password: 'l0ngt@1l' });
+  const { token } = await api('POST', '/auth/login', { username: 'superadmin', password: PASSWORD });
   if (!token) { console.error('Login failed'); process.exit(1); }
 
   // 2. Deploy workflow
@@ -230,7 +220,8 @@ async function main() {
         break;
       }
 
-      // Resolve it
+      // Claim it, then resolve
+      await api('POST', `/escalations/${escalationId}/claim`, {}, token);
       const resolveResp = await api('POST', `/escalations/${escalationId}/resolve`, {
         resolverPayload: { approved: true, station: STATIONS[s] },
       }, token);

@@ -1,0 +1,1403 @@
+{
+ "Resources": {
+  "ClusterEB0386A7": {
+   "Type": "AWS::ECS::Cluster",
+   "Properties": {
+    "ClusterName": "longtail",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Cluster/Resource"
+   }
+  },
+  "Alb16C2F182": {
+   "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+   "Properties": {
+    "LoadBalancerAttributes": [
+     {
+      "Key": "deletion_protection.enabled",
+      "Value": "false"
+     }
+    ],
+    "Scheme": "internet-facing",
+    "SecurityGroups": [
+     {
+      "Fn::ImportValue": "LongTail-Network:ExportsOutputFnGetAttAlbSecurityGroup86A59E99GroupIdE3A37BC7"
+     }
+    ],
+    "Subnets": [
+     {
+      "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPublicSubnet1Subnet5C2D37C4FFA2B456"
+     },
+     {
+      "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPublicSubnet2Subnet691E08A351552740"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "Type": "application"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/Resource"
+   }
+  },
+  "AlbHttpRedirect2E78FE2C": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "DefaultActions": [
+     {
+      "RedirectConfig": {
+       "Port": "443",
+       "Protocol": "HTTPS",
+       "StatusCode": "HTTP_302"
+      },
+      "Type": "redirect"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb16C2F182"
+    },
+    "Port": 80,
+    "Protocol": "HTTP"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/HttpRedirect/Resource"
+   }
+  },
+  "AlbHttpsListener2ADA614F": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "Certificates": [
+     {
+      "CertificateArn": {
+       "Fn::ImportValue": "LongTail-Dns:ExportsOutputRefCertificate4E7ABB08F7C8AF50"
+      }
+     }
+    ],
+    "DefaultActions": [
+     {
+      "FixedResponseConfig": {
+       "ContentType": "text/plain",
+       "MessageBody": "Not Found",
+       "StatusCode": "404"
+      },
+      "Type": "fixed-response"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb16C2F182"
+    },
+    "Port": 443,
+    "Protocol": "HTTPS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/HttpsListener/Resource"
+   }
+  },
+  "AlbHttpsListenerApiTargetGroup79DE3689": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/",
+    "HealthCheckTimeoutSeconds": 10,
+    "HealthyThresholdCount": 2,
+    "Port": 3030,
+    "Protocol": "HTTP",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "UnhealthyThresholdCount": 3,
+    "VpcId": {
+     "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpc8378EB38272D6E3A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/HttpsListener/ApiTargetGroup/Resource"
+   }
+  },
+  "AlbHttpsListenerApiTargetRuleB492058B": {
+   "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+   "Properties": {
+    "Actions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "AlbHttpsListenerApiTargetGroup79DE3689"
+      },
+      "Type": "forward"
+     }
+    ],
+    "Conditions": [
+     {
+      "Field": "path-pattern",
+      "PathPatternConfig": {
+       "Values": [
+        "/*"
+       ]
+      }
+     }
+    ],
+    "ListenerArn": {
+     "Ref": "AlbHttpsListener2ADA614F"
+    },
+    "Priority": 1
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/HttpsListener/ApiTargetRule/Resource"
+   }
+  },
+  "ApiLogGroup1DEDFC07": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/ecs/longtail/api",
+    "RetentionInDays": 30,
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiLogGroup/Resource"
+   }
+  },
+  "ApiTaskDefTaskRole76FB19FA": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiTaskDef/TaskRole/Resource"
+   }
+  },
+  "ApiTaskDefTaskRoleDefaultPolicy66F6BAC0": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ApiTaskDefTaskRoleDefaultPolicy66F6BAC0",
+    "Roles": [
+     {
+      "Ref": "ApiTaskDefTaskRole76FB19FA"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiTaskDef/TaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "ApiTaskDef37DBDBD0": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Command": [
+       "node",
+       "build/index.js"
+      ],
+      "Environment": [
+       {
+        "Name": "NODE_ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "PGSSLMODE",
+        "Value": "no-verify"
+       },
+       {
+        "Name": "POSTGRES_PORT",
+        "Value": "5432"
+       },
+       {
+        "Name": "POSTGRES_DB",
+        "Value": "longtail"
+       },
+       {
+        "Name": "LT_STORAGE_BACKEND",
+        "Value": "s3"
+       },
+       {
+        "Name": "LT_S3_BUCKET",
+        "Value": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefFilesBucket164501139A977DFC"
+        }
+       },
+       {
+        "Name": "LT_S3_REGION",
+        "Value": "us-west-1"
+       },
+       {
+        "Name": "APP_ROLE",
+        "Value": "api"
+       },
+       {
+        "Name": "PORT",
+        "Value": "3030"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc"
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "ApiLogGroup1DEDFC07"
+        },
+        "awslogs-stream-prefix": "api",
+        "awslogs-region": "us-west-1"
+       }
+      },
+      "Name": "api",
+      "PortMappings": [
+       {
+        "ContainerPort": 3030,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "POSTGRES_HOST",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":host::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "POSTGRES_USER",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":username::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "POSTGRES_PASSWORD",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":password::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "JWT_SECRET",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefJwtSigningKey15CA95A1680BA2AD"
+        }
+       },
+       {
+        "Name": "OAUTH_CONFIG",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+        }
+       },
+       {
+        "Name": "API_KEYS",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefApiKeys3BB3983D8BCC0B1D"
+        }
+       },
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAnthropicApiKeyC9C806DA1A52822F"
+        }
+       },
+       {
+        "Name": "OPENAI_API_KEY",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
+        }
+       },
+       {
+        "Name": "SEED_ADMIN_PASSWORD",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefSeedAdminPasswordFD70C749E8BAC7AA"
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "ApiTaskDefExecutionRoleE6ABB053",
+      "Arn"
+     ]
+    },
+    "Family": "LongTailComputeApiTaskDefF50D68C8",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "ApiTaskDefTaskRole76FB19FA",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiTaskDef/Resource"
+   }
+  },
+  "ApiTaskDefExecutionRoleE6ABB053": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiTaskDef/ExecutionRole/Resource"
+   }
+  },
+  "ApiTaskDefExecutionRoleDefaultPolicy358EAD94": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":ecr:us-west-1:162216049230:repository/cdk-hnb659fds-container-assets-162216049230-us-west-1"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "ApiLogGroup1DEDFC07",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefJwtSigningKey15CA95A1680BA2AD"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefApiKeys3BB3983D8BCC0B1D"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAnthropicApiKeyC9C806DA1A52822F"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefSeedAdminPasswordFD70C749E8BAC7AA"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "ApiTaskDefExecutionRoleDefaultPolicy358EAD94",
+    "Roles": [
+     {
+      "Ref": "ApiTaskDefExecutionRoleE6ABB053"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiTaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "ApiServiceC9037CF0": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "ClusterEB0386A7"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 100
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "api",
+      "ContainerPort": 3030,
+      "TargetGroupArn": {
+       "Ref": "AlbHttpsListenerApiTargetGroup79DE3689"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputFnGetAttAppSecurityGroupC396D536GroupId4ECD26A6"
+       }
+      ],
+      "Subnets": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940"
+       },
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3"
+       }
+      ]
+     }
+    },
+    "ServiceName": "api",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "TaskDefinition": {
+     "Ref": "ApiTaskDef37DBDBD0"
+    }
+   },
+   "DependsOn": [
+    "AlbHttpsListenerApiTargetRuleB492058B",
+    "ApiTaskDefTaskRoleDefaultPolicy66F6BAC0",
+    "ApiTaskDefTaskRole76FB19FA"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiService/Service"
+   }
+  },
+  "ApiServiceTaskCountTargetBFC64025": {
+   "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+   "Properties": {
+    "MaxCapacity": 4,
+    "MinCapacity": 1,
+    "ResourceId": {
+     "Fn::Join": [
+      "",
+      [
+       "service/",
+       {
+        "Ref": "ClusterEB0386A7"
+       },
+       "/",
+       {
+        "Fn::GetAtt": [
+         "ApiServiceC9037CF0",
+         "Name"
+        ]
+       }
+      ]
+     ]
+    },
+    "RoleARN": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":iam::162216049230:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ]
+     ]
+    },
+    "ScalableDimension": "ecs:service:DesiredCount",
+    "ServiceNamespace": "ecs"
+   },
+   "DependsOn": [
+    "ApiTaskDefTaskRoleDefaultPolicy66F6BAC0",
+    "ApiTaskDefTaskRole76FB19FA"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiService/TaskCount/Target/Resource"
+   }
+  },
+  "ApiServiceTaskCountTargetApiCpuScaling8D795804": {
+   "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+   "Properties": {
+    "PolicyName": "LongTailComputeApiServiceTaskCountTargetApiCpuScalingFFAF6FF6",
+    "PolicyType": "TargetTrackingScaling",
+    "ScalingTargetId": {
+     "Ref": "ApiServiceTaskCountTargetBFC64025"
+    },
+    "TargetTrackingScalingPolicyConfiguration": {
+     "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+     },
+     "TargetValue": 70
+    }
+   },
+   "DependsOn": [
+    "ApiTaskDefTaskRoleDefaultPolicy66F6BAC0",
+    "ApiTaskDefTaskRole76FB19FA"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/ApiService/TaskCount/Target/ApiCpuScaling/Resource"
+   }
+  },
+  "WorkerLogGroup31FDBE4A": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/ecs/longtail/worker",
+    "RetentionInDays": 30,
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerLogGroup/Resource"
+   }
+  },
+  "WorkerTaskDefTaskRole7915D243": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerTaskDef/TaskRole/Resource"
+   }
+  },
+  "WorkerTaskDefTaskRoleDefaultPolicy04B116E6": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "s3:GetObject*",
+        "s3:GetBucket*",
+        "s3:List*",
+        "s3:DeleteObject*",
+        "s3:PutObject",
+        "s3:PutObjectLegalHold",
+        "s3:PutObjectRetention",
+        "s3:PutObjectTagging",
+        "s3:PutObjectVersionTagging",
+        "s3:Abort*"
+       ],
+       "Effect": "Allow",
+       "Resource": [
+        {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6"
+        },
+        {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6"
+           },
+           "/*"
+          ]
+         ]
+        }
+       ]
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "WorkerTaskDefTaskRoleDefaultPolicy04B116E6",
+    "Roles": [
+     {
+      "Ref": "WorkerTaskDefTaskRole7915D243"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerTaskDef/TaskRole/DefaultPolicy/Resource"
+   }
+  },
+  "WorkerTaskDef3CFCC8D9": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Command": [
+       "node",
+       "build/index.js"
+      ],
+      "Environment": [
+       {
+        "Name": "NODE_ENV",
+        "Value": "production"
+       },
+       {
+        "Name": "PGSSLMODE",
+        "Value": "no-verify"
+       },
+       {
+        "Name": "POSTGRES_PORT",
+        "Value": "5432"
+       },
+       {
+        "Name": "POSTGRES_DB",
+        "Value": "longtail"
+       },
+       {
+        "Name": "LT_STORAGE_BACKEND",
+        "Value": "s3"
+       },
+       {
+        "Name": "LT_S3_BUCKET",
+        "Value": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefFilesBucket164501139A977DFC"
+        }
+       },
+       {
+        "Name": "LT_S3_REGION",
+        "Value": "us-west-1"
+       },
+       {
+        "Name": "APP_ROLE",
+        "Value": "worker"
+       }
+      ],
+      "Essential": true,
+      "Image": {
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc"
+      },
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "WorkerLogGroup31FDBE4A"
+        },
+        "awslogs-stream-prefix": "worker",
+        "awslogs-region": "us-west-1"
+       }
+      },
+      "Name": "worker",
+      "Secrets": [
+       {
+        "Name": "POSTGRES_HOST",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":host::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "POSTGRES_USER",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":username::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "POSTGRES_PASSWORD",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+           },
+           ":password::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "JWT_SECRET",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefJwtSigningKey15CA95A1680BA2AD"
+        }
+       },
+       {
+        "Name": "OAUTH_CONFIG",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+        }
+       },
+       {
+        "Name": "API_KEYS",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefApiKeys3BB3983D8BCC0B1D"
+        }
+       },
+       {
+        "Name": "ANTHROPIC_API_KEY",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAnthropicApiKeyC9C806DA1A52822F"
+        }
+       },
+       {
+        "Name": "OPENAI_API_KEY",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
+        }
+       }
+      ],
+      "StopTimeout": 120
+     }
+    ],
+    "Cpu": "512",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "WorkerTaskDefExecutionRoleA889F066",
+      "Arn"
+     ]
+    },
+    "Family": "LongTailComputeWorkerTaskDefB9E0E24A",
+    "Memory": "1024",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "WorkerTaskDefTaskRole7915D243",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerTaskDef/Resource"
+   }
+  },
+  "WorkerTaskDefExecutionRoleA889F066": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerTaskDef/ExecutionRole/Resource"
+   }
+  },
+  "WorkerTaskDefExecutionRoleDefaultPolicy7E2F924A": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchGetImage"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::Join": [
+         "",
+         [
+          "arn:",
+          {
+           "Ref": "AWS::Partition"
+          },
+          ":ecr:us-west-1:162216049230:repository/cdk-hnb659fds-container-assets-162216049230-us-west-1"
+         ]
+        ]
+       }
+      },
+      {
+       "Action": "ecr:GetAuthorizationToken",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "WorkerLogGroup31FDBE4A",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefJwtSigningKey15CA95A1680BA2AD"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefApiKeys3BB3983D8BCC0B1D"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAnthropicApiKeyC9C806DA1A52822F"
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "WorkerTaskDefExecutionRoleDefaultPolicy7E2F924A",
+    "Roles": [
+     {
+      "Ref": "WorkerTaskDefExecutionRoleA889F066"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerTaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "WorkerService99815FA9": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "ClusterEB0386A7"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 100
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "LaunchType": "FARGATE",
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputFnGetAttWorkerSecurityGroup5529CF0BGroupId178F84DF"
+       }
+      ],
+      "Subnets": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940"
+       },
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3"
+       }
+      ]
+     }
+    },
+    "ServiceName": "worker",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "long-tail"
+     }
+    ],
+    "TaskDefinition": {
+     "Ref": "WorkerTaskDef3CFCC8D9"
+    }
+   },
+   "DependsOn": [
+    "WorkerTaskDefTaskRoleDefaultPolicy04B116E6",
+    "WorkerTaskDefTaskRole7915D243"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerService/Service"
+   }
+  },
+  "WorkerServiceTaskCountTarget94398C8F": {
+   "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
+   "Properties": {
+    "MaxCapacity": 4,
+    "MinCapacity": 1,
+    "ResourceId": {
+     "Fn::Join": [
+      "",
+      [
+       "service/",
+       {
+        "Ref": "ClusterEB0386A7"
+       },
+       "/",
+       {
+        "Fn::GetAtt": [
+         "WorkerService99815FA9",
+         "Name"
+        ]
+       }
+      ]
+     ]
+    },
+    "RoleARN": {
+     "Fn::Join": [
+      "",
+      [
+       "arn:",
+       {
+        "Ref": "AWS::Partition"
+       },
+       ":iam::162216049230:role/aws-service-role/ecs.application-autoscaling.amazonaws.com/AWSServiceRoleForApplicationAutoScaling_ECSService"
+      ]
+     ]
+    },
+    "ScalableDimension": "ecs:service:DesiredCount",
+    "ServiceNamespace": "ecs"
+   },
+   "DependsOn": [
+    "WorkerTaskDefTaskRoleDefaultPolicy04B116E6",
+    "WorkerTaskDefTaskRole7915D243"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerService/TaskCount/Target/Resource"
+   }
+  },
+  "WorkerServiceTaskCountTargetWorkerCpuScaling92D230C2": {
+   "Type": "AWS::ApplicationAutoScaling::ScalingPolicy",
+   "Properties": {
+    "PolicyName": "LongTailComputeWorkerServiceTaskCountTargetWorkerCpuScaling00DEC307",
+    "PolicyType": "TargetTrackingScaling",
+    "ScalingTargetId": {
+     "Ref": "WorkerServiceTaskCountTarget94398C8F"
+    },
+    "TargetTrackingScalingPolicyConfiguration": {
+     "PredefinedMetricSpecification": {
+      "PredefinedMetricType": "ECSServiceAverageCPUUtilization"
+     },
+     "TargetValue": 70
+    }
+   },
+   "DependsOn": [
+    "WorkerTaskDefTaskRoleDefaultPolicy04B116E6",
+    "WorkerTaskDefTaskRole7915D243"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/WorkerService/TaskCount/Target/WorkerCpuScaling/Resource"
+   }
+  },
+  "AliasRecord851000D2": {
+   "Type": "AWS::Route53::RecordSet",
+   "Properties": {
+    "AliasTarget": {
+     "DNSName": {
+      "Fn::Join": [
+       "",
+       [
+        "dualstack.",
+        {
+         "Fn::GetAtt": [
+          "Alb16C2F182",
+          "DNSName"
+         ]
+        }
+       ]
+      ]
+     },
+     "HostedZoneId": {
+      "Fn::GetAtt": [
+       "Alb16C2F182",
+       "CanonicalHostedZoneID"
+      ]
+     }
+    },
+    "HostedZoneId": "Z04010773J8MI5Y7GZITH",
+    "Name": "longtail.hotmesh.io.",
+    "Type": "A"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/AliasRecord/Resource"
+   }
+  },
+  "CDKMetadata": {
+   "Type": "AWS::CDK::Metadata",
+   "Properties": {
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21RXU/DMAz8LbxnAQr7AfsQCAkJ1O4deakXmWZxFTtDqOp/R203tiGefHe2T+eksMW8sHc38CUzVzezQFvbVQquMfAlHx06sd0qZFFMZrWLJ/gEyYPiBqRZ444iKXEcBv4qHBUoYrrQjrsVpgM5HJZOsHIQYBtG2xXnqL3BAKLkAkO9hQDRUfSHwnaLtg3kYDB8ZaiXY2/KeMUv50gU43HmhC/6G0ge9TlxbqdLzvQflzIHvHQaeG8Ce7HdK/tfmxPuDcHediVPa2N950Due6AT6g269AEiqGLX7BpML3vwuBiUoWdLbFlIOX0vQdDAORdkZXEQKHrbnR9yuGF84mtlKpsErqHoq2nvHOdK6E3irDh/sN2iRMepHg8YUYXa92bMVyl4it6UKJzT9LFvWdusvYlco/2U20PxaO/n9u7mU4hmKUelPdpyqj+r0I+ZjAIAAA=="
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/CDKMetadata/Default"
+   }
+  }
+ },
+ "Outputs": {
+  "AlbDnsName": {
+   "Description": "ALB DNS name",
+   "Value": {
+    "Fn::GetAtt": [
+     "Alb16C2F182",
+     "DNSName"
+    ]
+   }
+  },
+  "ServiceUrl": {
+   "Description": "Application URL",
+   "Value": "https://longtail.hotmesh.io"
+  }
+ },
+ "Parameters": {
+  "BootstrapVersion": {
+   "Type": "AWS::SSM::Parameter::Value<String>",
+   "Default": "/cdk-bootstrap/hnb659fds/version",
+   "Description": "Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]"
+  }
+ },
+ "Rules": {
+  "CheckBootstrapVersion": {
+   "Assertions": [
+    {
+     "Assert": {
+      "Fn::Not": [
+       {
+        "Fn::Contains": [
+         [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+         ],
+         {
+          "Ref": "BootstrapVersion"
+         }
+        ]
+       }
+      ]
+     },
+     "AssertDescription": "CDK bootstrap stack version 6 required. Please run 'cdk bootstrap' with a recent version of the CDK CLI."
+    }
+   ]
+  }
+ }
+}

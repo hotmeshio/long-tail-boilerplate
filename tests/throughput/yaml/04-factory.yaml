@@ -157,7 +157,7 @@ app:
               type: object
             maps:
               _scope: '{trigger_ff.output.data._scope}'
-              workflowName: claim_and_resolve
+              workflowName: resolve_escalation
               escalation_id: '{wait_qc_ff.hook.data.escalationId}'
               resolver_id: workflow
               payload:
@@ -205,7 +205,7 @@ app:
               type: object
             maps:
               _scope: '{trigger_ff.output.data._scope}'
-              workflowName: claim_and_resolve
+              workflowName: resolve_escalation
               escalation_id: '{wait_pack_ff.hook.data.escalationId}'
               resolver_id: workflow
               payload:
@@ -253,7 +253,7 @@ app:
               type: object
             maps:
               _scope: '{trigger_ff.output.data._scope}'
-              workflowName: claim_and_resolve
+              workflowName: resolve_escalation
               escalation_id: '{wait_ship_ff.hook.data.escalationId}'
               resolver_id: workflow
               payload:
@@ -301,7 +301,7 @@ app:
               type: object
             maps:
               _scope: '{trigger_ff.output.data._scope}'
-              workflowName: claim_and_resolve
+              workflowName: resolve_escalation
               escalation_id: '{wait_dock_ff.hook.data.escalationId}'
               resolver_id: workflow
               payload:
@@ -349,7 +349,7 @@ app:
               type: object
             maps:
               _scope: '{trigger_ff.output.data._scope}'
-              workflowName: claim_and_resolve
+              workflowName: resolve_escalation
               escalation_id: '{wait_signoff_ff.hook.data.escalationId}'
               resolver_id: workflow
               payload:

@@ -1,0 +1,403 @@
+{
+  "/LongTail-Data": [
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    },
+    {
+      "type": "aws:cdk:stack-tags",
+      "data": [
+        {
+          "key": "Environment",
+          "value": "production"
+        },
+        {
+          "key": "Project",
+          "value": "long-tail"
+        }
+      ]
+    }
+  ],
+  "/LongTail-Data/DbEndpoint": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbEndpoint"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:137:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/BucketName": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BucketName"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:142:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/DbParameterGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DbParameterGroupD5340A4D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseInstance2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:44:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/Database/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DatabaseB269D8BB"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseInstance2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:44:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/FilesBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "FilesBucket16450113"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Bucket2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:73:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/JwtSigningKey/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "JwtSigningKey15CA95A1"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:99:22)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/OAuthProviders/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OAuthProvidersD351A251"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:107:24)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/ApiKeys/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ApiKeys3BB3983D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:112:26)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AnthropicApiKey/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AnthropicApiKeyC9C806DA"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:117:34)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/OpenaiApiKey/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "OpenaiApiKeyC0247A05"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:122:31)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/SeedAdminPassword/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "SeedAdminPasswordFD70C749"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Secret2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:127:36)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Fn::GetAtt\":[\"FilesBucket16450113\",\"Arn\"]}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"FilesBucket16450113\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefFilesBucket164501139A977DFC"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"DatabaseSecretAttachmentE5D1B020\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"JwtSigningKey15CA95A1\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefJwtSigningKey15CA95A1680BA2AD"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"OAuthProvidersD351A251\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"ApiKeys3BB3983D\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefApiKeys3BB3983D8BCC0B1D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"AnthropicApiKeyC9C806DA\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefAnthropicApiKeyC9C806DA1A52822F"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"OpenaiApiKeyC0247A05\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Exports/Output{\"Ref\":\"SeedAdminPasswordFD70C749\"}": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ExportsOutputRefSeedAdminPasswordFD70C749E8BAC7AA"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...aws-cdk-lib, node internals, @cspotcode/source-map-support...",
+        "(no user code in 9007199254740991 frames, use --stack-trace-limit to capture more)"
+      ]
+    }
+  ],
+  "/LongTail-Data/Database/SubnetGroup/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DatabaseSubnetGroup7D60F180"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseInstance2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:44:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/Database/Secret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LongTailDataDatabaseSecret084334BC3fdaad7efa858a3daf9490cf0a702aeb"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseInstance2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:44:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/FilesBucket/Policy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "FilesBucketPolicy8CA19688"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Bucket2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:73:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/Database/Secret/Attachment/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "DatabaseSecretAttachmentE5D1B020"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseInstance2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:44:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:24:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ]
+}

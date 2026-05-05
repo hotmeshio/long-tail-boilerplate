@@ -14,7 +14,7 @@ import { HotMesh } from '@hotmeshio/hotmesh';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { postgres_options } from './config';
+import { postgres_options } from '../../modules/config';
 
 const COUNT = parseInt(process.argv[2] || '1', 10);
 
@@ -30,10 +30,10 @@ async function main() {
   const connection = getConnection();
 
   const hotMesh = await HotMesh.init({
-    appId: 'yamltest',
+    appId: 'signal02',
     engine: { connection },
     workers: [{
-      topic: 'yamltest.signal.test',
+      topic: 'signal02.signal.test',
       connection,
       callback: async (data) => ({
         metadata: { ...data.metadata },
@@ -44,21 +44,21 @@ async function main() {
 
   const yaml = readFileSync(join(__dirname, 'yaml/02-signal.yaml'), 'utf-8');
   await hotMesh.deploy(yaml);
-  await hotMesh.activate('1');
+  await hotMesh.activate('20');
 
   console.log(`02-signal | ${COUNT} workflow(s)\n`);
 
   let passed = 0;
   for (let n = 0; n < COUNT; n++) {
     const orderId = `signal-${n}-${Date.now()}`;
-    const jobId = await hotMesh.pub('yamltest.signal.test', { orderId });
+    const jobId = await hotMesh.pub('signal02.signal.test', { orderId });
 
-    await sleepFor(2000);
+    await sleepFor(1000);
     const before = await hotMesh.getStatus(jobId);
 
-    await hotMesh.signal('yamltest.signal.ack', { id: jobId, result: 'approved' });
+    await hotMesh.signal('signal02.signal.ack', { id: jobId, result: 'approved' });
 
-    await sleepFor(2000);
+    await sleepFor(1000);
     const after = await hotMesh.getStatus(jobId);
 
     const ok = before === 1 && after === 0;

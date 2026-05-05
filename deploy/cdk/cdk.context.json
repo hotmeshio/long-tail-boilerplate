@@ -1,0 +1,10 @@
+{
+  "availability-zones:account=162216049230:region=us-west-1": [
+    "us-west-1a",
+    "us-west-1c"
+  ],
+  "hosted-zone:account=162216049230:domainName=hotmesh.io:region=us-west-1": {
+    "Id": "/hostedzone/Z04010773J8MI5Y7GZITH",
+    "Name": "hotmesh.io."
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "b59b28052132c8135dbf55446e87cfcc7f4a298b50c84da1283f6adb66ec9bf9": {
+      "displayName": "LongTail-Compute Template",
+      "source": {
+        "path": "LongTail-Compute.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "162216049230-us-west-1-8d2d4073": {
+          "bucketName": "cdk-hnb659fds-assets-162216049230-us-west-1",
+          "objectKey": "b59b28052132c8135dbf55446e87cfcc7f4a298b50c84da1283f6adb66ec9bf9.json",
+          "region": "us-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-file-publishing-role-162216049230-us-west-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {
+    "b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc": {
+      "displayName": "ApiTaskDef/api/AssetImage",
+      "source": {
+        "directory": "asset.b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc",
+        "platform": "linux/amd64"
+      },
+      "destinations": {
+        "162216049230-us-west-1-a130fc49": {
+          "repositoryName": "cdk-hnb659fds-container-assets-162216049230-us-west-1",
+          "imageTag": "b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc",
+          "region": "us-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-image-publishing-role-162216049230-us-west-1"
+        }
+      }
+    }
+  }
+}

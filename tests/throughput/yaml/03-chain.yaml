@@ -1,8 +1,8 @@
 app:
-  id: yamltest
-  version: '1'
+  id: chain03
+  version: '21'
   graphs:
-    - subscribes: yamltest.chain.test
+    - subscribes: chain03.chain.test
       expire: 300
 
       input:
@@ -28,7 +28,7 @@ app:
         # Auto step
         work1:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -42,7 +42,7 @@ app:
         # Station 1: escalate → wait → resolve
         escalate1:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -67,7 +67,7 @@ app:
 
         resolve1:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -83,7 +83,7 @@ app:
         # Station 2: escalate → wait → resolve
         escalate2:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -108,7 +108,7 @@ app:
 
         resolve2:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -124,7 +124,7 @@ app:
         # Station 3: escalate → wait → resolve
         escalate3:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -149,7 +149,7 @@ app:
 
         resolve3:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -165,7 +165,7 @@ app:
         # Final rollup
         complete:
           type: worker
-          topic: yamltest.chain.test
+          topic: chain03.chain.test
           input:
             schema:
               type: object
@@ -210,19 +210,19 @@ app:
           - to: done
 
       hooks:
-        yamltest.chain.ack1:
+        chain03.chain.ack1:
           - to: wait1
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.id}'
-        yamltest.chain.ack2:
+        chain03.chain.ack2:
           - to: wait2
             conditions:
               match:
                 - expected: '{$job.metadata.jid}'
                   actual: '{$self.hook.data.id}'
-        yamltest.chain.ack3:
+        chain03.chain.ack3:
           - to: wait3
             conditions:
               match:

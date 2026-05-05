@@ -1,9 +1,9 @@
 app:
-  id: yamltest
-  version: '1'
+  id: echo01
+  version: '3'
   graphs:
-    - subscribes: yamltest.echo
-      publishes: yamltest.echo.done
+    - subscribes: echo01.echo
+      publishes: echo01.echo.done
 
       input:
         schema:
@@ -27,7 +27,7 @@ app:
 
         echo1:
           type: worker
-          topic: yamltest.echo
+          topic: echo01.echo
           input:
             schema:
               type: object
@@ -39,7 +39,7 @@ app:
 
         echo2:
           type: worker
-          topic: yamltest.echo
+          topic: echo01.echo
           input:
             schema:
               type: object
@@ -51,7 +51,7 @@ app:
 
         echo3:
           type: worker
-          topic: yamltest.echo
+          topic: echo01.echo
           input:
             schema:
               type: object

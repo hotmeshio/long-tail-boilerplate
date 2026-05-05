@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "2d0262a85fd3905d46dcbc948e811dbb68e5f082b741299fad58fe6a175d045e": {
+      "displayName": "LongTail-Data Template",
+      "source": {
+        "path": "LongTail-Data.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "162216049230-us-west-1-e117917c": {
+          "bucketName": "cdk-hnb659fds-assets-162216049230-us-west-1",
+          "objectKey": "2d0262a85fd3905d46dcbc948e811dbb68e5f082b741299fad58fe6a175d045e.json",
+          "region": "us-west-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-file-publishing-role-162216049230-us-west-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

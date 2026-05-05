@@ -14,10 +14,10 @@ import { HotMesh } from '@hotmeshio/hotmesh';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { postgres_options } from './config';
+import { postgres_options } from '../../modules/config';
 
 const COUNT = parseInt(process.argv[2] || '1', 10);
-const SIGNAL_TOPICS = ['yamltest.chain.ack1', 'yamltest.chain.ack2', 'yamltest.chain.ack3'];
+const SIGNAL_TOPICS = ['chain03.chain.ack1', 'chain03.chain.ack2', 'chain03.chain.ack3'];
 
 function getConnection() {
   return { class: Client, options: postgres_options };
@@ -31,10 +31,10 @@ async function main() {
   const connection = getConnection();
 
   const hotMesh = await HotMesh.init({
-    appId: 'yamltest',
+    appId: 'chain03',
     engine: { connection },
     workers: [{
-      topic: 'yamltest.chain.test',
+      topic: 'chain03.chain.test',
       connection,
       callback: async (data) => {
         const input = data.data as Record<string, unknown>;
@@ -54,7 +54,7 @@ async function main() {
 
   const yaml = readFileSync(join(__dirname, 'yaml/03-chain.yaml'), 'utf-8');
   await hotMesh.deploy(yaml);
-  await hotMesh.activate('1');
+  await hotMesh.activate('21');
 
   console.log(`03-chain | ${COUNT} workflow(s) × 3 stations\n`);
   const t0 = performance.now();
@@ -62,7 +62,7 @@ async function main() {
 
   for (let n = 0; n < COUNT; n++) {
     const orderId = `chain-${n}-${Date.now()}`;
-    const jobId = await hotMesh.pub('yamltest.chain.test', { orderId });
+    const jobId = await hotMesh.pub('chain03.chain.test', { orderId });
 
     for (let s = 0; s < SIGNAL_TOPICS.length; s++) {
       await sleepFor(500);

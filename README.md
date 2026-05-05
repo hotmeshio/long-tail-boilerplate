@@ -2,7 +2,31 @@
 
 A working example site for [Long Tail](https://github.com/hotmeshio/long-tail) -- durable workflows with IAM, escalations, MCP tools, and a built-in dashboard, all backed by PostgreSQL.
 
-This repo is designed to be cloned and modified. Every workflow demonstrates a different pattern you'll use in production: simple activities, AI-powered escalation, browser automation, and human-in-the-loop assembly lines. The integration tests show how to exercise these workflows end-to-end through the HTTP API.
+Clone this repo and start building. Every workflow demonstrates a pattern you'll use in production: simple activities, confidence-based escalation, browser automation, human-in-the-loop assembly lines, and YAML-compiled execution graphs. The throughput tests prove these patterns at scale, and the CDK stacks deploy everything to AWS.
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [What's Included](#whats-included)
+- [Example Workflows](#example-workflows)
+  - [Hello World](#hello-world)
+  - [Content Review](#content-review)
+  - [Screenshot Research](#screenshot-research)
+  - [Assembly Line](#assembly-line)
+- [Testing](#testing)
+  - [Unit Tests](#unit-tests)
+  - [Integration Tests](#integration-tests)
+  - [Throughput Tests (Local)](#throughput-tests-local)
+  - [Throughput Tests (Remote)](#throughput-tests-remote)
+- [AWS Operations](#aws-operations)
+- [AWS Deployment](#aws-deployment)
+- [Project Structure](#project-structure)
+- [Adding Your Own Workflow](#adding-your-own-workflow)
+- [Escalation Patterns](#escalation-patterns)
+- [IAM](#iam)
+- [Custom MCP Servers](#custom-mcp-servers)
+- [Configuration](#configuration)
+- [Full Reset](#full-reset)
 
 ## Quick Start
 
@@ -31,12 +55,15 @@ Login: `superadmin` / `l0ngt@1l`
 |-----------|-----|-------------|
 | Dashboard | [localhost:3030](http://localhost:3030) | Workflow registry, execution timeline, escalation queues |
 | REST API | [localhost:3030/api](http://localhost:3030/api) | Invoke workflows, manage escalations, query results |
-| MinIO Console | [localhost:9003](http://localhost:9003) | S3-compatible file storage browser |
+| Health | [localhost:3030/health](http://localhost:3030/health) | Health check endpoint |
+| MinIO Console | [localhost:9003](http://localhost:9003) | S3-compatible file storage browser (minioadmin / minioadmin) |
 | PostgreSQL | localhost:5416 | Workflow state, IAM, escalation records |
 
 ## Example Workflows
 
-### Hello World (`src/workflows/hello-world/`)
+### Hello World
+
+`src/workflows/hello-world/`
 
 Minimal workflow demonstrating durable timers and proxy activities with IAM context. Good starting point for understanding the basic pattern.
 
@@ -44,9 +71,11 @@ Minimal workflow demonstrating durable timers and proxy activities with IAM cont
 envelope.data.name  -->  sleep  -->  greet activity  -->  return result
 ```
 
-### Content Review (`src/workflows/content-review/`)
+### Content Review
 
-Shows confidence-based escalation. An activity analyzes content and returns a confidence score. High confidence returns immediately; low confidence creates an escalation for a human reviewer.
+`src/workflows/content-review/`
+
+Confidence-based escalation. An activity analyzes content and returns a confidence score. High confidence returns immediately; low confidence creates an escalation for a human reviewer.
 
 ```
 content  -->  analyzeContent  -->  confidence >= threshold?
@@ -54,7 +83,9 @@ content  -->  analyzeContent  -->  confidence >= threshold?
                                     no  --> escalate to reviewer
 ```
 
-### Screenshot Research (`src/workflows/screenshot-research/`)
+### Screenshot Research
+
+`src/workflows/screenshot-research/`
 
 Multi-step pipeline: captures a screenshot with Playwright, analyzes it with a vision LLM, and stores the analysis in the knowledge store. Demonstrates chaining multiple activities with external service dependencies.
 
@@ -62,15 +93,15 @@ Multi-step pipeline: captures a screenshot with Playwright, analyzes it with a v
 url  -->  captureScreenshot  -->  analyzeScreenshot (vision LLM)  -->  storeAnalysis  -->  return
 ```
 
-### Assembly Line (`src/workflows/assembly-line/`)
+### Assembly Line
+
+`src/workflows/assembly-line/`
 
 Three orchestrators that demonstrate human-in-the-loop (HITL) patterns using escalation APIs and durable signaling. No interceptor, no ceremony -- just raw Durable primitives.
 
 All three reuse the same **workstation** child workflow, which creates an escalation, pauses until a human resolves it, then signals the parent.
 
-#### Assembly Line Orchestrator (`index.ts`)
-
-Sequential parent-child orchestration. A product moves through named workstations. Each station spawns a child workflow that creates an escalation for a specific role (grinder, gluer, etc.), pauses, and signals the parent when the human resolves it.
+**Assembly Line Orchestrator** (`index.ts`) -- Sequential parent-child orchestration. A product moves through named workstations. Each station spawns a child workflow that creates an escalation for a specific role (grinder, gluer, etc.), pauses, and signals the parent when the human resolves it.
 
 ```
 product  -->  [grinder station]  -->  [gluer station]  -->  return results
@@ -82,13 +113,9 @@ product  -->  [grinder station]  -->  [gluer station]  -->  return results
               signal parent           signal parent
 ```
 
-#### Step Iterator (`iterator.ts`)
+**Step Iterator** (`iterator.ts`) -- Generic data-driven loop. Identical behavior to the assembly line, but the orchestrator knows nothing about specific stations -- it just walks a dynamic `steps[]` array. Proves the pattern is entirely data-driven.
 
-Generic data-driven loop. Identical behavior to the assembly line, but the orchestrator knows nothing about specific stations -- it just walks a dynamic `steps[]` array. Proves the pattern is entirely data-driven.
-
-#### Reverter (`reverter.ts`)
-
-Loop with revert support. Each human resolution controls flow:
+**Reverter** (`reverter.ts`) -- Loop with revert support. Each human resolution controls flow:
 
 - `{ approved: true }` -- advance to next step
 - `{ approved: false, revertSteps: 1 }` -- go back 1 step
@@ -96,7 +123,7 @@ Loop with revert support. Each human resolution controls flow:
 
 Tracks a monotonic attempt counter and full history of advances and reverts. This is the pattern for QA pipelines, multi-stage approvals, and any workflow where humans can reject and send work backwards.
 
-## Running Tests
+## Testing
 
 ### Unit Tests
 
@@ -111,40 +138,99 @@ npm test
 Exercises workflows end-to-end through the HTTP API. Requires Docker Compose running with a seeded database.
 
 ```bash
-# Make sure the app is running
-docker compose up -d --build
-docker compose exec app npm run seed
-
-# Run the integration suite
-npm run test:integration
+docker compose exec app npm run test:integration
 ```
 
-The assembly line integration test (`tests/integration/assembly-line.test.ts`) walks through the full escalation lifecycle for all three HITL workflows:
+The assembly line integration test walks through the full escalation lifecycle for all three HITL workflows: registers configs, invokes workflows, polls for pending escalations by role, claims and resolves each one, and verifies the workflow completes with expected results.
 
-1. Registers workflow configs via the API
-2. Invokes each workflow with station/step data
-3. Polls for pending escalations by role
-4. Claims and resolves each escalation with a resolver payload
-5. Verifies the workflow completes with the expected results
+### Throughput Tests (Local)
 
-This is the pattern for testing any workflow that involves human tasks.
-
-### Full Reset
-
-If something gets stuck or you want a clean slate:
+Sustained load tests that simulate concurrent factory floor traffic. Run inside Docker against the local app:
 
 ```bash
-docker compose down -v          # Stop everything, delete volumes
-docker compose up -d --build    # Rebuild and start fresh
-docker compose exec app npm run seed  # Re-seed users and roles
-npm run test:integration        # Verify everything works
+# YAML engine (compiled graph, inline escalations)
+docker compose exec app npm run test:factory:1       # 1 workflow, smoke test
+docker compose exec app npm run test:factory:10      # 10 sustained
+docker compose exec app npm run test:factory:100     # 100 sustained
+
+# Durable engine (TypeScript, parent-child orchestration)
+docker compose exec app npm run test:assembly:1      # 1 workflow, smoke test
+docker compose exec app npm run test:assembly:10     # 10 sustained
+docker compose exec app npm run test:assembly:100    # 100 sustained
 ```
+
+The YAML factory test (`04-factory.ts`, `05-factory-sustained.ts`) deploys a YAML workflow definition with 5 automated steps and 5 human stations, then runs N orders through it with concurrent claim and resolve loops.
+
+The durable assembly test (`06-assembly-line.ts`) invokes the TypeScript `stepIterator` workflow with the same concurrent claim/resolve pattern.
+
+### Throughput Tests (Remote)
+
+Same tests targeting the production AWS deployment. Run from your Mac (not inside Docker). Requires `REMOTE_PASSWORD` set in `.env`:
+
+```bash
+# YAML engine on AWS
+npm run test:remote:factory:1
+npm run test:remote:factory:10
+npm run test:remote:factory:100
+
+# Durable engine on AWS
+npm run test:remote:assembly:1
+npm run test:remote:assembly:10
+npm run test:remote:assembly:100
+```
+
+### Raw Throughput Tests
+
+Lower-level HotMesh engine benchmarks (no Long Tail API, no escalations):
+
+```bash
+docker compose exec app npm run test:throughput:echo      # Baseline: minimal pub/complete
+docker compose exec app npm run test:throughput:signal     # Hook + signal round-trip
+docker compose exec app npm run test:throughput:chain      # 3-station signal chain
+```
+
+## AWS Operations
+
+Run from your Mac (requires AWS CLI configured):
+
+```bash
+# Health and status
+npm run aws:health              # Health check
+npm run aws:services            # Service status table
+
+# CloudWatch metrics
+npm run aws:stats               # CPU, memory, connections — last 5 min
+npm run aws:stats:15m           # Last 15 min
+npm run aws:stats:30m           # Last 30 min
+npm run aws:stats:1h            # Last hour
+npm run aws:stats:1d            # Last 24 hours
+
+# Live logs
+npm run aws:logs:api            # Tail API logs (Ctrl+C to stop)
+npm run aws:logs:worker         # Tail worker logs
+
+# Deploy
+npm run aws:deploy              # Build and deploy via CDK
+```
+
+## AWS Deployment
+
+The `deploy/` directory contains the full AWS infrastructure as CDK stacks: VPC, RDS PostgreSQL, S3, ECS Fargate (separate API and worker services), ALB with HTTPS, Route 53 DNS, and GitHub Actions CI/CD.
+
+See [deploy/README.md](deploy/README.md) for the complete deployment guide, including:
+
+- Step-by-step first deploy with verification at each stage
+- Secrets Manager configuration (LLM keys, OAuth, JWT)
+- Two-service architecture (API + worker)
+- Network layout and security groups
+- Day-to-day operations (secret rotation, log tailing, service restarts)
+- GitHub Actions OIDC setup for automated deploys
 
 ## Project Structure
 
 ```
 src/
-  index.ts                          # Entry point — registers workers and starts Long Tail
+  index.ts                          # Entry point — registers workers, starts Long Tail
   activities/
     image.ts                        # 12 sharp-based image processing operations
   mcp-servers/
@@ -163,12 +249,30 @@ src/
 scripts/
   seed.ts                           # Creates users, roles, escalation chains
   token.ts                          # Generate a JWT for API testing
+  aws-stats.sh                      # CloudWatch metrics dashboard
 tests/
   integration/
-    helpers.ts                      # ApiClient, poll utility, logging
-    types.ts                        # Shared test types
-    vitest.config.ts                # Integration test config (sequential, long timeouts)
     assembly-line.test.ts           # End-to-end HITL workflow tests
+    helpers.ts                      # ApiClient, poll utility, logging
+  throughput/
+    01-echo.ts                      # HotMesh baseline: pub + execute + complete
+    02-signal.ts                    # Hook + signal round-trip
+    03-chain.ts                     # 3-station signal chain
+    04-factory.ts                   # YAML factory: 1 workflow, 5 stations
+    05-factory-sustained.ts         # YAML factory: N sustained with claim/resolve loops
+    06-assembly-line.ts             # Durable assembly: N sustained with claim/resolve loops
+    yaml/
+      04-factory.yaml               # YAML workflow: 5 auto steps + 5 human stations
+deploy/
+  README.md                         # Complete deployment guide
+  cdk/
+    bin/app.ts                      # Stack instantiation
+    lib/
+      network-stack.ts              # VPC, subnets, security groups
+      data-stack.ts                 # RDS, S3, Secrets Manager
+      dns-stack.ts                  # ACM certificate, Route 53
+      compute-stack.ts              # ECS Fargate, ALB, DNS record
+      github-oidc-stack.ts          # IAM role for GitHub Actions
 ```
 
 ## Adding Your Own Workflow
@@ -280,7 +384,7 @@ mcp: {
 
 ## Configuration
 
-All options are passed to `start()` in `src/index.ts`. See `.env.example` for environment variables.
+All options are passed to `start()` in `src/index.ts`. See `.env.example` for the full list.
 
 | Env Var | Default | Description |
 |---------|---------|-------------|
@@ -290,4 +394,16 @@ All options are passed to `start()` in `src/index.ts`. See `.env.example` for en
 | `JWT_SECRET` | `change-me` | JWT signing secret |
 | `LT_STORAGE_BACKEND` | `s3` | File storage backend |
 | `LT_S3_ENDPOINT` | `http://localhost:9002` | MinIO/S3 endpoint |
-| `ANTHROPIC_API_KEY` | — | Enables vision LLM and MCP tool orchestration |
+| `ANTHROPIC_API_KEY` | -- | Enables vision LLM and MCP tool orchestration |
+| `OPENAI_API_KEY` | -- | OpenAI API access |
+| `REMOTE_URL` | -- | Target URL for remote throughput tests |
+| `REMOTE_PASSWORD` | -- | Superadmin password for remote tests |
+
+## Full Reset
+
+```bash
+docker compose down -v                    # Stop everything, delete volumes
+docker compose up -d --build              # Rebuild and start fresh
+docker compose exec app npm run seed      # Re-seed users and roles
+docker compose exec app npm run test:integration  # Verify everything works
+```
