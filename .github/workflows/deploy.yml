@@ -93,12 +93,15 @@ jobs:
 
       - run: npm ci
 
-      - name: Health check
+      - name: Wait for services to stabilize
         run: |
-          for i in $(seq 1 10); do
+          echo "Waiting for health endpoint..."
+          for i in $(seq 1 30); do
             curl -sf https://longtail.hotmesh.io/health && break
             sleep 5
           done
+          echo "Health OK. Waiting 60s for quorum to form..."
+          sleep 60
 
       - name: Smoke test (1 YAML factory workflow)
         env:
