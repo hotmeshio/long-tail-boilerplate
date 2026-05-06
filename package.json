@@ -47,6 +47,10 @@
     "aws:services": "aws ecs describe-services --cluster longtail --services api worker --query 'services[*].{name:serviceName,desired:desiredCount,running:runningCount}' --output table",
     "aws:deploy": "cd deploy/cdk && npm run build && npx cdk deploy LongTail-Compute --require-approval never",
 
+    "release:patch": "npm version patch && git push && git push --tags",
+    "release:minor": "npm version minor && git push && git push --tags",
+    "release:major": "npm version major && git push && git push --tags",
+
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

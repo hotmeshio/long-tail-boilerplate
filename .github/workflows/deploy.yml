@@ -1,0 +1,113 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  test:
+    name: Pre-deploy Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - name: Start services
+        run: docker compose up -d --build
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3030/health && break
+            sleep 2
+          done
+
+      - name: Seed database
+        run: docker compose exec -T app npm run seed
+
+      - name: Run integration tests
+        run: docker compose exec -T app npm run test:integration
+
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs app --tail 50
+
+  deploy:
+    name: Deploy to AWS
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Install CDK dependencies
+        working-directory: deploy/cdk
+        run: npm ci
+
+      - name: Build CDK
+        working-directory: deploy/cdk
+        run: npm run build
+
+      - name: CDK diff (informational)
+        working-directory: deploy/cdk
+        run: npx cdk diff --all || true
+
+      - name: CDK deploy
+        working-directory: deploy/cdk
+        run: npx cdk deploy --all --require-approval never
+
+  smoke:
+    name: Post-deploy Smoke Test
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 10); do
+            curl -sf https://longtail.hotmesh.io/health && break
+            sleep 5
+          done
+
+      - name: Smoke test (1 YAML factory workflow)
+        env:
+          REMOTE_URL: https://longtail.hotmesh.io
+          REMOTE_PASSWORD: ${{ secrets.REMOTE_PASSWORD }}
+        run: npx ts-node tests/throughput/04-factory.ts 1
+
+      - name: Smoke test (1 durable assembly workflow)
+        env:
+          REMOTE_URL: https://longtail.hotmesh.io
+          REMOTE_PASSWORD: ${{ secrets.REMOTE_PASSWORD }}
+        run: npx ts-node tests/throughput/06-assembly-line.ts 1 1
