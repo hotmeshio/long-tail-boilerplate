@@ -5,15 +5,9 @@ services:
       target: dev
     ports:
       - "${PORT:-3030}:3030"
-    deploy:
-      resources:
-        limits:
-          cpus: '8'
-          memory: 4G
-        reservations:
-          cpus: '4'
-          memory: 2G
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
@@ -38,14 +32,6 @@ services:
       POSTGRES_PASSWORD: password
     ports:
       - "${PG_PORT:-5416}:5432"
-    deploy:
-      resources:
-        limits:
-          cpus: '4'
-          memory: 2G
-        reservations:
-          cpus: '2'
-          memory: 1G
     volumes:
       - pgdata:/var/lib/postgresql/data
     command:
