@@ -13,7 +13,9 @@ services:
         reservations:
           cpus: '4'
           memory: 2G
-    env_file: .env
+    env_file:
+      - path: .env
+        required: false
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
