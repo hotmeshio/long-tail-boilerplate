@@ -1,6 +1,6 @@
 {
   "name": "my-longtail-app",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Durable workflows with IAM, MCP tools, and a built-in dashboard. Powered by PostgreSQL.",
   "main": "src/index.ts",
@@ -19,23 +19,18 @@
     "test:throughput:factory": "ts-node tests/throughput/04-factory.ts",
     "test:throughput:sustained": "ts-node tests/throughput/05-factory-sustained.ts",
     "test:throughput:assembly": "ts-node tests/throughput/06-assembly-line.ts",
-
     "test:factory:1": "ts-node tests/throughput/04-factory.ts 1",
     "test:factory:10": "ts-node tests/throughput/05-factory-sustained.ts 10 5",
     "test:factory:100": "ts-node tests/throughput/05-factory-sustained.ts 100 10",
-
     "test:assembly:1": "ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:assembly:10": "ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:assembly:100": "ts-node tests/throughput/06-assembly-line.ts 100 10",
-
     "test:remote:factory:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/04-factory.ts 1",
     "test:remote:factory:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 10 5",
     "test:remote:factory:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 100 10",
-
     "test:remote:assembly:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:remote:assembly:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:remote:assembly:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 100 10",
-
     "aws:stats": "./scripts/aws-stats.sh 5m",
     "aws:stats:15m": "./scripts/aws-stats.sh 15m",
     "aws:stats:30m": "./scripts/aws-stats.sh 30m",
@@ -46,11 +41,9 @@
     "aws:health": "curl -s https://longtail.hotmesh.io/health && echo ''",
     "aws:services": "aws ecs describe-services --cluster longtail --services api worker --query 'services[*].{name:serviceName,desired:desiredCount,running:runningCount}' --output table",
     "aws:deploy": "cd deploy/cdk && npm run build && npx cdk deploy LongTail-Compute --require-approval never",
-
     "release:patch": "npm version patch && git push && git push --tags",
     "release:minor": "npm version minor && git push && git push --tags",
     "release:major": "npm version major && git push && git push --tags",
-
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
