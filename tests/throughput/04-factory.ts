@@ -158,11 +158,20 @@ async function main() {
 
   if (existing?.workflows?.length) {
     wfId = existing.workflows[0].id;
-    await api('PUT', `/yaml-workflows/${wfId}`, {
-      yaml_content: yamlContent,
-      activity_manifest: buildManifest(),
-    }, token);
-    console.log(`   Updated existing: ${wfId}`);
+    const wf = existing.workflows[0];
+
+    if (wf.status === 'active') {
+      console.log(`   Already active: ${wfId}`);
+    } else {
+      await api('PUT', `/yaml-workflows/${wfId}`, {
+        yaml_content: yamlContent,
+        activity_manifest: buildManifest(),
+      }, token);
+      await api('POST', `/yaml-workflows/${wfId}/deploy`, {}, token);
+      await sleep(500);
+      await api('POST', `/yaml-workflows/${wfId}/activate`, {}, token);
+      console.log(`   Updated and activated: ${wfId}`);
+    }
   } else {
     const created = await api('POST', '/yaml-workflows/direct', {
       name: 'factory.floor',
@@ -174,13 +183,12 @@ async function main() {
       app_id: 'longtail',
     }, token);
     wfId = created.id;
-    console.log(`   Created: ${wfId}`);
+    await api('POST', `/yaml-workflows/${wfId}/deploy`, {}, token);
+    await sleep(500);
+    await api('POST', `/yaml-workflows/${wfId}/activate`, {}, token);
+    console.log(`   Created and activated: ${wfId}`);
   }
-
-  await api('POST', `/yaml-workflows/${wfId}/deploy`, {}, token);
-  await sleep(500);
-  await api('POST', `/yaml-workflows/${wfId}/activate`, {}, token);
-  console.log('   Active\n');
+  console.log('');
 
   // 3. Run workflows
   const t0 = performance.now();
