@@ -48,7 +48,7 @@
   },
   "dependencies": {
     "@hotmeshio/hotmesh": "^0.14.7",
-    "@hotmeshio/long-tail": "^0.1.13",
+    "@hotmeshio/long-tail": "^0.1.14",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",

@@ -153,25 +153,34 @@ async function main() {
   // ── Loop 2: Claim escalations ─────────────────────────────────────
   const claimLoop = (async () => {
     await sleep(2000);
-    while (true) {
+    while (completed < TARGET) {
       try {
-        const resp = await api('GET', '/escalations?status=pending&limit=50', undefined, token);
-        const pending = resp?.escalations || [];
+        // Paginate through all pending escalations to find ours
+        let offset = 0;
+        const PAGE = 50;
+        while (true) {
+          const resp = await api('GET', `/escalations?status=pending&limit=${PAGE}&offset=${offset}`, undefined, token);
+          const pending = resp?.escalations || [];
+          let foundOurs = false;
 
-        for (const esc of pending) {
-          // Only claim escalations belonging to our jobs
-          if (!jobIds.has(esc.workflow_id)) continue;
-          if (!STATIONS.includes(esc.role)) continue;
-          if (claimed.has(esc.id) || resolvedIds.has(esc.id)) continue;
+          for (const esc of pending) {
+            if (!jobIds.has(esc.workflow_id)) continue;
+            if (!STATIONS.includes(esc.role)) continue;
+            if (claimed.has(esc.id) || resolvedIds.has(esc.id)) continue;
+            foundOurs = true;
 
-          const claimResp = await api('POST', `/escalations/${esc.id}/claim`, {}, token);
-          if (claimResp?.error) continue;
-          claimed.set(esc.id, { role: esc.role });
-          claimCount++;
+            const claimResp = await api('POST', `/escalations/${esc.id}/claim`, {}, token);
+            if (claimResp?.error) continue;
+            claimed.set(esc.id, { role: esc.role });
+            claimCount++;
+          }
+
+          // Stop paginating if we got fewer than a full page or found some of ours
+          if (pending.length < PAGE || foundOurs) break;
+          offset += PAGE;
         }
       } catch { /* transient */ }
 
-      if (claimCount >= TARGET * 5) break;
       await sleep(1000);
     }
   })();
@@ -179,8 +188,7 @@ async function main() {
   // ── Loop 3: Resolve claimed escalations ───────────────────────────
   const resolveLoop = (async () => {
     await sleep(3000);
-    while (true) {
-      // Take all claimed items and submit for resolution
+    while (completed < TARGET) {
       for (const [escId, meta] of claimed.entries()) {
         if (resolvedIds.has(escId)) continue;
         try {
@@ -193,20 +201,26 @@ async function main() {
         } catch { /* transient */ }
       }
 
-      if (resolveCount >= TARGET * 5) break;
       await sleep(1000);
     }
   })();
 
   // ── Loop 4: Monitor ───────────────────────────────────────────────
+  const completedJobs = new Set<string>();
   const monitorLoop = (async () => {
     while (true) {
       await sleep(5000);
       try {
-        const running = await api('GET', '/mcp-runs?app_id=longtail&status=running&limit=1&offset=0', undefined, token);
-        const runningCount = running?.total ?? 0;
-        completed = submitted - runningCount;
-        if (completed < 0) completed = 0;
+        // Check only our jobIds, skip already-confirmed ones
+        for (const jobId of jobIds) {
+          if (completedJobs.has(jobId)) continue;
+          try {
+            const exec = await api('GET', `/mcp-runs/${jobId}/execution?app_id=longtail`, undefined, token);
+            if (exec?.status === 'completed') completedJobs.add(jobId);
+          } catch { /* transient */ }
+        }
+        completed = completedJobs.size;
+        const runningCount = submitted - completed;
         if (runningCount > peakInFlight) peakInFlight = runningCount;
         const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
         console.log(`[${elapsed}s] Submitted=${submitted} Claimed=${claimCount} Resolved=${resolveCount} Running=${runningCount} Completed=${completed}/${TARGET}  peak=${peakInFlight}`);
