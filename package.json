@@ -1,6 +1,6 @@
 {
   "name": "my-longtail-app",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Durable workflows with IAM, MCP tools, and a built-in dashboard. Powered by PostgreSQL.",
   "main": "src/index.ts",
