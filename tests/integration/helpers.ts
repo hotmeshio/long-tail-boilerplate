@@ -121,6 +121,21 @@ export class ApiClient {
     return { status: res.status, data };
   }
 
+  // ── YAML workflow lifecycle ───────────────────────────────────────────────
+
+  async deployWorkflow(id: string): Promise<any> {
+    const { data } = await this.post(`/api/yaml-workflows/${id}/deploy`);
+    return data;
+  }
+
+  async invokeWorkflow(id: string, inputData: any, sync = false): Promise<any> {
+    const { data } = await this.post(`/api/yaml-workflows/${id}/invoke`, {
+      data: inputData,
+      sync,
+    });
+    return data;
+  }
+
   // ── Workflow observation ───────────────────────────────────────────────────
 
   async getWorkflowStatus(workflowId: string): Promise<any> {

@@ -5,39 +5,42 @@ import { DataStack } from '../lib/data-stack';
 import { DnsStack } from '../lib/dns-stack';
 import { ComputeStack } from '../lib/compute-stack';
 import { GithubOidcStack } from '../lib/github-oidc-stack';
+import { loadConfig } from '../lib/config';
 
 const app = new cdk.App();
+const config = loadConfig(app);
 
 const env: cdk.Environment = {
   account: process.env.CDK_DEFAULT_ACCOUNT,
   region: process.env.CDK_DEFAULT_REGION,
 };
 
-// Stack-level tags applied to all resources
-cdk.Tags.of(app).add('Project', 'long-tail');
-cdk.Tags.of(app).add('Environment', 'production');
+cdk.Tags.of(app).add('Project', config.projectSlug);
+cdk.Tags.of(app).add('Environment', config.environment);
 
 // 1. Network — VPC, subnets, NAT gateway, security groups
-const network = new NetworkStack(app, 'LongTail-Network', { env });
+const network = new NetworkStack(app, config.stackName('Network'), { env });
 
 // 2. Data — RDS, S3, Secrets Manager
-const data = new DataStack(app, 'LongTail-Data', {
+const data = new DataStack(app, config.stackName('Data'), {
   env,
   vpc: network.vpc,
   dbSecurityGroup: network.dbSecurityGroup,
+  config,
 });
 
 // 3. DNS — Route 53 hosted zone lookup, ACM certificate
-const dns = new DnsStack(app, 'LongTail-Dns', { env });
+const dns = new DnsStack(app, config.stackName('Dns'), { env, config });
 
-// 4. Compute — ECS Fargate, ALB, DNS A record
-new ComputeStack(app, 'LongTail-Compute', {
+// 4. Compute — ECS Fargate, ALB, NATS, DNS A record
+new ComputeStack(app, config.stackName('Compute'), {
   env,
   vpc: network.vpc,
   dbSecret: data.dbSecret,
   albSecurityGroup: network.albSecurityGroup,
   appSecurityGroup: network.appSecurityGroup,
   workerSecurityGroup: network.workerSecurityGroup,
+  natsSecurityGroup: network.natsSecurityGroup,
   bucket: data.bucket,
   jwtSecret: data.jwtSecret,
   oauthSecret: data.oauthSecret,
@@ -45,8 +48,10 @@ new ComputeStack(app, 'LongTail-Compute', {
   anthropicApiKeySecret: data.anthropicApiKeySecret,
   openaiApiKeySecret: data.openaiApiKeySecret,
   seedAdminPasswordSecret: data.seedAdminPasswordSecret,
+  natsTokenSecret: data.natsTokenSecret,
   certificate: dns.certificate,
   hostedZone: dns.hostedZone,
+  config,
 });
 
 // 5. GitHub OIDC — deployed manually with context variables:
@@ -55,5 +60,5 @@ new ComputeStack(app, 'LongTail-Compute', {
 const githubOwner = app.node.tryGetContext('githubOwner');
 const githubRepo = app.node.tryGetContext('githubRepo');
 if (githubOwner && githubRepo) {
-  new GithubOidcStack(app, 'LongTail-GithubOidc', { env });
+  new GithubOidcStack(app, config.stackName('GithubOidc'), { env, config });
 }

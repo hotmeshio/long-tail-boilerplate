@@ -39,11 +39,12 @@ const iam = __importStar(require("aws-cdk-lib/aws-iam"));
 class GithubOidcStack extends cdk.Stack {
     constructor(scope, id, props) {
         super(scope, id, props);
+        const { config } = props;
         const githubOwner = this.node.tryGetContext('githubOwner');
         const githubRepo = this.node.tryGetContext('githubRepo');
         if (!githubOwner || !githubRepo) {
             throw new Error('Context variables "githubOwner" and "githubRepo" are required. ' +
-                'Deploy with: npx cdk deploy LongTail-GithubOidc -c githubOwner=OWNER -c githubRepo=REPO');
+                `Deploy with: npx cdk deploy ${config.stackName('GithubOidc')} -c githubOwner=OWNER -c githubRepo=REPO`);
         }
         // Create the OIDC provider for GitHub Actions.
         // If one already exists in the account, import it instead.
@@ -53,7 +54,7 @@ class GithubOidcStack extends cdk.Stack {
             thumbprints: ['ffffffffffffffffffffffffffffffffffffffff'],
         });
         this.deployRole = new iam.Role(this, 'GithubActionsRole', {
-            roleName: 'LongTail-GithubActionsDeployRole',
+            roleName: config.deployRoleName,
             assumedBy: new iam.OpenIdConnectPrincipal(provider, {
                 StringLike: {
                     'token.actions.githubusercontent.com:sub': `repo:${githubOwner}/${githubRepo}:*`,

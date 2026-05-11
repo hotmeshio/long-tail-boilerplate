@@ -40,32 +40,35 @@ const data_stack_1 = require("../lib/data-stack");
 const dns_stack_1 = require("../lib/dns-stack");
 const compute_stack_1 = require("../lib/compute-stack");
 const github_oidc_stack_1 = require("../lib/github-oidc-stack");
+const config_1 = require("../lib/config");
 const app = new cdk.App();
+const config = (0, config_1.loadConfig)(app);
 const env = {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region: process.env.CDK_DEFAULT_REGION,
 };
-// Stack-level tags applied to all resources
-cdk.Tags.of(app).add('Project', 'long-tail');
-cdk.Tags.of(app).add('Environment', 'production');
+cdk.Tags.of(app).add('Project', config.projectSlug);
+cdk.Tags.of(app).add('Environment', config.environment);
 // 1. Network — VPC, subnets, NAT gateway, security groups
-const network = new network_stack_1.NetworkStack(app, 'LongTail-Network', { env });
+const network = new network_stack_1.NetworkStack(app, config.stackName('Network'), { env });
 // 2. Data — RDS, S3, Secrets Manager
-const data = new data_stack_1.DataStack(app, 'LongTail-Data', {
+const data = new data_stack_1.DataStack(app, config.stackName('Data'), {
     env,
     vpc: network.vpc,
     dbSecurityGroup: network.dbSecurityGroup,
+    config,
 });
 // 3. DNS — Route 53 hosted zone lookup, ACM certificate
-const dns = new dns_stack_1.DnsStack(app, 'LongTail-Dns', { env });
-// 4. Compute — ECS Fargate, ALB, DNS A record
-new compute_stack_1.ComputeStack(app, 'LongTail-Compute', {
+const dns = new dns_stack_1.DnsStack(app, config.stackName('Dns'), { env, config });
+// 4. Compute — ECS Fargate, ALB, NATS, DNS A record
+new compute_stack_1.ComputeStack(app, config.stackName('Compute'), {
     env,
     vpc: network.vpc,
     dbSecret: data.dbSecret,
     albSecurityGroup: network.albSecurityGroup,
     appSecurityGroup: network.appSecurityGroup,
     workerSecurityGroup: network.workerSecurityGroup,
+    natsSecurityGroup: network.natsSecurityGroup,
     bucket: data.bucket,
     jwtSecret: data.jwtSecret,
     oauthSecret: data.oauthSecret,
@@ -73,8 +76,10 @@ new compute_stack_1.ComputeStack(app, 'LongTail-Compute', {
     anthropicApiKeySecret: data.anthropicApiKeySecret,
     openaiApiKeySecret: data.openaiApiKeySecret,
     seedAdminPasswordSecret: data.seedAdminPasswordSecret,
+    natsTokenSecret: data.natsTokenSecret,
     certificate: dns.certificate,
     hostedZone: dns.hostedZone,
+    config,
 });
 // 5. GitHub OIDC — deployed manually with context variables:
 //    npx cdk deploy LongTail-GithubOidc -c githubOwner=OWNER -c githubRepo=REPO
@@ -82,5 +87,5 @@ new compute_stack_1.ComputeStack(app, 'LongTail-Compute', {
 const githubOwner = app.node.tryGetContext('githubOwner');
 const githubRepo = app.node.tryGetContext('githubRepo');
 if (githubOwner && githubRepo) {
-    new github_oidc_stack_1.GithubOidcStack(app, 'LongTail-GithubOidc', { env });
+    new github_oidc_stack_1.GithubOidcStack(app, config.stackName('GithubOidc'), { env, config });
 }

@@ -37,7 +37,7 @@ cd long-tail-boilerplate
 cp .env.example .env
 npm install
 
-# 2. Start everything (Postgres + MinIO + app with HMR)
+# 2. Start everything (Postgres + MinIO + NATS + app with HMR)
 docker compose up -d --build
 
 # 3. Seed users and roles
@@ -56,6 +56,7 @@ Login: `superadmin` / `l0ngt@1l`
 | Dashboard | [localhost:3030](http://localhost:3030) | Workflow registry, execution timeline, escalation queues |
 | REST API | [localhost:3030/api](http://localhost:3030/api) | Invoke workflows, manage escalations, query results |
 | Health | [localhost:3030/health](http://localhost:3030/health) | Health check endpoint |
+| NATS | localhost:4222 (client), localhost:9222 (WebSocket) | Real-time event bus for cross-container event delivery |
 | MinIO Console | [localhost:9003](http://localhost:9003) | S3-compatible file storage browser (minioadmin / minioadmin) |
 | PostgreSQL | localhost:5416 | Workflow state, IAM, escalation records |
 
@@ -142,6 +143,8 @@ docker compose exec app npm run test:integration
 ```
 
 The assembly line integration test walks through the full escalation lifecycle for all three HITL workflows: registers configs, invokes workflows, polls for pending escalations by role, claims and resolves each one, and verifies the workflow completes with expected results.
+
+The NATS event delivery test subscribes directly to NATS, triggers a workflow, walks the escalation lifecycle, and verifies that each step produces a corresponding event on the NATS event bus. This proves that events flow cross-container in production (worker publishes, API/dashboard receives).
 
 ### Throughput Tests (Local)
 
@@ -246,6 +249,9 @@ src/
       worker.ts                     #   Workstation child workflow
       iterator.ts                   #   Step Iterator (data-driven loop)
       reverter.ts                   #   Reverter (loop with revert support)
+deploy/
+  nats.conf                         # NATS server config (auth, WebSocket, monitoring)
+  cdk/                              # AWS CDK infrastructure stacks
 scripts/
   seed.ts                           # Creates users, roles, escalation chains
   token.ts                          # Generate a JWT for API testing
@@ -253,6 +259,8 @@ scripts/
 tests/
   integration/
     assembly-line.test.ts           # End-to-end HITL workflow tests
+    nats-events.test.ts             # NATS event delivery across containers
+    self-test.test.ts               # Health and self-test validation
     helpers.ts                      # ApiClient, poll utility, logging
   throughput/
     01-echo.ts                      # HotMesh baseline: pub + execute + complete
@@ -394,6 +402,9 @@ All options are passed to `start()` in `src/index.ts`. See `.env.example` for th
 | `JWT_SECRET` | `change-me` | JWT signing secret |
 | `LT_STORAGE_BACKEND` | `s3` | File storage backend |
 | `LT_S3_ENDPOINT` | `http://localhost:9002` | MinIO/S3 endpoint |
+| `NATS_URL` | `nats://nats:4222` | Internal NATS connection for event publishing |
+| `NATS_TOKEN` | `dev_api_secret` | NATS auth token (Secrets Manager in production) |
+| `NATS_WS_URL` | `ws://localhost:9222` | NATS WebSocket URL for browser dashboard |
 | `ANTHROPIC_API_KEY` | -- | Enables vision LLM and MCP tool orchestration |
 | `OPENAI_API_KEY` | -- | OpenAI API access |
 | `REMOTE_URL` | -- | Target URL for remote throughput tests |

@@ -12,11 +12,16 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: dev_api_secret
+      NATS_WS_URL: ws://localhost:9222
       NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
     depends_on:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      nats:
         condition: service_healthy
     volumes:
       - ./src:/app/src
@@ -60,6 +65,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  nats:
+    image: nats:2-alpine
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "${NATS_WS_PORT:-9222}:9222"
+    command: ["-c", "/etc/nats/nats.conf", "--auth", "dev_api_secret"]
+    volumes:
+      - ./deploy/nats.conf:/etc/nats/nats.conf:ro
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider http://localhost:8222/healthz || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   minio:
     image: minio/minio:latest

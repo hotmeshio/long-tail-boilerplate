@@ -31,6 +31,9 @@
     "test:remote:assembly:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:remote:assembly:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:remote:assembly:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 100 10",
+    "test:nats": "vitest run --config tests/integration/vitest.config.ts tests/integration/nats-events.test.ts",
+    "test:self-test": "vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
+    "test:self-test:remote": "REMOTE_URL=https://longtail.hotmesh.io vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
     "aws:stats": "./scripts/aws-stats.sh 5m",
     "aws:stats:15m": "./scripts/aws-stats.sh 15m",
     "aws:stats:30m": "./scripts/aws-stats.sh 30m",
@@ -48,7 +51,7 @@
   },
   "dependencies": {
     "@hotmeshio/hotmesh": "^0.14.7",
-    "@hotmeshio/long-tail": "^0.1.14",
+    "@hotmeshio/long-tail": "^0.1.16",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",

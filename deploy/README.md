@@ -51,10 +51,17 @@ The same Docker image runs in two modes, controlled by the `APP_ROLE` environmen
 
 | Service | `APP_ROLE` | Role | Network |
 |---------|-----------|------|---------|
-| **API** | `api` | Express dashboard, REST API, Socket.IO, readonly workflow observers | Behind ALB on port 3030 |
+| **API** | `api` | Express dashboard, REST API, readonly workflow observers | Behind ALB on port 3030 |
 | **Worker** | `worker` | Workflow execution, durable activities, leader election via LISTEN/NOTIFY | No inbound traffic |
+| **NATS** | *(n/a)* | Event bus for cross-container event delivery (replaces Socket.IO for multi-container) | Internal port 4222, WebSocket 9222 via ALB |
 
 Local development runs both roles in a single container with `APP_ROLE` unset (standalone mode). On AWS, they are separate Fargate services with independent scaling and lifecycle.
+
+### Why NATS (Not Socket.IO)
+
+Socket.IO works in single-container mode because all events are emitted and consumed in the same process. In a multi-container deployment (separate API and worker services), Socket.IO cannot deliver events across containers — the worker emits events that the API container (serving the dashboard) never sees.
+
+NATS solves this: workers publish events to NATS, and the dashboard connects directly to NATS via WebSocket. One event bus, one subscription, no intermediary. The browser authenticates to NATS using a token obtained from an authenticated API endpoint (`GET /api/nats-credentials`), so unauthenticated users cannot subscribe to events.
 
 The worker uses a 120-second stop timeout. When ECS sends SIGTERM during a rolling deploy, in-flight durable activities complete and leader advisory locks release gracefully before the container exits.
 
@@ -96,8 +103,9 @@ The same code runs in both environments. Only env vars change:
 |---------|-------|-----|
 | Postgres | Container on port 5416 | RDS in isolated subnets |
 | File storage | MinIO container on port 9002 | S3 bucket |
-| SSL | Not required | `PGSSLMODE=no-verify` |
-| Secrets | `.env` file | Secrets Manager → ECS task definition |
+| Event bus | NATS container on port 4222/9222 | NATS Fargate service via Cloud Map + ALB |
+| SSL | Not required | `PGSSLMODE=no-verify`, TLS at ALB for NATS WS |
+| Secrets | `.env` file / docker-compose env | Secrets Manager → ECS task definition |
 | App role | Standalone (unset) | `APP_ROLE=api` or `APP_ROLE=worker` |
 
 ---
@@ -121,12 +129,13 @@ The app starts on `http://localhost:3030`. Postgres runs on port 5416. MinIO run
 
 ### Services
 
-Docker Compose runs three containers:
+Docker Compose runs four containers:
 
 | Container | Image | Ports | Purpose |
 |-----------|-------|-------|---------|
 | `app` | Built from `Dockerfile` (dev stage) | 3030 | API + workers (standalone mode) |
 | `postgres` | `postgres:16` | 5416 | Database |
+| `nats` | `nats:2-alpine` | 4222 (client), 9222 (WebSocket) | Event bus for real-time dashboard updates |
 | `minio` | `minio/minio` | 9002 (API), 9003 (console) | S3-compatible file storage |
 
 The `app` container mounts `src/`, `scripts/`, and `tests/` as volumes. Code changes hot-reload via `ts-node-dev`.
@@ -155,6 +164,11 @@ LT_S3_REGION=us-east-1
 LT_S3_ACCESS_KEY=minioadmin
 LT_S3_SECRET_KEY=minioadmin
 LT_S3_FORCE_PATH_STYLE=true
+
+# NATS event bus
+NATS_URL=nats://nats:4222         # Internal NATS connection
+NATS_TOKEN=dev_api_secret         # Auth token (Secrets Manager in production)
+NATS_WS_URL=ws://localhost:9222   # Browser WebSocket URL
 
 # LLM (required for workflow builder)
 ANTHROPIC_API_KEY=sk-ant-...
@@ -228,9 +242,9 @@ The CDK code in `deploy/cdk/` creates four CloudFormation stacks:
 | Stack | Resources | Deploy time |
 |-------|-----------|-------------|
 | **LongTail-Network** | VPC, 6 subnets (2 public, 2 private, 2 isolated), 1 NAT gateway, 4 security groups | ~5 min |
-| **LongTail-Data** | RDS PostgreSQL 16, S3 bucket, 7 Secrets Manager entries | ~15 min |
+| **LongTail-Data** | RDS PostgreSQL 16, S3 bucket, 8 Secrets Manager entries (including NATS token) | ~15 min |
 | **LongTail-Dns** | ACM certificate for `longtail.hotmesh.io` (DNS-validated via existing `hotmesh.io` hosted zone in Route 53) | ~3 min |
-| **LongTail-Compute** | ECS Fargate cluster, API service, worker service, ALB, Route 53 A record | ~10 min |
+| **LongTail-Compute** | ECS Fargate cluster, API service, worker service, NATS service, ALB (ports 443 + 9222), Route 53 A record | ~10 min |
 
 A fifth stack, **LongTail-GithubOidc**, creates an IAM role for GitHub Actions. It's deployed separately, once.
 
@@ -242,25 +256,29 @@ All resources are tagged with `Project: long-tail` and `Environment: production`
                     Internet
                        │
                    ┌───┴───┐
-                   │  ALB  │  (public subnets, ports 80/443)
+                   │  ALB  │  (public subnets, ports 80/443/9222)
                    └───┬───┘
-                       │ port 3030
+                       │
+         ┌─────────────┼────────────┐
+         │ :3030       │ :9222      │
+    ┌────┴────┐   ┌────┴────┐  ┌────┴─────┐
+    │   API   │   │  NATS   │  │  Worker  │   (private subnets, NAT egress)
+    │ Fargate │   │ Fargate │  │ Fargate  │
+    └────┬────┘   └────┬────┘  └────┬─────┘
+         │  :4222      │  :4222     │
+         └─────────────┤────────────┘
+                       │
               ┌────────┴────────┐
-              │                 │
-         ┌────┴────┐      ┌────┴─────┐
-         │   API   │      │  Worker  │    (private subnets, NAT egress)
-         │ Fargate │      │ Fargate  │
-         └────┬────┘      └────┬─────┘
-              │                │
-              │   port 5432    │
-              └───────┬────────┘
-                 ┌────┴────┐
-                 │   RDS   │              (isolated subnets, no internet)
-                 │ Postgres│
-                 └─────────┘
+              │   port 5432     │
+         ┌────┴────┐
+         │   RDS   │              (isolated subnets, no internet)
+         │ Postgres│
+         └─────────┘
 ```
 
-- **Public subnets** — ALB only. Receives internet traffic on 80 (redirects to 443) and 443 (HTTPS with ACM cert).
+- **NATS** — Internal event bus in private subnets. API and worker connect on port 4222. Browser dashboard connects via ALB on port 9222 (TLS terminated at ALB, plaintext internally).
+
+- **Public subnets** — ALB only. Receives internet traffic on 80 (redirects to 443), 443 (HTTPS with ACM cert), and 9222 (NATS WebSocket, TLS terminated at ALB).
 - **Private subnets** — Fargate tasks. Outbound internet via NAT gateway (for ECR image pulls, S3, external APIs). No inbound except from ALB.
 - **Isolated subnets** — RDS only. No internet access at all. Only reachable from the private subnets.
 
@@ -270,22 +288,24 @@ One NAT gateway (cost-optimized for a single-environment setup).
 
 | Security Group | Inbound Rules | Attached To |
 |---------------|---------------|-------------|
-| ALB | TCP 80, 443 from `0.0.0.0/0` | Application Load Balancer |
+| ALB | TCP 80, 443, 9222 from `0.0.0.0/0` | Application Load Balancer |
 | API tasks | TCP 3030 from ALB SG | API Fargate tasks |
 | Worker tasks | *(none)* | Worker Fargate tasks |
+| NATS | TCP 4222 from API SG + Worker SG, TCP 9222 from ALB SG, TCP 8222 from ALB SG (health) | NATS Fargate task |
 | RDS | TCP 5432 from API SG, TCP 5432 from Worker SG | RDS instance |
 
 Workers have no inbound rules — they initiate all connections outbound (to Postgres, S3, external APIs).
 
 ### Secrets Manager
 
-CDK creates seven secrets. Some are auto-generated, some need manual setup:
+CDK creates eight secrets. Some are auto-generated, some need manual setup:
 
 | Secret Name | Created By | Action Required |
 |-------------|-----------|-----------------|
 | `LongTail/Database` | CDK (auto-generated RDS credentials) | None — used automatically |
 | `LongTail/JwtSigningKey` | CDK (auto-generated, 64 chars) | None — used automatically |
 | `LongTail/SeedAdminPassword` | CDK (auto-generated, 32 chars) | None — used for first-boot superadmin |
+| `LongTail/NatsToken` | CDK (auto-generated, 48 chars) | None — shared by NATS server, API, and worker |
 | `LongTail/AnthropicApiKey` | CDK (placeholder) | **Replace with your real key** |
 | `LongTail/OpenaiApiKey` | CDK (placeholder) | **Replace with your real key** |
 | `LongTail/OAuthProviders` | CDK (empty `{}`) | Optional — add OAuth provider credentials |
@@ -383,7 +403,7 @@ npx cdk deploy LongTail-Compute --require-approval never
 This step builds the Docker image for `linux/amd64` (cross-compiles if you're on an ARM Mac), pushes it to ECR, and creates the ECS cluster, both Fargate services, the ALB, and the Route 53 A record.
 
 **Verify:**
-- ECS → Clusters → `longtail`: two services (`api` and `worker`), each with 1 running task
+- ECS → Clusters → `longtail`: three services (`api`, `worker`, `nats`), each with 1 running task
 - EC2 → Load Balancers: internet-facing ALB with HTTPS on 443
 - `https://longtail.hotmesh.io/health` returns `{"status":"ok"}`
 
@@ -532,8 +552,8 @@ This starts new tasks with fresh secret values and drains the old ones. Takes ~2
 
 Two workflows in `.github/workflows/`:
 
-- **`test.yml`** — runs on every push and PR. Typechecks and runs unit tests.
-- **`deploy.yml`** — runs on git tags matching `v*.*.*`. Builds and deploys via CDK.
+- **`test.yml`** — runs on every push and PR. Typechecks, unit tests, and integration tests (including NATS event delivery).
+- **`deploy.yml`** — runs on git tags matching `v*.*.*`. Runs all tests, builds and deploys via CDK, then runs post-deploy smoke tests.
 
 ### Setup (one-time, after manual deploy is working)
 
@@ -604,6 +624,7 @@ Both services run at 0.5 vCPU / 1 GB RAM. Auto-scaling is configured 1–4 tasks
 |---------|-----|--------|---------|-----|-------------|
 | API | 0.5 vCPU | 1 GB | 1 | 4 | default |
 | Worker | 0.5 vCPU | 1 GB | 1 | 4 | 120 seconds |
+| NATS | 0.25 vCPU | 512 MB | 1 | 1 | default |
 
 ### Future Flips
 

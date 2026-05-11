@@ -4,9 +4,11 @@ import * as rds from 'aws-cdk-lib/aws-rds';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
+import type { DeployConfig } from './config';
 export interface DataStackProps extends cdk.StackProps {
     vpc: ec2.Vpc;
     dbSecurityGroup: ec2.SecurityGroup;
+    config: DeployConfig;
 }
 export declare class DataStack extends cdk.Stack {
     readonly dbInstance: rds.DatabaseInstance;
@@ -18,5 +20,6 @@ export declare class DataStack extends cdk.Stack {
     readonly anthropicApiKeySecret: secretsmanager.Secret;
     readonly openaiApiKeySecret: secretsmanager.Secret;
     readonly seedAdminPasswordSecret: secretsmanager.Secret;
+    readonly natsTokenSecret: secretsmanager.Secret;
     constructor(scope: Construct, id: string, props: DataStackProps);
 }

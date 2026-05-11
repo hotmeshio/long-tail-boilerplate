@@ -42,7 +42,7 @@ const secretsmanager = __importStar(require("aws-cdk-lib/aws-secretsmanager"));
 class DataStack extends cdk.Stack {
     constructor(scope, id, props) {
         super(scope, id, props);
-        const { vpc, dbSecurityGroup } = props;
+        const { vpc, dbSecurityGroup, config } = props;
         // --- RDS PostgreSQL ---
         const parameterGroup = new rds.ParameterGroup(this, 'DbParameterGroup', {
             engine: rds.DatabaseInstanceEngine.postgres({
@@ -69,9 +69,9 @@ class DataStack extends cdk.Stack {
             allocatedStorage: 100,
             maxAllocatedStorage: 500,
             storageType: rds.StorageType.GP3,
-            databaseName: 'longtail',
-            credentials: rds.Credentials.fromGeneratedSecret('longtail', {
-                secretName: 'LongTail/Database',
+            databaseName: config.dbName,
+            credentials: rds.Credentials.fromGeneratedSecret(config.dbUsername, {
+                secretName: config.secretName('Database'),
             }),
             backupRetention: cdk.Duration.days(7),
             deletionProtection: true,
@@ -80,7 +80,7 @@ class DataStack extends cdk.Stack {
         this.dbSecret = this.dbInstance.secret;
         // --- S3 Bucket ---
         this.bucket = new s3.Bucket(this, 'FilesBucket', {
-            bucketName: `longtail-files-${cdk.Stack.of(this).account}-${cdk.Stack.of(this).region}`,
+            bucketName: config.bucketName(cdk.Stack.of(this).account, cdk.Stack.of(this).region),
             encryption: s3.BucketEncryption.S3_MANAGED,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
             enforceSSL: true,
@@ -104,32 +104,39 @@ class DataStack extends cdk.Stack {
         });
         // --- Secrets Manager ---
         this.jwtSecret = new secretsmanager.Secret(this, 'JwtSigningKey', {
-            secretName: 'LongTail/JwtSigningKey',
+            secretName: config.secretName('JwtSigningKey'),
             generateSecretString: {
                 passwordLength: 64,
                 excludePunctuation: true,
             },
         });
         this.oauthSecret = new secretsmanager.Secret(this, 'OAuthProviders', {
-            secretName: 'LongTail/OAuthProviders',
+            secretName: config.secretName('OAuthProviders'),
             secretStringValue: cdk.SecretValue.unsafePlainText('{}'),
         });
         this.apiKeysSecret = new secretsmanager.Secret(this, 'ApiKeys', {
-            secretName: 'LongTail/ApiKeys',
+            secretName: config.secretName('ApiKeys'),
             secretStringValue: cdk.SecretValue.unsafePlainText('{}'),
         });
         this.anthropicApiKeySecret = new secretsmanager.Secret(this, 'AnthropicApiKey', {
-            secretName: 'LongTail/AnthropicApiKey',
+            secretName: config.secretName('AnthropicApiKey'),
             secretStringValue: cdk.SecretValue.unsafePlainText('placeholder'),
         });
         this.openaiApiKeySecret = new secretsmanager.Secret(this, 'OpenaiApiKey', {
-            secretName: 'LongTail/OpenaiApiKey',
+            secretName: config.secretName('OpenaiApiKey'),
             secretStringValue: cdk.SecretValue.unsafePlainText('placeholder'),
         });
         this.seedAdminPasswordSecret = new secretsmanager.Secret(this, 'SeedAdminPassword', {
-            secretName: 'LongTail/SeedAdminPassword',
+            secretName: config.secretName('SeedAdminPassword'),
             generateSecretString: {
                 passwordLength: 32,
+                excludePunctuation: true,
+            },
+        });
+        this.natsTokenSecret = new secretsmanager.Secret(this, 'NatsToken', {
+            secretName: config.secretName('NatsToken'),
+            generateSecretString: {
+                passwordLength: 48,
                 excludePunctuation: true,
             },
         });
