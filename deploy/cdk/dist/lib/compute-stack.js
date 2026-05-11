@@ -163,7 +163,10 @@ class ComputeStack extends cdk.Stack {
         natsWsListener.addTargets('NatsWsTarget', {
             port: 9222,
             protocol: elbv2.ApplicationProtocol.HTTP,
-            targets: [natsService],
+            targets: [natsService.loadBalancerTarget({
+                    containerName: 'nats',
+                    containerPort: 9222,
+                })],
             healthCheck: {
                 path: '/',
                 port: '8222',
