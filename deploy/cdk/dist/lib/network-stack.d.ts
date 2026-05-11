@@ -7,5 +7,6 @@ export declare class NetworkStack extends cdk.Stack {
     readonly appSecurityGroup: ec2.SecurityGroup;
     readonly workerSecurityGroup: ec2.SecurityGroup;
     readonly albSecurityGroup: ec2.SecurityGroup;
+    readonly natsSecurityGroup: ec2.SecurityGroup;
     constructor(scope: Construct, id: string, props?: cdk.StackProps);
 }

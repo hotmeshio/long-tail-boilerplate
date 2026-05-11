@@ -1,6 +1,6 @@
 try { require('dotenv/config'); } catch {}
 import { Pool } from 'pg';
-import { start } from '@hotmeshio/long-tail';
+import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
 
 import * as helloWorld from './workflows/hello-world';
 import * as contentReview from './workflows/content-review';
@@ -135,6 +135,15 @@ async function main() {
     server: isWorker
       ? { enabled: false }                    // Worker: no HTTP server
       : { port: parseInt(process.env.PORT || '3030') },
+
+    // NATS as the sole event transport: workers publish events to NATS,
+    // browser connects directly to NATS via WebSocket. No Socket.IO relay.
+    // Using explicit adapters skips Socket.IO auto-registration, so the
+    // /api/settings endpoint reports transport='nats' and the dashboard
+    // connects directly to NATS WebSocket.
+    events: process.env.NATS_URL
+      ? { adapters: [new NatsEventAdapter({ url: process.env.NATS_URL, token: process.env.NATS_TOKEN })] }
+      : undefined,
 
     mcp: {
       serverFactories: {

@@ -40,16 +40,17 @@ const route53 = __importStar(require("aws-cdk-lib/aws-route53"));
 class DnsStack extends cdk.Stack {
     constructor(scope, id, props) {
         super(scope, id, props);
-        this.hostedZone = route53.HostedZone.fromLookup(this, 'HotmeshZone', {
-            domainName: 'hotmesh.io',
+        const { config } = props;
+        this.hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
+            domainName: config.hostedZoneDomain,
         });
         this.certificate = new acm.Certificate(this, 'Certificate', {
-            domainName: 'longtail.hotmesh.io',
+            domainName: config.domainName,
             validation: acm.CertificateValidation.fromDns(this.hostedZone),
         });
         new cdk.CfnOutput(this, 'CertificateArn', {
             value: this.certificate.certificateArn,
-            description: 'ACM certificate ARN for longtail.hotmesh.io',
+            description: `ACM certificate ARN for ${config.domainName}`,
         });
     }
 }
