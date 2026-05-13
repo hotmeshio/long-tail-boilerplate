@@ -1,6 +1,7 @@
 try { require('dotenv/config'); } catch {}
 import { Pool } from 'pg';
 import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
+import type { LTWorkerConfig, LTMcpServerConfig } from '@hotmeshio/long-tail';
 
 import * as helloWorld from './workflows/hello-world';
 import * as contentReview from './workflows/content-review';
@@ -10,8 +11,19 @@ import { workstation } from './workflows/assembly-line/worker';
 import { stepIterator } from './workflows/assembly-line/iterator';
 import { reverter } from './workflows/assembly-line/reverter';
 import { createImageToolsServer } from './mcp-servers/image-tools';
+import { IMAGE_TOOLS } from './mcp-servers/tool-manifests-image';
+import { createGmailServer, GMAIL_SERVER_CONFIG } from './mcp-servers/gmail';
 
 const bcrypt: any = require('bcryptjs');
+
+// ── Constants ───────────────────────────────────────────────────────────────
+
+const REVIEWER = 'reviewer';
+const ENGINEER = 'engineer';
+const ADMIN = 'admin';
+const SUPERADMIN = 'superadmin';
+const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
+const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
 
 const DB_CONFIG = {
   host: process.env.POSTGRES_HOST || 'localhost',
@@ -21,46 +33,150 @@ const DB_CONFIG = {
   database: process.env.POSTGRES_DB || 'myapp',
 };
 
+// ── Worker configs ──────────────────────────────────────────────────────────
+
+const helloWorldConfig: LTWorkerConfig = {
+  description: 'Hello world — minimal durable workflow with sleep and IAM context',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  envelopeSchema: {
+    data: { name: 'World' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const contentReviewConfig: LTWorkerConfig = {
+  description: 'Content review — AI-powered moderation with human escalation for low-confidence results',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: CERTIFIED_ROLES,
+  envelopeSchema: {
+    data: { contentId: 'article-001', content: 'Content to review...', contentType: 'article' },
+    metadata: { certified: true, source: 'dashboard' },
+  },
+  resolverSchema: {
+    approved: true,
+    analysis: { confidence: 0.95, flags: [], summary: 'Manually reviewed and approved.' },
+  },
+};
+
+const screenshotConfig: LTWorkerConfig = {
+  description: 'Screenshot research — capture and analyze web pages using Playwright and Vision',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  envelopeSchema: {
+    data: { url: 'https://example.com', description: 'Capture and analyze this page' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const assemblyLineConfig: LTWorkerConfig = {
+  description: 'Assembly line — orchestrates sequential stations with parallel child workflows and human escalation',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: CERTIFIED_ROLES,
+  envelopeSchema: {
+    data: {
+      productName: 'Widget A',
+      stations: [
+        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
+        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
+      ],
+    },
+    metadata: { certified: true, source: 'dashboard' },
+  },
+};
+
+const stepIteratorConfig: LTWorkerConfig = {
+  description: 'Step iterator — walks stations sequentially, spawning a child workstation for each step',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: CERTIFIED_ROLES,
+  envelopeSchema: {
+    data: {
+      name: 'Widget B',
+      steps: [
+        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
+        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components.' },
+      ],
+    },
+    metadata: { certified: true, source: 'dashboard' },
+  },
+};
+
+const reverterConfig: LTWorkerConfig = {
+  description: 'Reverter — like stepIterator but supports revert-on-rejection, stepping backwards',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: CERTIFIED_ROLES,
+  envelopeSchema: {
+    data: {
+      name: 'Widget C',
+      steps: [
+        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
+        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components.' },
+      ],
+    },
+    metadata: { certified: true, source: 'dashboard' },
+  },
+  resolverSchema: { approved: true, revertSteps: 0 },
+};
+
+const workstationConfig: LTWorkerConfig = {
+  description: 'Workstation — child workflow for a single assembly station. Creates escalation, waits for human, signals parent.',
+  invocable: false,
+  defaultRole: 'grinder',
+  roles: [...CERTIFIED_ROLES, 'grinder', 'gluer'],
+  resolverSchema: { approved: true, station: 'grinder' },
+};
+
 // APP_ROLE controls the container's behavior:
 //   'api'    — dashboard + REST API, readonly workflow observers
 //   'worker' — workflow execution only, no HTTP server
 //   unset    — full standalone mode (local dev via docker compose)
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
 
-// Active worker registrations
+// Active worker registrations with inline config
 const WORKERS = [
-  { taskQueue: 'default', workflow: helloWorld.helloWorkflow },
-  { taskQueue: 'default', workflow: contentReview.reviewContent },
-  { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch },
-  { taskQueue: 'assembly-line', workflow: assemblyLine },
-  { taskQueue: 'assembly-line', workflow: workstation },
-  { taskQueue: 'assembly-line', workflow: stepIterator },
-  { taskQueue: 'assembly-line', workflow: reverter },
+  { taskQueue: 'default', workflow: helloWorld.helloWorkflow, config: helloWorldConfig },
+  { taskQueue: 'default', workflow: contentReview.reviewContent, config: contentReviewConfig },
+  { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, config: screenshotConfig },
+  { taskQueue: 'assembly-line', workflow: assemblyLine, config: assemblyLineConfig },
+  { taskQueue: 'assembly-line', workflow: workstation, config: workstationConfig },
+  { taskQueue: 'assembly-line', workflow: stepIterator, config: stepIteratorConfig },
+  { taskQueue: 'assembly-line', workflow: reverter, config: reverterConfig },
 ];
 
-// Readonly observers — same workers registered with readonly connections so the
-// dashboard can see and invoke them without the API container executing work.
-const READONLY_OBSERVERS = [
-  { taskQueue: 'default', workflow: helloWorld.helloWorkflow, connection: { readonly: true } },
-  { taskQueue: 'default', workflow: contentReview.reviewContent, connection: { readonly: true } },
-  { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, connection: { readonly: true } },
-  { taskQueue: 'assembly-line', workflow: assemblyLine, connection: { readonly: true } },
-  { taskQueue: 'assembly-line', workflow: workstation, connection: { readonly: true } },
-  { taskQueue: 'assembly-line', workflow: stepIterator, connection: { readonly: true } },
-  { taskQueue: 'assembly-line', workflow: reverter, connection: { readonly: true } },
-];
+// Readonly observers — same workflows with readonly connections for dashboard visibility
+const READONLY_OBSERVERS = WORKERS.map((w) => ({
+  ...w,
+  connection: { readonly: true } as const,
+}));
+
+// ── Image tools MCP server config ───────────────────────────────────────────
+
+const IMAGE_TOOLS_CONFIG: LTMcpServerConfig = {
+  description: 'Image processing tools — resize, crop, rotate, convert, blur, compress, and more.',
+  tags: ['image', 'processing', 'vision'],
+  compileHints: 'Image tools accept file paths from storage. Use file_storage tools to upload images first.',
+  toolManifest: IMAGE_TOOLS,
+};
 
 // ── Conditional seed ────────────────────────────────────────────────────────
 
-const SEED_ROLES = ['reviewer', 'engineer', 'admin', 'superadmin'];
+const SEED_ROLES = [REVIEWER, ENGINEER, ADMIN, SUPERADMIN];
 
 const SEED_CHAINS: [string, string][] = [
-  ['reviewer', 'admin'],
-  ['reviewer', 'engineer'],
-  ['admin', 'engineer'],
-  ['admin', 'superadmin'],
-  ['engineer', 'admin'],
-  ['engineer', 'superadmin'],
+  [REVIEWER, ADMIN],
+  [REVIEWER, ENGINEER],
+  [ADMIN, ENGINEER],
+  [ADMIN, SUPERADMIN],
+  [ENGINEER, ADMIN],
+  [ENGINEER, SUPERADMIN],
 ];
 
 async function seedIfEmpty() {
@@ -125,29 +241,25 @@ async function main() {
     database: DB_CONFIG,
 
     workers: isApi
-      ? READONLY_OBSERVERS                    // API: readonly observers for dashboard visibility
-      : WORKERS,                              // Worker or standalone: active workers
+      ? READONLY_OBSERVERS
+      : WORKERS,
 
     auth: {
       secret: process.env.JWT_SECRET || 'change-me',
     },
 
     server: isWorker
-      ? { enabled: false }                    // Worker: no HTTP server
+      ? { enabled: false }
       : { port: parseInt(process.env.PORT || '3030') },
 
-    // NATS as the sole event transport: workers publish events to NATS,
-    // browser connects directly to NATS via WebSocket. No Socket.IO relay.
-    // Using explicit adapters skips Socket.IO auto-registration, so the
-    // /api/settings endpoint reports transport='nats' and the dashboard
-    // connects directly to NATS WebSocket.
     events: process.env.NATS_URL
       ? { adapters: [new NatsEventAdapter({ url: process.env.NATS_URL, token: process.env.NATS_TOKEN })] }
       : undefined,
 
     mcp: {
       serverFactories: {
-        'image-tools': createImageToolsServer,
+        'image-tools': { factory: createImageToolsServer, config: IMAGE_TOOLS_CONFIG },
+        'long-tail-gmail': { factory: createGmailServer, config: GMAIL_SERVER_CONFIG },
       },
     },
   });

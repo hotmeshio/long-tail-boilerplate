@@ -70,7 +70,9 @@ export class ComputeStack extends cdk.Stack {
       POSTGRES_USER: ecs.Secret.fromSecretsManager(dbSecret, 'username'),
       POSTGRES_PASSWORD: ecs.Secret.fromSecretsManager(dbSecret, 'password'),
       JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
-      OAUTH_CONFIG: ecs.Secret.fromSecretsManager(oauthSecret),
+      OAUTH_GOOGLE_CLIENT_ID: ecs.Secret.fromSecretsManager(oauthSecret, 'google_client_id'),
+      OAUTH_GOOGLE_CLIENT_SECRET: ecs.Secret.fromSecretsManager(oauthSecret, 'google_client_secret'),
+      OAUTH_ENCRYPTION_KEY: ecs.Secret.fromSecretsManager(oauthSecret, 'encryption_key'),
       API_KEYS: ecs.Secret.fromSecretsManager(apiKeysSecret),
       ANTHROPIC_API_KEY: ecs.Secret.fromSecretsManager(anthropicApiKeySecret),
       OPENAI_API_KEY: ecs.Secret.fromSecretsManager(openaiApiKeySecret),
@@ -84,6 +86,7 @@ export class ComputeStack extends cdk.Stack {
       LT_STORAGE_BACKEND: 's3',
       LT_S3_BUCKET: bucket.bucketName,
       LT_S3_REGION: cdk.Stack.of(this).region,
+      BASE_URL: `https://${config.domainName}`,
     };
 
     // --- ECS Cluster ---
@@ -259,6 +262,7 @@ export class ComputeStack extends cdk.Stack {
       healthCheckGracePeriod: cdk.Duration.seconds(60),
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
+      enableExecuteCommand: true,
     });
 
     const apiScaling = apiService.autoScaleTaskCount({
@@ -330,6 +334,7 @@ export class ComputeStack extends cdk.Stack {
       serviceName: 'worker',
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
+      enableExecuteCommand: true,
     });
 
     const workerScaling = workerService.autoScaleTaskCount({

@@ -223,6 +223,7 @@ class ComputeStack extends cdk.Stack {
             healthCheckGracePeriod: cdk.Duration.seconds(60),
             minHealthyPercent: 100,
             maxHealthyPercent: 200,
+            enableExecuteCommand: true,
         });
         const apiScaling = apiService.autoScaleTaskCount({
             minCapacity: 1,
@@ -286,6 +287,7 @@ class ComputeStack extends cdk.Stack {
             serviceName: 'worker',
             minHealthyPercent: 100,
             maxHealthyPercent: 200,
+            enableExecuteCommand: true,
         });
         const workerScaling = workerService.autoScaleTaskCount({
             minCapacity: 1,

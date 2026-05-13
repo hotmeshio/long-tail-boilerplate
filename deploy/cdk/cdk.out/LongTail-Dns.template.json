@@ -21,7 +21,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "ValidationMethod": "DNS"
@@ -33,7 +33,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/03ITQ6CQAxA4bOwnyk4kRNwABI8gKmlmPIzmGlHFoS7G+JCVy/fCxDqAFWBm3rqJz/LA/abIU2uY11zIna46Z04mQxCaLxgxCcn2Jvfc80Q/3icbrO9sh0urj3DqOU7XOFSQ1WMKuJTjiYLQ/ftByE3tsCIAAAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/02IQQqDQAwA3+J9Ny2BvsAHFOwDShpjida1bLJ6EP9exEOFgWEGAW8I14oWi9wO8aMvWB9OPIRGbCqZJdBiT5bs2imTy0iJ3pJhrf8v1F065bb3vfi3+BbS1Ar0dpkRYafqTTXmklxHgebwD0IiSlaIAAAA"
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Dns/CDKMetadata/Default"

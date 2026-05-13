@@ -19,7 +19,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -46,7 +46,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -84,7 +84,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -150,7 +150,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VPCSecurityGroups": [
@@ -212,7 +212,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VersioningConfiguration": {
@@ -290,7 +290,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -312,7 +312,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -334,7 +334,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -356,7 +356,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -378,7 +378,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -403,7 +403,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -413,10 +413,35 @@
     "aws:cdk:path": "LongTail-Data/SeedAdminPassword/Resource"
    }
   },
+  "NatsToken456B2AD9": {
+   "Type": "AWS::SecretsManager::Secret",
+   "Properties": {
+    "GenerateSecretString": {
+     "ExcludePunctuation": true,
+     "PasswordLength": 48
+    },
+    "Name": "LongTail/NatsToken",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Data/NatsToken/Resource"
+   }
+  },
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/3WNwY7CMAxEv4V76oUCH7CAhPa0iHJfuamBUOqi2AGhKP+OIKBFK+1p7DczmhLKaQnDAV6ksE1bHF0NsVK0rcGL/ETfCMQVeuxIyS99H05mvuXF7A9boGKNQl8simzJVKFm0rfCO3ilK7KeNPuvZjLyoNIh4448xPmWn8EsG/Q70k9VtPuO+NH/x8k4GRlDnAXb5rHnlWXVH529/uL8p3Qn30FPQZPhviE4yMe5nMBoCsPBQZwrfGB1HcE66w09iHI+SwEAAA=="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/3WN0YoCMQxFv8X3Tnap+AGrgvikOL4vmU506zgZaVJFSv9dtMrKwkLgJufeSyzYiYXPEV6kcm1XHX0DqVZ0ncGLfKfQCqQ1BuxJKSzCEE9mtuP59A+bo2KDQksWRXZk6tgw6VvhHbzSNblAWvxXMxt5UOmRcU8B0mzHz2CRLYY96Zcqup+e+NH/xyk4GxlDmkbXlWfPrch6OHp3/cXlzvlOVlFPUbPhoSU4yMfZWrjP6CDeVyGy+p5gU/QGXp2OqEsBAAA="
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Data/CDKMetadata/Default"
@@ -437,6 +462,14 @@
    "Description": "S3 bucket name",
    "Value": {
     "Ref": "FilesBucket16450113"
+   }
+  },
+  "ExportsOutputRefNatsToken456B2AD973FDF1CF": {
+   "Value": {
+    "Ref": "NatsToken456B2AD9"
+   },
+   "Export": {
+    "Name": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
    }
   },
   "ExportsOutputFnGetAttFilesBucket16450113Arn55CDC1C6": {

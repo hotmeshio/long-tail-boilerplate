@@ -17,12 +17,12 @@
         "terminationProtection": false,
         "tags": {
           "Environment": "production",
-          "Project": "long-tail"
+          "Project": "longtail"
         },
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-deploy-role-162216049230-us-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-cfn-exec-role-162216049230-us-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/9eea051818fedb61aa888116b994021e3202c04d071b16090bff44b443c05480.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/0a291f0ec75a23473408f40775d8ba5d3f5ffa2aca12e03985b6c4c6e55c9a69.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -56,12 +56,12 @@
         "terminationProtection": false,
         "tags": {
           "Environment": "production",
-          "Project": "long-tail"
+          "Project": "longtail"
         },
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-deploy-role-162216049230-us-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-cfn-exec-role-162216049230-us-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/2d0262a85fd3905d46dcbc948e811dbb68e5f082b741299fad58fe6a175d045e.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/0b34634448bab8ad5eaf240c546d4772f78d24f55aa00b061e1e5fc8c962ebe4.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -96,12 +96,12 @@
         "terminationProtection": false,
         "tags": {
           "Environment": "production",
-          "Project": "long-tail"
+          "Project": "longtail"
         },
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-deploy-role-162216049230-us-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-cfn-exec-role-162216049230-us-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/767b5f0a65ec98cda629f883ae64cf8c7bcbbee32bde9825dc48c517fe6798a7.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/1cf14ed1b32ef96da66b2e922f66379aea76c0b4fbee2fe8c07a9be6b895ca3d.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -135,12 +135,12 @@
         "terminationProtection": false,
         "tags": {
           "Environment": "production",
-          "Project": "long-tail"
+          "Project": "longtail"
         },
         "validateOnSynth": false,
         "assumeRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-deploy-role-162216049230-us-west-1",
         "cloudFormationExecutionRoleArn": "arn:${AWS::Partition}:iam::162216049230:role/cdk-hnb659fds-cfn-exec-role-162216049230-us-west-1",
-        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/b59b28052132c8135dbf55446e87cfcc7f4a298b50c84da1283f6adb66ec9bf9.json",
+        "stackTemplateAssetObjectUrl": "s3://cdk-hnb659fds-assets-162216049230-us-west-1/d60809050e582bbf922d8a86033389bd0b6c2612145425ba729c65682fb8411d.json",
         "requiresBootstrapStackVersion": 6,
         "bootstrapStackVersionSsmParameter": "/cdk-bootstrap/hnb659fds/version",
         "additionalDependencies": [
@@ -154,8 +154,8 @@
       },
       "dependencies": [
         "LongTail-Network",
-        "LongTail-Dns",
         "LongTail-Data",
+        "LongTail-Dns",
         "LongTail-Compute.assets"
       ],
       "additionalMetadataFile": "LongTail-Compute.metadata.json",

@@ -11,12 +11,366 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Compute/Cluster/Resource"
+   }
+  },
+  "ClusterDefaultServiceDiscoveryNamespaceC336F9B4": {
+   "Type": "AWS::ServiceDiscovery::PrivateDnsNamespace",
+   "Properties": {
+    "Name": "longtail.local",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ],
+    "Vpc": {
+     "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpc8378EB38272D6E3A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Cluster/DefaultServiceDiscoveryNamespace/Resource"
+   }
+  },
+  "NatsLogGroup17D06A46": {
+   "Type": "AWS::Logs::LogGroup",
+   "Properties": {
+    "LogGroupName": "/ecs/longtail/nats",
+    "RetentionInDays": 7,
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ]
+   },
+   "UpdateReplacePolicy": "Delete",
+   "DeletionPolicy": "Delete",
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsLogGroup/Resource"
+   }
+  },
+  "NatsTaskDefTaskRoleC2844904": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsTaskDef/TaskRole/Resource"
+   }
+  },
+  "NatsTaskDefE394A84B": {
+   "Type": "AWS::ECS::TaskDefinition",
+   "Properties": {
+    "ContainerDefinitions": [
+     {
+      "Command": [
+       "printf 'port: 4222\\nhttp_port: 8222\\nauthorization { token: %s }\\nwebsocket { port: 9222\\n  no_tls: true\\n}\\n' \"$NATS_TOKEN\" > /tmp/nats.conf && exec nats-server -c /tmp/nats.conf"
+      ],
+      "EntryPoint": [
+       "sh",
+       "-c"
+      ],
+      "Essential": true,
+      "Image": "nats:2-alpine",
+      "LogConfiguration": {
+       "LogDriver": "awslogs",
+       "Options": {
+        "awslogs-group": {
+         "Ref": "NatsLogGroup17D06A46"
+        },
+        "awslogs-stream-prefix": "nats",
+        "awslogs-region": "us-west-1"
+       }
+      },
+      "Name": "nats",
+      "PortMappings": [
+       {
+        "ContainerPort": 4222,
+        "Protocol": "tcp"
+       },
+       {
+        "ContainerPort": 9222,
+        "Protocol": "tcp"
+       },
+       {
+        "ContainerPort": 8222,
+        "Protocol": "tcp"
+       }
+      ],
+      "Secrets": [
+       {
+        "Name": "NATS_TOKEN",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+        }
+       }
+      ]
+     }
+    ],
+    "Cpu": "256",
+    "ExecutionRoleArn": {
+     "Fn::GetAtt": [
+      "NatsTaskDefExecutionRole513AE32D",
+      "Arn"
+     ]
+    },
+    "Family": "LongTailComputeNatsTaskDefC3BCD471",
+    "Memory": "512",
+    "NetworkMode": "awsvpc",
+    "RequiresCompatibilities": [
+     "FARGATE"
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ],
+    "TaskRoleArn": {
+     "Fn::GetAtt": [
+      "NatsTaskDefTaskRoleC2844904",
+      "Arn"
+     ]
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsTaskDef/Resource"
+   }
+  },
+  "NatsTaskDefExecutionRole513AE32D": {
+   "Type": "AWS::IAM::Role",
+   "Properties": {
+    "AssumeRolePolicyDocument": {
+     "Statement": [
+      {
+       "Action": "sts:AssumeRole",
+       "Effect": "Allow",
+       "Principal": {
+        "Service": "ecs-tasks.amazonaws.com"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsTaskDef/ExecutionRole/Resource"
+   }
+  },
+  "NatsTaskDefExecutionRoleDefaultPolicy073422A0": {
+   "Type": "AWS::IAM::Policy",
+   "Properties": {
+    "PolicyDocument": {
+     "Statement": [
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::GetAtt": [
+         "NatsLogGroup17D06A46",
+         "Arn"
+        ]
+       }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+       }
+      }
+     ],
+     "Version": "2012-10-17"
+    },
+    "PolicyName": "NatsTaskDefExecutionRoleDefaultPolicy073422A0",
+    "Roles": [
+     {
+      "Ref": "NatsTaskDefExecutionRole513AE32D"
+     }
+    ]
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsTaskDef/ExecutionRole/DefaultPolicy/Resource"
+   }
+  },
+  "NatsService498B6824": {
+   "Type": "AWS::ECS::Service",
+   "Properties": {
+    "Cluster": {
+     "Ref": "ClusterEB0386A7"
+    },
+    "DeploymentConfiguration": {
+     "Alarms": {
+      "AlarmNames": [],
+      "Enable": false,
+      "Rollback": false
+     },
+     "MaximumPercent": 200,
+     "MinimumHealthyPercent": 50
+    },
+    "DesiredCount": 1,
+    "EnableECSManagedTags": false,
+    "HealthCheckGracePeriodSeconds": 60,
+    "LaunchType": "FARGATE",
+    "LoadBalancers": [
+     {
+      "ContainerName": "nats",
+      "ContainerPort": 9222,
+      "TargetGroupArn": {
+       "Ref": "AlbNatsWsListenerNatsWsTargetGroup55BB9672"
+      }
+     }
+    ],
+    "NetworkConfiguration": {
+     "AwsvpcConfiguration": {
+      "AssignPublicIp": "DISABLED",
+      "SecurityGroups": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputFnGetAttNatsSecurityGroup9384EC4DGroupIdEF0D355A"
+       }
+      ],
+      "Subnets": [
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940"
+       },
+       {
+        "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3"
+       }
+      ]
+     }
+    },
+    "ServiceName": "nats",
+    "ServiceRegistries": [
+     {
+      "RegistryArn": {
+       "Fn::GetAtt": [
+        "NatsServiceCloudmapServiceB395827E",
+        "Arn"
+       ]
+      }
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ],
+    "TaskDefinition": {
+     "Ref": "NatsTaskDefE394A84B"
+    }
+   },
+   "DependsOn": [
+    "AlbNatsWsListenerNatsWsTargetRule0A58F533",
+    "NatsTaskDefTaskRoleC2844904"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsService/Service"
+   }
+  },
+  "NatsServiceCloudmapServiceB395827E": {
+   "Type": "AWS::ServiceDiscovery::Service",
+   "Properties": {
+    "DnsConfig": {
+     "DnsRecords": [
+      {
+       "TTL": 60,
+       "Type": "A"
+      }
+     ],
+     "NamespaceId": {
+      "Fn::GetAtt": [
+       "ClusterDefaultServiceDiscoveryNamespaceC336F9B4",
+       "Id"
+      ]
+     },
+     "RoutingPolicy": "MULTIVALUE"
+    },
+    "HealthCheckCustomConfig": {
+     "FailureThreshold": 1
+    },
+    "Name": "nats",
+    "NamespaceId": {
+     "Fn::GetAtt": [
+      "ClusterDefaultServiceDiscoveryNamespaceC336F9B4",
+      "Id"
+     ]
+    },
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ]
+   },
+   "DependsOn": [
+    "NatsTaskDefTaskRoleC2844904"
+   ],
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/NatsService/CloudmapService/Resource"
    }
   },
   "Alb16C2F182": {
@@ -49,7 +403,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "Type": "application"
@@ -127,7 +481,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "TargetGroupAttributes": [
@@ -176,6 +530,103 @@
     "aws:cdk:path": "LongTail-Compute/Alb/HttpsListener/ApiTargetRule/Resource"
    }
   },
+  "AlbNatsWsListener945D7109": {
+   "Type": "AWS::ElasticLoadBalancingV2::Listener",
+   "Properties": {
+    "Certificates": [
+     {
+      "CertificateArn": {
+       "Fn::ImportValue": "LongTail-Dns:ExportsOutputRefCertificate4E7ABB08F7C8AF50"
+      }
+     }
+    ],
+    "DefaultActions": [
+     {
+      "FixedResponseConfig": {
+       "ContentType": "text/plain",
+       "MessageBody": "Not Found",
+       "StatusCode": "404"
+      },
+      "Type": "fixed-response"
+     }
+    ],
+    "LoadBalancerArn": {
+     "Ref": "Alb16C2F182"
+    },
+    "Port": 9222,
+    "Protocol": "HTTPS"
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/NatsWsListener/Resource"
+   }
+  },
+  "AlbNatsWsListenerNatsWsTargetGroup55BB9672": {
+   "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+   "Properties": {
+    "HealthCheckIntervalSeconds": 30,
+    "HealthCheckPath": "/",
+    "HealthCheckPort": "8222",
+    "HealthCheckProtocol": "HTTP",
+    "HealthCheckTimeoutSeconds": 10,
+    "HealthyThresholdCount": 2,
+    "Port": 9222,
+    "Protocol": "HTTP",
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ],
+    "TargetGroupAttributes": [
+     {
+      "Key": "stickiness.enabled",
+      "Value": "false"
+     }
+    ],
+    "TargetType": "ip",
+    "UnhealthyThresholdCount": 3,
+    "VpcId": {
+     "Fn::ImportValue": "LongTail-Network:ExportsOutputRefVpc8378EB38272D6E3A"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/NatsWsListener/NatsWsTargetGroup/Resource"
+   }
+  },
+  "AlbNatsWsListenerNatsWsTargetRule0A58F533": {
+   "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+   "Properties": {
+    "Actions": [
+     {
+      "TargetGroupArn": {
+       "Ref": "AlbNatsWsListenerNatsWsTargetGroup55BB9672"
+      },
+      "Type": "forward"
+     }
+    ],
+    "Conditions": [
+     {
+      "Field": "path-pattern",
+      "PathPatternConfig": {
+       "Values": [
+        "/*"
+       ]
+      }
+     }
+    ],
+    "ListenerArn": {
+     "Ref": "AlbNatsWsListener945D7109"
+    },
+    "Priority": 1
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Compute/Alb/NatsWsListener/NatsWsTargetRule/Resource"
+   }
+  },
   "ApiLogGroup1DEDFC07": {
    "Type": "AWS::Logs::LogGroup",
    "Properties": {
@@ -188,7 +639,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -220,7 +671,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -263,6 +714,30 @@
          ]
         }
        ]
+      },
+      {
+       "Action": [
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": "logs:DescribeLogGroups",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:DescribeLogStreams",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
       }
      ],
      "Version": "2012-10-17"
@@ -325,11 +800,19 @@
        {
         "Name": "PORT",
         "Value": "3030"
+       },
+       {
+        "Name": "NATS_URL",
+        "Value": "nats://nats.longtail.local:4222"
+       },
+       {
+        "Name": "NATS_WS_URL",
+        "Value": "wss://longtail.hotmesh.io:9222"
        }
       ],
       "Essential": true,
       "Image": {
-       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc"
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:71b8452da7f3bfaba9d1a94c87dfafe23f55b1ee9107a4788dcf146790655259"
       },
       "LogConfiguration": {
        "LogDriver": "awslogs",
@@ -426,6 +909,12 @@
         "ValueFrom": {
          "Fn::ImportValue": "LongTail-Data:ExportsOutputRefSeedAdminPasswordFD70C749E8BAC7AA"
         }
+       },
+       {
+        "Name": "NATS_TOKEN",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+        }
        }
       ]
      }
@@ -450,7 +939,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "TaskRoleArn": {
@@ -486,7 +975,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -606,6 +1095,16 @@
        "Resource": {
         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefSeedAdminPasswordFD70C749E8BAC7AA"
        }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+       }
       }
      ],
      "Version": "2012-10-17"
@@ -638,6 +1137,7 @@
     },
     "DesiredCount": 1,
     "EnableECSManagedTags": false,
+    "EnableExecuteCommand": true,
     "HealthCheckGracePeriodSeconds": 60,
     "LaunchType": "FARGATE",
     "LoadBalancers": [
@@ -675,7 +1175,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "TaskDefinition": {
@@ -772,7 +1272,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -804,7 +1304,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -847,6 +1347,30 @@
          ]
         }
        ]
+      },
+      {
+       "Action": [
+        "ssmmessages:CreateControlChannel",
+        "ssmmessages:CreateDataChannel",
+        "ssmmessages:OpenControlChannel",
+        "ssmmessages:OpenDataChannel"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": "logs:DescribeLogGroups",
+       "Effect": "Allow",
+       "Resource": "*"
+      },
+      {
+       "Action": [
+        "logs:CreateLogStream",
+        "logs:DescribeLogStreams",
+        "logs:PutLogEvents"
+       ],
+       "Effect": "Allow",
+       "Resource": "*"
       }
      ],
      "Version": "2012-10-17"
@@ -905,11 +1429,15 @@
        {
         "Name": "APP_ROLE",
         "Value": "worker"
+       },
+       {
+        "Name": "NATS_URL",
+        "Value": "nats://nats.longtail.local:4222"
        }
       ],
       "Essential": true,
       "Image": {
-       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:b8709e73db5c0ec441870d9c6799ed660bc7ce025f8aaa7206cc258ef93432dc"
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:71b8452da7f3bfaba9d1a94c87dfafe23f55b1ee9107a4788dcf146790655259"
       },
       "LogConfiguration": {
        "LogDriver": "awslogs",
@@ -994,6 +1522,12 @@
         "ValueFrom": {
          "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
         }
+       },
+       {
+        "Name": "NATS_TOKEN",
+        "ValueFrom": {
+         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+        }
        }
       ],
       "StopTimeout": 120
@@ -1019,7 +1553,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "TaskRoleArn": {
@@ -1055,7 +1589,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -1165,6 +1699,16 @@
        "Resource": {
         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOpenaiApiKeyC0247A05EDD4B358"
        }
+      },
+      {
+       "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+       ],
+       "Effect": "Allow",
+       "Resource": {
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefNatsToken456B2AD973FDF1CF"
+       }
       }
      ],
      "Version": "2012-10-17"
@@ -1197,6 +1741,7 @@
     },
     "DesiredCount": 1,
     "EnableECSManagedTags": false,
+    "EnableExecuteCommand": true,
     "LaunchType": "FARGATE",
     "NetworkConfiguration": {
      "AwsvpcConfiguration": {
@@ -1224,7 +1769,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "TaskDefinition": {
@@ -1344,7 +1889,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21RXU/DMAz8LbxnAQr7AfsQCAkJ1O4deakXmWZxFTtDqOp/R203tiGefHe2T+eksMW8sHc38CUzVzezQFvbVQquMfAlHx06sd0qZFFMZrWLJ/gEyYPiBqRZ444iKXEcBv4qHBUoYrrQjrsVpgM5HJZOsHIQYBtG2xXnqL3BAKLkAkO9hQDRUfSHwnaLtg3kYDB8ZaiXY2/KeMUv50gU43HmhC/6G0ge9TlxbqdLzvQflzIHvHQaeG8Ce7HdK/tfmxPuDcHediVPa2N950Due6AT6g269AEiqGLX7BpML3vwuBiUoWdLbFlIOX0vQdDAORdkZXEQKHrbnR9yuGF84mtlKpsErqHoq2nvHOdK6E3irDh/sN2iRMepHg8YUYXa92bMVyl4it6UKJzT9LFvWdusvYlco/2U20PxaO/n9u7mU4hmKUelPdpyqj+r0I+ZjAIAAA=="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21R0W7bMAz8lr4r6uChH5Am2DCg2Ao77wUjswJrRTREykVg+N8Ly83ibAUE8HhHniiqstVDZb/dwbtsXNttAh3t2Ci4zsC7vIzoxI67kEUxmd1rvMAfkDwoHkC6Pb5SJCWOc8G/DEcFiphW3Gdvg2kgh3PTBTYOAhxDsd1xjjoZWaSWxPGA6WzH50QDKO6j/IYTSg+Lx1f0/1dMJrAXOz6x/5k497N0wZMhONmx5lA6SnzmQO5c/AuaDAYQJRcY2iMEiI6iHyo7bvs+kIP5hU8M7WPRlqXd5Os6EsX4WXPBK/0AyaP+nXOdfuFS52XudT4ZdOkFRFDF7tl1mH6dwON2ZmbN1tizkHI6P4KggasvZGVxECh6O15/Zp6hLPSWWcIhgeso+mbpu27vhphM4qz48N2O2xodp7bsu6AGdZpMma9R8BS9qVE4p+Ub/2Tts04mcov2Te6HqrLzuXsTok3KUemEtl7iBx0sBJrdAgAA"
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Compute/CDKMetadata/Default"
@@ -1364,6 +1909,10 @@
   "ServiceUrl": {
    "Description": "Application URL",
    "Value": "https://longtail.hotmesh.io"
+  },
+  "NatsWsUrl": {
+   "Description": "NATS WebSocket URL for browser connections",
+   "Value": "wss://longtail.hotmesh.io:9222"
   }
  },
  "Parameters": {

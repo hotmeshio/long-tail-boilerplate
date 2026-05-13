@@ -12,6 +12,7 @@ services:
       POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
       POSTGRES_PORT: ${POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
+      LT_S3_PUBLIC_ENDPOINT: http://localhost:9002
       NATS_URL: nats://nats:4222
       NATS_TOKEN: dev_api_secret
       NATS_WS_URL: ws://localhost:9222
