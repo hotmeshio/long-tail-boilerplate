@@ -18,7 +18,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -51,7 +51,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -76,7 +76,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -134,7 +134,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -165,7 +165,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -202,7 +202,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -227,7 +227,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -295,7 +295,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -320,7 +320,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -385,7 +385,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -410,7 +410,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -475,7 +475,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -500,7 +500,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -550,7 +550,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -575,7 +575,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -614,7 +614,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ]
    },
@@ -661,6 +661,13 @@
       "FromPort": 443,
       "IpProtocol": "tcp",
       "ToPort": 443
+     },
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "NATS WebSocket from anywhere (TLS terminated at ALB)",
+      "FromPort": 9222,
+      "IpProtocol": "tcp",
+      "ToPort": 9222
      }
     ],
     "Tags": [
@@ -670,7 +677,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -699,7 +706,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -752,7 +759,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -761,6 +768,131 @@
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Network/WorkerSecurityGroup/Resource"
+   }
+  },
+  "NatsSecurityGroup9384EC4D": {
+   "Type": "AWS::EC2::SecurityGroup",
+   "Properties": {
+    "GroupDescription": "Security group for NATS event bus",
+    "SecurityGroupEgress": [
+     {
+      "CidrIp": "0.0.0.0/0",
+      "Description": "Allow all outbound traffic by default",
+      "IpProtocol": "-1"
+     }
+    ],
+    "Tags": [
+     {
+      "Key": "Environment",
+      "Value": "production"
+     },
+     {
+      "Key": "Project",
+      "Value": "longtail"
+     }
+    ],
+    "VpcId": {
+     "Ref": "Vpc8378EB38"
+    }
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Network/NatsSecurityGroup/Resource"
+   }
+  },
+  "NatsSecurityGroupfromLongTailNetworkAppSecurityGroup7830FEA942226674D6EC": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "API tasks to NATS",
+    "FromPort": 4222,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "NatsSecurityGroup9384EC4D",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AppSecurityGroupC396D536",
+      "GroupId"
+     ]
+    },
+    "ToPort": 4222
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Network/NatsSecurityGroup/from LongTailNetworkAppSecurityGroup7830FEA9:4222"
+   }
+  },
+  "NatsSecurityGroupfromLongTailNetworkWorkerSecurityGroup34DBA06A422259F865AB": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "Worker tasks to NATS",
+    "FromPort": 4222,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "NatsSecurityGroup9384EC4D",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "WorkerSecurityGroup5529CF0B",
+      "GroupId"
+     ]
+    },
+    "ToPort": 4222
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Network/NatsSecurityGroup/from LongTailNetworkWorkerSecurityGroup34DBA06A:4222"
+   }
+  },
+  "NatsSecurityGroupfromLongTailNetworkAlbSecurityGroupC65482D49222E16B411F": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "ALB to NATS WebSocket",
+    "FromPort": 9222,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "NatsSecurityGroup9384EC4D",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AlbSecurityGroup86A59E99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 9222
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Network/NatsSecurityGroup/from LongTailNetworkAlbSecurityGroupC65482D4:9222"
+   }
+  },
+  "NatsSecurityGroupfromLongTailNetworkAlbSecurityGroupC65482D48222249CF603": {
+   "Type": "AWS::EC2::SecurityGroupIngress",
+   "Properties": {
+    "Description": "ALB health check to NATS monitoring",
+    "FromPort": 8222,
+    "GroupId": {
+     "Fn::GetAtt": [
+      "NatsSecurityGroup9384EC4D",
+      "GroupId"
+     ]
+    },
+    "IpProtocol": "tcp",
+    "SourceSecurityGroupId": {
+     "Fn::GetAtt": [
+      "AlbSecurityGroup86A59E99",
+      "GroupId"
+     ]
+    },
+    "ToPort": 8222
+   },
+   "Metadata": {
+    "aws:cdk:path": "LongTail-Network/NatsSecurityGroup/from LongTailNetworkAlbSecurityGroupC65482D4:8222"
    }
   },
   "DbSecurityGroupE9D701AD": {
@@ -781,7 +913,7 @@
      },
      {
       "Key": "Project",
-      "Value": "long-tail"
+      "Value": "longtail"
      }
     ],
     "VpcId": {
@@ -843,7 +975,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/32OwYrCQBBEv8X7ZHSH9QNERHJZQiJepdP27rbGHpnuMYj475J1MTdPVfUoigo+zIOfTaDXAvfHouPW3xoDPDrodUcY/G17Rrf8lm21dFVuO8Ymt0I2sNHVMRttoO1o5CNbqEZkMI7yKg9mVVaDfIGtwaiHq6sSX8BoHC7FKAm9Cs8n/2lhBvh7IjHXEObEdl2nmM9/H96CUn4Sqd5dTRpzQro7iXvyB51ewqf/mPvZ5KDMRcpifCJfP/UB+Ar5dzEBAAA="
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/32OUYvCQAyEf4vv271jwR8gckhfpLTSV0lj7i5as7LJtoj436XnYd+EwMx8DGGCD8vgPxcwaoGHU9Fz52+NAZ4cjLonDP7WXtCtv6Wt1q7KXc/Y5E7IJja7OmajHXQ9zXxmK9WIDMZRXuXJfJXVJFuwDRiNcHVV4gGM5selGCWhV+G55D+tzAB/zyTmGsKc2K6bFPPlb8NbUMpPItW7q0ljTkh3J/FA/qgfQwh+usVRmYuUxfhMvn7qA5sfBeExAQAA"
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Network/CDKMetadata/Default"
@@ -878,6 +1010,41 @@
     "Name": "LongTail-Network:ExportsOutputFnGetAttDbSecurityGroupE9D701ADGroupId7A7C114A"
    }
   },
+  "ExportsOutputRefVpc8378EB38272D6E3A": {
+   "Value": {
+    "Ref": "Vpc8378EB38"
+   },
+   "Export": {
+    "Name": "LongTail-Network:ExportsOutputRefVpc8378EB38272D6E3A"
+   }
+  },
+  "ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940": {
+   "Value": {
+    "Ref": "VpcPrivateSubnet1Subnet536B997A"
+   },
+   "Export": {
+    "Name": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940"
+   }
+  },
+  "ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3": {
+   "Value": {
+    "Ref": "VpcPrivateSubnet2Subnet3788AAA1"
+   },
+   "Export": {
+    "Name": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3"
+   }
+  },
+  "ExportsOutputFnGetAttNatsSecurityGroup9384EC4DGroupIdEF0D355A": {
+   "Value": {
+    "Fn::GetAtt": [
+     "NatsSecurityGroup9384EC4D",
+     "GroupId"
+    ]
+   },
+   "Export": {
+    "Name": "LongTail-Network:ExportsOutputFnGetAttNatsSecurityGroup9384EC4DGroupIdEF0D355A"
+   }
+  },
   "ExportsOutputFnGetAttAlbSecurityGroup86A59E99GroupIdE3A37BC7": {
    "Value": {
     "Fn::GetAtt": [
@@ -903,30 +1070,6 @@
    },
    "Export": {
     "Name": "LongTail-Network:ExportsOutputRefVpcPublicSubnet2Subnet691E08A351552740"
-   }
-  },
-  "ExportsOutputRefVpc8378EB38272D6E3A": {
-   "Value": {
-    "Ref": "Vpc8378EB38"
-   },
-   "Export": {
-    "Name": "LongTail-Network:ExportsOutputRefVpc8378EB38272D6E3A"
-   }
-  },
-  "ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940": {
-   "Value": {
-    "Ref": "VpcPrivateSubnet1Subnet536B997A"
-   },
-   "Export": {
-    "Name": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet1Subnet536B997AFD4CC940"
-   }
-  },
-  "ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3": {
-   "Value": {
-    "Ref": "VpcPrivateSubnet2Subnet3788AAA1"
-   },
-   "Export": {
-    "Name": "LongTail-Network:ExportsOutputRefVpcPrivateSubnet2Subnet3788AAA1380949A3"
    }
   },
   "ExportsOutputFnGetAttAppSecurityGroupC396D536GroupId4ECD26A6": {

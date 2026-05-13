@@ -3,7 +3,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     },
@@ -16,8 +16,45 @@
         },
         {
           "key": "Project",
-          "value": "long-tail"
+          "value": "longtail"
         }
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsService": [
+    {
+      "type": "aws:cdk:warning",
+      "data": "minHealthyPercent has not been configured so the default value of 50% is used. The number of running tasks will decrease below the desired count during deployments etc. See https://github.com/aws/aws-cdk/issues/31705 [ack: @aws-cdk/aws-ecs:minHealthyPercent]",
+      "trace": [
+        "Annotations.addMessage (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/core/lib/annotations.js:1:2399)",
+        "Annotations.addWarningV2 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/core/lib/annotations.js:1:1087)",
+        "new BaseService2 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/aws-ecs/lib/base/base-service.js:1:13903)",
+        "new BaseService2 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/core/lib/no-box-stack-traces.js:1:345)",
+        "new FargateService2 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/aws-ecs/lib/fargate/fargate-service.js:1:6805)",
+        "new FargateService2 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/node_modules/aws-cdk-lib/core/lib/prop-injectable.js:1:855)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:140:25)",
+        "Object.<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "Module._compile (node:internal/modules/cjs/loader:1705:14)",
+        "Module.m._compile (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/index.ts:1618:23)",
+        "node:internal/modules/cjs/loader:1838:10",
+        "Object.require.extensions.<computed> [as .ts] (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/index.ts:1621:12)",
+        "Module.load (node:internal/modules/cjs/loader:1441:32)",
+        "Function._load (node:internal/modules/cjs/loader:1263:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:328:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:237:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "phase4 (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/bin.ts:649:14)",
+        "bootstrap (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/bin.ts:95:10)",
+        "main (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/bin.ts:55:10)",
+        "Object.<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/node_modules/ts-node/src/bin.ts:800:3)",
+        "Module._compile (node:internal/modules/cjs/loader:1705:14)",
+        "Object.<anonymous> (node:internal/modules/cjs/loader:1838:10)",
+        "Module.load (node:internal/modules/cjs/loader:1441:32)",
+        "Function._load (node:internal/modules/cjs/loader:1263:12)",
+        "TracingChannel.traceSync (node:diagnostics_channel:328:14)",
+        "wrapModuleLoad (node:internal/modules/cjs/loader:237:24)",
+        "Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)",
+        "node:internal/main/run_main_module:36:49"
       ]
     }
   ],
@@ -29,8 +66,8 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:249:5)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:357:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -43,8 +80,22 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:254:5)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:362:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsWsUrl": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsWsUrl"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:367:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -84,8 +135,53 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Cluster2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:83:21)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:91:21)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsLogGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsLogGroup17D06A46"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new LogGroup2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:107:26)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsTaskDef/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsTaskDefE394A84B"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new FargateTaskDefinition2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:113:25)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsService/Service": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsService498B6824"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new FargateService2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:140:25)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -99,8 +195,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new ApplicationLoadBalancer2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:90:16)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:155:16)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -114,8 +210,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new LogGroup2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:118:25)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:217:25)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -129,8 +225,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateTaskDefinition2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:124:24)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:223:24)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -144,8 +240,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateService2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:150:24)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:252:24)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -159,8 +255,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new LogGroup2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:190:28)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:293:28)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -174,8 +270,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateTaskDefinition2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:196:27)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:299:27)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -189,8 +285,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateService2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:218:27)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:325:27)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -204,8 +300,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new ARecord2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:239:5)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:347:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -223,6 +319,66 @@
       ]
     }
   ],
+  "/LongTail-Compute/Cluster/DefaultServiceDiscoveryNamespace/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "ClusterDefaultServiceDiscoveryNamespaceC336F9B4"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new Cluster2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:91:21)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsTaskDef/TaskRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsTaskDefTaskRoleC2844904"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new FargateTaskDefinition2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:113:25)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsTaskDef/ExecutionRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsTaskDefExecutionRole513AE32D"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:118:17)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsService/CloudmapService/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsServiceCloudmapServiceB395827E"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new FargateService2 in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:140:25)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
   "/LongTail-Compute/Alb/HttpRedirect/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -232,8 +388,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:97:14)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:162:14)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -247,8 +403,23 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:105:36)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:170:36)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/Alb/NatsWsListener/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlbNatsWsListener945D7109"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:183:37)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -262,8 +433,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateTaskDefinition2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:124:24)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:223:24)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -277,8 +448,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:129:16)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:228:16)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -292,8 +463,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new FargateTaskDefinition2 in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:196:27)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:299:27)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -307,8 +478,23 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:201:19)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:304:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/NatsTaskDef/ExecutionRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsTaskDefExecutionRoleDefaultPolicy073422A0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:118:17)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -322,8 +508,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:170:19)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:273:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -337,8 +523,38 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:170:19)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:273:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/Alb/NatsWsListener/NatsWsTargetGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlbNatsWsListenerNatsWsTargetGroup55BB9672"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:193:20)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Compute/Alb/NatsWsListener/NatsWsTargetRule/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AlbNatsWsListenerNatsWsTargetRule0A58F533"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...WrappedClass.<anonymous> in aws-cdk-lib...",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:193:20)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -352,8 +568,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.grantReadWrite in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:148:12)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:250:12)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -367,8 +583,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:129:16)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:228:16)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -382,8 +598,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.autoScaleTaskCount in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:162:35)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:265:35)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -397,8 +613,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.grantReadWrite in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:216:12)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:323:12)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -412,8 +628,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.<anonymous> in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:201:19)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:304:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -427,8 +643,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...WrappedClass.autoScaleTaskCount in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:229:41)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:337:41)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -442,8 +658,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...ScalableTaskCount.scaleOnCpuUtilization in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:166:16)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:269:16)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -457,8 +673,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...ScalableTaskCount.scaleOnCpuUtilization in aws-cdk-lib...",
-        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:233:19)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:34:1)",
+        "new ComputeStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/compute-stack.ts:341:19)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:36:1)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }

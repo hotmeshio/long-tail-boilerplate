@@ -53,7 +53,7 @@ function sleep(ms: number) {
 
 function buildManifest(): any[] {
   const manifest: any[] = [
-    { activity_id: 'trigger_ff', title: 'Trigger', type: 'trigger', tool_source: 'trigger', topic: 'factory.floor', input_mappings: {}, output_fields: ['orderId', 'product'] },
+    { activity_id: 'trigger_ff', title: 'Trigger', type: 'trigger', tool_source: 'trigger', topic: 'factory_floor', input_mappings: {}, output_fields: ['orderId', 'product'] },
   ];
 
   // 5 automated steps — all use a simple factory_step tool (we'll register it as a no-op MCP tool isn't needed; the YAML worker will call it)
@@ -63,7 +63,7 @@ function buildManifest(): any[] {
       title: step,
       type: 'worker',
       tool_source: 'mcp',
-      topic: 'factory.floor',
+      topic: 'factory_floor',
       workflow_name: 'get_knowledge',
       mcp_server_id: 'long-tail-knowledge',
       mcp_tool_name: 'get_knowledge',
@@ -84,7 +84,7 @@ function buildManifest(): any[] {
       title: `Escalate ${STATIONS[i]}`,
       type: 'worker',
       tool_source: 'mcp',
-      topic: 'factory.floor',
+      topic: 'factory_floor',
       workflow_name: 'escalate_and_wait',
       mcp_server_id: 'long-tail-human-queue',
       mcp_tool_name: 'escalate_and_wait',
@@ -96,7 +96,7 @@ function buildManifest(): any[] {
       title: `Wait ${STATIONS[i]}`,
       type: 'hook',
       tool_source: 'signal',
-      topic: 'factory.floor',
+      topic: 'factory_floor',
       hook_topic: hookTopics[i],
       input_mappings: {},
       output_fields: [],
@@ -106,7 +106,7 @@ function buildManifest(): any[] {
       title: `Resolve ${STATIONS[i]}`,
       type: 'worker',
       tool_source: 'mcp',
-      topic: 'factory.floor',
+      topic: 'factory_floor',
       workflow_name: 'resolve_escalation',
       mcp_server_id: 'long-tail-human-queue',
       mcp_tool_name: 'resolve_escalation',
@@ -121,7 +121,7 @@ function buildManifest(): any[] {
     title: 'Complete',
     type: 'worker',
     tool_source: 'mcp',
-    topic: 'factory.floor',
+    topic: 'factory_floor',
     workflow_name: 'factory_step',
     mcp_server_id: 'long-tail-human-queue',
     mcp_tool_name: 'factory_step',
@@ -133,7 +133,7 @@ function buildManifest(): any[] {
     title: 'Done',
     type: 'hook',
     tool_source: 'signal',
-    topic: 'factory.floor',
+    topic: 'factory_floor',
     input_mappings: {},
     output_fields: [],
   });
@@ -150,10 +150,10 @@ async function main() {
   if (!token) { console.error('Login failed'); process.exit(1); }
 
   // 2. Deploy workflow
-  console.log('2. Deploy factory.floor workflow');
+  console.log('2. Deploy factory_floor workflow');
   const yamlContent = readFileSync(join(__dirname, 'yaml/04-factory.yaml'), 'utf-8');
 
-  const existing = await api('GET', '/yaml-workflows?graph_topic=factory.floor&limit=1', undefined, token);
+  const existing = await api('GET', '/yaml-workflows?graph_topic=factory_floor&limit=1', undefined, token);
   let wfId: string;
 
   if (existing?.workflows?.length) {
@@ -174,7 +174,7 @@ async function main() {
     }
   } else {
     const created = await api('POST', '/yaml-workflows/direct', {
-      name: 'factory.floor',
+      name: 'factory_floor',
       description: 'Factory floor: 5 auto + 5 human stations + rollup',
       yaml_content: yamlContent,
       input_schema: { type: 'object', properties: { orderId: { type: 'string' }, product: { type: 'string' } }, required: ['orderId', 'product'] },

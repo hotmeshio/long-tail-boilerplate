@@ -3,7 +3,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:31:13)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:33:13)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     },
@@ -16,7 +16,7 @@
         },
         {
           "key": "Project",
-          "value": "long-tail"
+          "value": "longtail"
         }
       ]
     }
@@ -29,8 +29,8 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new DnsStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/dns-stack.ts:22:5)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:31:13)",
+        "new DnsStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/dns-stack.ts:30:5)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:33:13)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
@@ -70,8 +70,8 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Certificate2 in aws-cdk-lib...",
-        "new DnsStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/dns-stack.ts:17:24)",
-        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:31:13)",
+        "new DnsStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/dns-stack.ts:25:24)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:33:13)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
     }
