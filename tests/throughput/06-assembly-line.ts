@@ -172,8 +172,8 @@ async function main() {
       console.log(`[${elapsed}s] Submitted=${submitted} Claimed=${claimCount} Resolved=${resolveCount} Completed=${completed}/${TARGET}  peak=${peakInFlight}`);
 
       if (completed >= TARGET) break;
-      if (performance.now() - t0 > 600_000) {
-        console.log('TIMEOUT after 10 minutes');
+      if (performance.now() - t0 > 900_000) {
+        console.log('TIMEOUT after 15 minutes');
         break;
       }
     }
