@@ -1,7 +1,7 @@
 try { require('dotenv/config'); } catch {}
 import { Pool } from 'pg';
 import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
-import type { LTWorkerConfig, LTMcpServerConfig } from '@hotmeshio/long-tail';
+import type { LTStartConfig, LTWorkerConfig, LTMcpServerConfig, LTAgentConfig } from '@hotmeshio/long-tail';
 
 import * as helloWorld from './workflows/hello-world';
 import * as contentReview from './workflows/content-review';
@@ -16,7 +16,7 @@ import { createGmailServer, GMAIL_SERVER_CONFIG } from './mcp-servers/gmail';
 
 const bcrypt: any = require('bcryptjs');
 
-// ── Constants ───────────────────────────────────────────────────────────────
+// ── Roles ──────────────────────────────────────────────────────────────────
 
 const REVIEWER = 'reviewer';
 const ENGINEER = 'engineer';
@@ -24,6 +24,8 @@ const ADMIN = 'admin';
 const SUPERADMIN = 'superadmin';
 const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
 const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
+
+// ── Database ───────────────────────────────────────────────────────────────
 
 const DB_CONFIG = {
   host: process.env.POSTGRES_HOST || 'localhost',
@@ -33,7 +35,7 @@ const DB_CONFIG = {
   database: process.env.POSTGRES_DB || 'myapp',
 };
 
-// ── Worker configs ──────────────────────────────────────────────────────────
+// ── Workflow configs ───────────────────────────────────────────────────────
 
 const helloWorldConfig: LTWorkerConfig = {
   description: 'Hello world — minimal durable workflow with sleep and IAM context',
@@ -134,14 +136,9 @@ const workstationConfig: LTWorkerConfig = {
   resolverSchema: { approved: true, station: 'grinder' },
 };
 
-// APP_ROLE controls the container's behavior:
-//   'api'    — dashboard + REST API, readonly workflow observers
-//   'worker' — workflow execution only, no HTTP server
-//   unset    — full standalone mode (local dev via docker compose)
-const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
+// ── Workers ────────────────────────────────────────────────────────────────
 
-// Active worker registrations with inline config
-const WORKERS = [
+const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'default', workflow: helloWorld.helloWorkflow, config: helloWorldConfig },
   { taskQueue: 'default', workflow: contentReview.reviewContent, config: contentReviewConfig },
   { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, config: screenshotConfig },
@@ -151,22 +148,75 @@ const WORKERS = [
   { taskQueue: 'assembly-line', workflow: reverter, config: reverterConfig },
 ];
 
-// Readonly observers — same workflows with readonly connections for dashboard visibility
-const READONLY_OBSERVERS = WORKERS.map((w) => ({
+// Readonly observers — same workflows for dashboard visibility without competing for work
+const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({
   ...w,
   connection: { readonly: true } as const,
 }));
 
-// ── Image tools MCP server config ───────────────────────────────────────────
+// ── MCP servers ────────────────────────────────────────────────────────────
 
 const IMAGE_TOOLS_CONFIG: LTMcpServerConfig = {
   description: 'Image processing tools — resize, crop, rotate, convert, blur, compress, and more.',
   tags: ['image', 'processing', 'vision'],
+  category: 'Media',
   compileHints: 'Image tools accept file paths from storage. Use file_storage tools to upload images first.',
   toolManifest: IMAGE_TOOLS,
 };
 
-// ── Conditional seed ────────────────────────────────────────────────────────
+// ── Agents ─────────────────────────────────────────────────────────────────
+
+const AGENTS: LTAgentConfig[] = [
+  {
+    name: 'health-monitor',
+    description: 'Watches for workflow failures and alerts before cascading issues',
+    goals: 'Detect failures early, capture diagnostics, and alert before cascading issues',
+    rules: 'Do not restart failed workflows automatically. Capture state and escalate.',
+    status: 'active',
+    knowledge_domain: 'system-health',
+    schedules: [
+      { cron: '0 * * * *', workflow_type: 'helloWorkflow' },
+    ],
+    subscriptions: [
+      {
+        topic: 'workflow.failed',
+        reaction_type: 'durable',
+        workflow_type: 'helloWorkflow',
+        input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } },
+      },
+      {
+        topic: 'activity.failed',
+        reaction_type: 'durable',
+        workflow_type: 'helloWorkflow',
+        input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } },
+      },
+    ],
+  },
+  {
+    name: 'event-coordinator',
+    description: 'Routes cross-system events to workflows for automated processing',
+    goals: 'Serve as the central nervous system for event-driven automation',
+    rules: 'Route critical events within 5 seconds. Never drop events.',
+    status: 'active',
+    knowledge_domain: 'event-routing',
+    subscriptions: [
+      {
+        topic: 'app.>',
+        reaction_type: 'durable',
+        workflow_type: 'helloWorkflow',
+        input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } },
+      },
+      {
+        topic: 'knowledge.stored',
+        reaction_type: 'durable',
+        workflow_type: 'helloWorkflow',
+        input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } },
+      },
+    ],
+  },
+];
+
+// ── Seed ───────────────────────────────────────────────────────────────────
 
 const SEED_ROLES = [REVIEWER, ENGINEER, ADMIN, SUPERADMIN];
 
@@ -231,7 +281,13 @@ async function seedIfEmpty() {
   }
 }
 
-// ── Main ────────────────────────────────────────────────────────────────────
+// ── Start ──────────────────────────────────────────────────────────────────
+
+// APP_ROLE controls the container's behavior:
+//   'api'    — dashboard + REST API, readonly workflow observers
+//   'worker' — workflow execution only, no HTTP server
+//   unset    — full standalone mode (local dev via docker compose)
+const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
 
 async function main() {
   const isWorker = APP_ROLE === 'worker';
@@ -240,21 +296,17 @@ async function main() {
   const lt = await start({
     database: DB_CONFIG,
 
-    workers: isApi
-      ? READONLY_OBSERVERS
-      : WORKERS,
+    server: isWorker
+      ? { enabled: false }
+      : { port: parseInt(process.env.PORT || '3030') },
 
     auth: {
       secret: process.env.JWT_SECRET || 'change-me',
     },
 
-    server: isWorker
-      ? { enabled: false }
-      : { port: parseInt(process.env.PORT || '3030') },
+    workers: isApi ? READONLY_OBSERVERS : WORKERS,
 
-    events: process.env.NATS_URL
-      ? { adapters: [new NatsEventAdapter({ url: process.env.NATS_URL, token: process.env.NATS_TOKEN })] }
-      : undefined,
+    agents: AGENTS,
 
     mcp: {
       serverFactories: {
@@ -262,9 +314,16 @@ async function main() {
         'long-tail-gmail': { factory: createGmailServer, config: GMAIL_SERVER_CONFIG },
       },
     },
+
+    escalation: {
+      strategy: 'mcp',
+    },
+
+    events: process.env.NATS_URL
+      ? { adapters: [new NatsEventAdapter({ url: process.env.NATS_URL, token: process.env.NATS_TOKEN })] }
+      : undefined,
   });
 
-  // Seed the superadmin account on first boot (API role only, or standalone)
   if (!isWorker) {
     await seedIfEmpty();
   }
