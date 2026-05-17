@@ -27,10 +27,11 @@
     "test:assembly:100": "ts-node tests/throughput/06-assembly-line.ts 100 10",
     "test:remote:factory:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/04-factory.ts 1",
     "test:remote:factory:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 10 5",
-    "test:remote:factory:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 100 10",
+    "test:remote:factory:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 100 2",
     "test:remote:assembly:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:remote:assembly:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:remote:assembly:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 100 10",
+    "test:remote:assembly:250": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 250 5",
     "test:nats": "vitest run --config tests/integration/vitest.config.ts tests/integration/nats-events.test.ts",
     "test:self-test": "vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
     "test:self-test:remote": "REMOTE_URL=https://longtail.hotmesh.io vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
@@ -50,8 +51,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.16.1",
-    "@hotmeshio/long-tail": "^0.2.5",
+    "@hotmeshio/hotmesh": "^0.16.2",
+    "@hotmeshio/long-tail": "^0.2.6",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",
