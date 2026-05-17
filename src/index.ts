@@ -175,19 +175,21 @@ const AGENTS: LTAgentConfig[] = [
     status: 'active',
     knowledge_domain: 'system-health',
     schedules: [
-      { cron: '0 * * * *', workflow_type: 'helloWorkflow' },
+      { cron: '*/15 * * * *', workflow_type: 'helloWorkflow', execute_as: 'superadmin' },
     ],
     subscriptions: [
       {
         topic: 'workflow.failed',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
+        execute_as: 'superadmin',
         input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } },
       },
       {
         topic: 'activity.failed',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
+        execute_as: 'superadmin',
         input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } },
       },
     ],
@@ -204,12 +206,14 @@ const AGENTS: LTAgentConfig[] = [
         topic: 'app.>',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
+        execute_as: 'superadmin',
         input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } },
       },
       {
         topic: 'knowledge.stored',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
+        execute_as: 'superadmin',
         input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } },
       },
     ],
