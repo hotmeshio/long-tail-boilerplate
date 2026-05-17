@@ -1,291 +1,7 @@
 try { require('dotenv/config'); } catch {}
-import { Pool } from 'pg';
 import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
-import type { LTStartConfig, LTWorkerConfig, LTMcpServerConfig, LTAgentConfig } from '@hotmeshio/long-tail';
 
-import * as helloWorld from './workflows/hello-world';
-import * as contentReview from './workflows/content-review';
-import * as screenshotResearch from './workflows/screenshot-research';
-import { assemblyLine } from './workflows/assembly-line';
-import { workstation } from './workflows/assembly-line/worker';
-import { stepIterator } from './workflows/assembly-line/iterator';
-import { reverter } from './workflows/assembly-line/reverter';
-import { createImageToolsServer } from './mcp-servers/image-tools';
-import { IMAGE_TOOLS } from './mcp-servers/tool-manifests-image';
-import { createGmailServer, GMAIL_SERVER_CONFIG } from './mcp-servers/gmail';
-
-const bcrypt: any = require('bcryptjs');
-
-// ── Roles ──────────────────────────────────────────────────────────────────
-
-const REVIEWER = 'reviewer';
-const ENGINEER = 'engineer';
-const ADMIN = 'admin';
-const SUPERADMIN = 'superadmin';
-const CERTIFIED_ROLES = [REVIEWER, ENGINEER, ADMIN];
-const INVOCATION_ROLES = [SUPERADMIN, ENGINEER];
-
-// ── Database ───────────────────────────────────────────────────────────────
-
-const DB_CONFIG = {
-  host: process.env.POSTGRES_HOST || 'localhost',
-  port: parseInt(process.env.POSTGRES_PORT || '5416'),
-  user: process.env.POSTGRES_USER || 'postgres',
-  password: process.env.POSTGRES_PASSWORD || 'password',
-  database: process.env.POSTGRES_DB || 'myapp',
-};
-
-// ── Workflow configs ───────────────────────────────────────────────────────
-
-const helloWorldConfig: LTWorkerConfig = {
-  description: 'Hello world — minimal durable workflow with sleep and IAM context',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  envelopeSchema: {
-    data: { name: 'World' },
-    metadata: { source: 'dashboard' },
-  },
-};
-
-const contentReviewConfig: LTWorkerConfig = {
-  description: 'Content review — AI-powered moderation with human escalation for low-confidence results',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: CERTIFIED_ROLES,
-  envelopeSchema: {
-    data: { contentId: 'article-001', content: 'Content to review...', contentType: 'article' },
-    metadata: { certified: true, source: 'dashboard' },
-  },
-  resolverSchema: {
-    approved: true,
-    analysis: { confidence: 0.95, flags: [], summary: 'Manually reviewed and approved.' },
-  },
-};
-
-const screenshotConfig: LTWorkerConfig = {
-  description: 'Screenshot research — capture and analyze web pages using Playwright and Vision',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  envelopeSchema: {
-    data: { url: 'https://example.com', description: 'Capture and analyze this page' },
-    metadata: { source: 'dashboard' },
-  },
-};
-
-const assemblyLineConfig: LTWorkerConfig = {
-  description: 'Assembly line — orchestrates sequential stations with parallel child workflows and human escalation',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: CERTIFIED_ROLES,
-  envelopeSchema: {
-    data: {
-      productName: 'Widget A',
-      stations: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
-      ],
-    },
-    metadata: { certified: true, source: 'dashboard' },
-  },
-};
-
-const stepIteratorConfig: LTWorkerConfig = {
-  description: 'Step iterator — walks stations sequentially, spawning a child workstation for each step',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: CERTIFIED_ROLES,
-  envelopeSchema: {
-    data: {
-      name: 'Widget B',
-      steps: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components.' },
-      ],
-    },
-    metadata: { certified: true, source: 'dashboard' },
-  },
-};
-
-const reverterConfig: LTWorkerConfig = {
-  description: 'Reverter — like stepIterator but supports revert-on-rejection, stepping backwards',
-  invocable: true,
-  invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: CERTIFIED_ROLES,
-  envelopeSchema: {
-    data: {
-      name: 'Widget C',
-      steps: [
-        { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
-        { stationName: 'gluer', role: 'gluer', instructions: 'Bond components.' },
-      ],
-    },
-    metadata: { certified: true, source: 'dashboard' },
-  },
-  resolverSchema: { approved: true, revertSteps: 0 },
-};
-
-const workstationConfig: LTWorkerConfig = {
-  description: 'Workstation — child workflow for a single assembly station. Creates escalation, waits for human, signals parent.',
-  invocable: false,
-  defaultRole: 'grinder',
-  roles: [...CERTIFIED_ROLES, 'grinder', 'gluer'],
-  resolverSchema: { approved: true, station: 'grinder' },
-};
-
-// ── Workers ────────────────────────────────────────────────────────────────
-
-const WORKERS: LTStartConfig['workers'] = [
-  { taskQueue: 'default', workflow: helloWorld.helloWorkflow, config: helloWorldConfig },
-  { taskQueue: 'default', workflow: contentReview.reviewContent, config: contentReviewConfig },
-  { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, config: screenshotConfig },
-  { taskQueue: 'assembly-line', workflow: assemblyLine, config: assemblyLineConfig },
-  { taskQueue: 'assembly-line', workflow: workstation, config: workstationConfig },
-  { taskQueue: 'assembly-line', workflow: stepIterator, config: stepIteratorConfig },
-  { taskQueue: 'assembly-line', workflow: reverter, config: reverterConfig },
-];
-
-// Readonly observers — same workflows for dashboard visibility without competing for work
-const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({
-  ...w,
-  connection: { readonly: true } as const,
-}));
-
-// ── MCP servers ────────────────────────────────────────────────────────────
-
-const IMAGE_TOOLS_CONFIG: LTMcpServerConfig = {
-  description: 'Image processing tools — resize, crop, rotate, convert, blur, compress, and more.',
-  tags: ['image', 'processing', 'vision'],
-  category: 'Media',
-  compileHints: 'Image tools accept file paths from storage. Use file_storage tools to upload images first.',
-  toolManifest: IMAGE_TOOLS,
-};
-
-// ── Agents ─────────────────────────────────────────────────────────────────
-
-const AGENTS: LTAgentConfig[] = [
-  {
-    name: 'health-monitor',
-    description: 'Watches for workflow failures and alerts before cascading issues',
-    goals: 'Detect failures early, capture diagnostics, and alert before cascading issues',
-    rules: 'Do not restart failed workflows automatically. Capture state and escalate.',
-    status: 'active',
-    knowledge_domain: 'system-health',
-    schedules: [
-      { cron: '*/15 * * * *', workflow_type: 'helloWorkflow', execute_as: 'superadmin' },
-    ],
-    subscriptions: [
-      {
-        topic: 'workflow.failed',
-        reaction_type: 'durable',
-        workflow_type: 'helloWorkflow',
-        execute_as: 'superadmin',
-        input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } },
-      },
-      {
-        topic: 'activity.failed',
-        reaction_type: 'durable',
-        workflow_type: 'helloWorkflow',
-        execute_as: 'superadmin',
-        input_mapping: { data: { activity: '{event.activityName}', workflowId: '{event.workflowId}' } },
-      },
-    ],
-  },
-  {
-    name: 'event-coordinator',
-    description: 'Routes cross-system events to workflows for automated processing',
-    goals: 'Serve as the central nervous system for event-driven automation',
-    rules: 'Route critical events within 5 seconds. Never drop events.',
-    status: 'active',
-    knowledge_domain: 'event-routing',
-    subscriptions: [
-      {
-        topic: 'app.>',
-        reaction_type: 'durable',
-        workflow_type: 'helloWorkflow',
-        execute_as: 'superadmin',
-        input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } },
-      },
-      {
-        topic: 'knowledge.stored',
-        reaction_type: 'durable',
-        workflow_type: 'helloWorkflow',
-        execute_as: 'superadmin',
-        input_mapping: { data: { domain: '{event.data.domain}', key: '{event.data.key}' } },
-      },
-    ],
-  },
-];
-
-// ── Seed ───────────────────────────────────────────────────────────────────
-
-const SEED_ROLES = [REVIEWER, ENGINEER, ADMIN, SUPERADMIN];
-
-const SEED_CHAINS: [string, string][] = [
-  [REVIEWER, ADMIN],
-  [REVIEWER, ENGINEER],
-  [ADMIN, ENGINEER],
-  [ADMIN, SUPERADMIN],
-  [ENGINEER, ADMIN],
-  [ENGINEER, SUPERADMIN],
-];
-
-async function seedIfEmpty() {
-  const password = process.env.SEED_ADMIN_PASSWORD;
-  if (!password) return;
-
-  const pool = new Pool(DB_CONFIG);
-  try {
-    const { rows } = await pool.query(
-      "SELECT COUNT(*) AS count FROM lt_users WHERE external_id = 'superadmin'",
-    );
-    if (parseInt(rows[0].count) > 0) return;
-
-    console.log('[seed] No users found — seeding superadmin account');
-
-    for (const role of SEED_ROLES) {
-      await pool.query(
-        'INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING',
-        [role],
-      );
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-    const { rows: userRows } = await pool.query(
-      `INSERT INTO lt_users (external_id, display_name, email, password_hash, status)
-       VALUES ('superadmin', 'Super Admin', 'admin@longtail.local', $1, 'active')
-       ON CONFLICT DO NOTHING RETURNING id`,
-      [hash],
-    );
-
-    if (userRows.length > 0) {
-      await pool.query(
-        `INSERT INTO lt_user_roles (user_id, role, type)
-         VALUES ($1, 'superadmin', 'superadmin')
-         ON CONFLICT DO NOTHING`,
-        [userRows[0].id],
-      );
-    }
-
-    for (const [source, target] of SEED_CHAINS) {
-      await pool.query(
-        'INSERT INTO lt_config_role_escalations (source_role, target_role) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [source, target],
-      );
-    }
-
-    console.log('[seed] Superadmin account created (login: superadmin)');
-  } catch (err: any) {
-    console.error('[seed] Seed failed (non-fatal):', err.message);
-  } finally {
-    await pool.end();
-  }
-}
-
-// ── Start ──────────────────────────────────────────────────────────────────
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, seedIfEmpty } from './config';
 
 // APP_ROLE controls the container's behavior:
 //   'api'    — dashboard + REST API, readonly workflow observers
@@ -297,6 +13,7 @@ async function main() {
   const isWorker = APP_ROLE === 'worker';
   const isApi = APP_ROLE === 'api';
 
+  // 1. Start Long Tail
   const lt = await start({
     database: DB_CONFIG,
 
@@ -313,10 +30,7 @@ async function main() {
     agents: AGENTS,
 
     mcp: {
-      serverFactories: {
-        'image-tools': { factory: createImageToolsServer, config: IMAGE_TOOLS_CONFIG },
-        'long-tail-gmail': { factory: createGmailServer, config: GMAIL_SERVER_CONFIG },
-      },
+      serverFactories: MCP_SERVER_FACTORIES,
     },
 
     escalation: {
@@ -328,10 +42,12 @@ async function main() {
       : undefined,
   });
 
+  // 2. Seed default users (skipped for worker-only containers)
   if (!isWorker) {
     await seedIfEmpty();
   }
 
+  // 3. Graceful shutdown
   process.on('SIGTERM', () => lt.shutdown());
   process.on('SIGINT', () => lt.shutdown());
 }
