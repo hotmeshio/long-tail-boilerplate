@@ -1,12 +1,24 @@
+/**
+ * Entry point for the Long Tail application.
+ *
+ * Configuration is assembled from `./config/`, which exports:
+ * - **DB_CONFIG** — database connection (Postgres via env vars)
+ * - **WORKERS** — workflow worker definitions (the assembly line)
+ * - **READONLY_OBSERVERS** — lightweight observer copies for the API dashboard
+ * - **MCP_SERVER_FACTORIES** — MCP tool servers exposed to agents
+ * - **AGENTS** — LLM agent definitions wired into the escalation flow
+ * - **seedIfEmpty()** — idempotent seed for default users/data
+ *
+ * The `APP_ROLE` env var splits this into two container images
+ * (api + worker) in production, or runs everything in one
+ * process for local dev.
+ */
 try { require('dotenv/config'); } catch {}
 import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
 
 import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, seedIfEmpty } from './config';
 
-// APP_ROLE controls the container's behavior:
-//   'api'    — dashboard + REST API, readonly workflow observers
-//   'worker' — workflow execution only, no HTTP server
-//   unset    — full standalone mode (local dev via docker compose)
+/** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
 
 async function main() {
