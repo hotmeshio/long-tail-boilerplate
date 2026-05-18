@@ -25,9 +25,10 @@
     "test:assembly:1": "ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:assembly:10": "ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:assembly:100": "ts-node tests/throughput/06-assembly-line.ts 100 10",
+    "test:assembly:250": "ts-node tests/throughput/06-assembly-line.ts 250 10",
     "test:remote:factory:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/04-factory.ts 1",
     "test:remote:factory:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 10 5",
-    "test:remote:factory:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 100 2",
+    "test:remote:factory:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/05-factory-sustained.ts 100 10",
     "test:remote:assembly:1": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 1 1",
     "test:remote:assembly:10": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 10 5",
     "test:remote:assembly:100": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/06-assembly-line.ts 100 10",
@@ -51,8 +52,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.16.2",
-    "@hotmeshio/long-tail": "^0.2.6",
+    "@hotmeshio/hotmesh": "^0.16.3",
+    "@hotmeshio/long-tail": "^0.2.7",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",
