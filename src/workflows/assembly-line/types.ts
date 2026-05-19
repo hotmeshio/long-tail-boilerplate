@@ -15,10 +15,7 @@ export interface StationEnvelopeData {
   stationName: string;
   role: string;
   instructions: string;
-  parentSignalId: string;
-  parentTaskQueue: string;
-  parentWorkflowType: string;
-  parentWorkflowId: string;
+  parentWorkflowId?: string;
 }
 
 export interface StationResult {

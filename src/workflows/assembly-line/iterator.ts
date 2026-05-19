@@ -4,7 +4,8 @@
  * Proves that the number and shape of steps can be entirely
  * data-driven. The orchestrator knows nothing about grinder,
  * gluer, or any specific station — it just walks the list,
- * spawns a child for each, and waits for the signal.
+ * spawns a child for each, and awaits its result directly
+ * via executeChild (no separate signal subscription needed).
  *
  * Reuses the same `workstation` child workflow as the assembly line.
  */
@@ -25,18 +26,14 @@ export async function stepIterator(envelope: LTEnvelope): Promise<any> {
   const results: StationResult[] = [];
 
   for (const [i, step] of steps.entries()) {
-    const signalId = `step-${i}-${ctx.workflowId}`;
-    const childWorkflowId = `workstation-${ctx.workflowId}-${i}`;
+    const childWorkflowId = `${ctx.workflowId}-${i}`;
 
-    await Durable.workflow.startChild({
+    const result = await Durable.workflow.executeChild<StationResult>({
       workflowName: 'workstation',
       args: [
         {
           data: {
             ...step,
-            parentSignalId: signalId,
-            parentTaskQueue: 'assembly-line',
-            parentWorkflowType: 'stepIterator',
             parentWorkflowId: ctx.workflowId,
           },
           metadata: { source: 'step-iterator', step: i, ...(envelope.metadata?.certified === true ? { certified: true } : {}) },
@@ -46,12 +43,8 @@ export async function stepIterator(envelope: LTEnvelope): Promise<any> {
       workflowId: childWorkflowId,
       expire: JOB_EXPIRE_SECS,
       entity: 'workstation',
-      signalIn: false,
     });
 
-    const result = await Durable.workflow.condition<StationResult>(
-      signalId,
-    ) as StationResult;
     results.push(result);
   }
 

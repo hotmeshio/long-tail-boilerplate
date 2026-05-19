@@ -4,10 +4,8 @@
  * Each workstation:
  *   1. Creates an escalation assigned to its role (grinder, gluer, etc.)
  *   2. Pauses (condition) until a human claims and resolves the escalation
- *   3. Signals the parent orchestrator with the result
- *
- * No interceptor, no registration — just raw Durable primitives
- * and a direct escalation record with signal routing metadata.
+ *   3. Returns the result — the parent uses executeChild so it gets
+ *      the return value directly (no explicit signal needed)
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
@@ -18,7 +16,7 @@ import * as activities from './activities';
 
 type ActivitiesType = typeof activities;
 
-const { createStationEscalation, signalParent } =
+const { createStationEscalation } =
   Durable.workflow.proxyActivities<ActivitiesType>({ activities });
 
 export async function workstation(envelope: LTEnvelope): Promise<any> {
@@ -26,10 +24,6 @@ export async function workstation(envelope: LTEnvelope): Promise<any> {
     stationName,
     role,
     instructions,
-    parentSignalId,
-    parentTaskQueue,
-    parentWorkflowType,
-    parentWorkflowId,
   } = envelope.data as StationEnvelopeData;
 
   const ctx = Durable.workflow.workflowInfo();
@@ -51,20 +45,12 @@ export async function workstation(envelope: LTEnvelope): Promise<any> {
     localSignalId,
   ) as Record<string, any>;
 
-  // 3. Build result and signal the parent orchestrator
+  // 3. Return result — parent receives this via executeChild
   const result: StationResult = {
     stationName,
     resolution,
     completedAt: new Date().toISOString(),
   };
-
-  await signalParent({
-    parentTaskQueue,
-    parentWorkflowType,
-    parentWorkflowId,
-    signalId: parentSignalId,
-    data: result,
-  });
 
   return { type: 'return' as const, data: result };
 }
