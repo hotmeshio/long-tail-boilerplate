@@ -1,17 +1,10 @@
 /**
  * Assembly Line — durable orchestrator with human task queues.
  *
- * Demonstrates the core composition pattern without the LT interceptor:
- *   startChild  → spawn a child workflow (fire-and-forget)
- *   condition   → pause until the child signals back
- *   signal      → child wakes the parent when done
- *
  * A product moves through sequential workstations. Each station
- * creates an escalation for a human operator, pauses, then signals
- * the parent when the human resolves it.
- *
- * No registration, no certification, no interceptor — just Durable
- * primitives and the escalation table.
+ * creates an escalation for a human operator, pauses, then returns
+ * its result when the human resolves it. The parent receives the
+ * result directly via executeChild.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
@@ -30,19 +23,14 @@ export async function assemblyLine(envelope: LTEnvelope): Promise<any> {
   const results: StationResult[] = [];
 
   for (const [i, station] of stations.entries()) {
-    const signalId = `station-${i}-${ctx.workflowId}`;
-    const childWorkflowId = `workstation-${ctx.workflowId}-${i}`;
+    const childWorkflowId = `${ctx.workflowId}-${i}`;
 
-    // Spawn child — fire-and-forget; only the start is awaited
-    await Durable.workflow.startChild({
+    const result = await Durable.workflow.executeChild<StationResult>({
       workflowName: 'workstation',
       args: [
         {
           data: {
             ...station,
-            parentSignalId: signalId,
-            parentTaskQueue: 'assembly-line',
-            parentWorkflowType: 'assemblyLine',
             parentWorkflowId: ctx.workflowId,
           },
           metadata: { source: 'assembly-line', station: station.stationName, ...(envelope.metadata?.certified === true ? { certified: true } : {}) },
@@ -52,11 +40,8 @@ export async function assemblyLine(envelope: LTEnvelope): Promise<any> {
       workflowId: childWorkflowId,
       expire: JOB_EXPIRE_SECS,
       entity: 'workstation',
-      signalIn: false,
     });
 
-    // Pause until the child signals back with its result
-    const result = await Durable.workflow.condition<StationResult>(signalId) as StationResult;
     results.push(result);
   }
 
