@@ -28,6 +28,7 @@ const STATIONS = [
   { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },
   { stationName: 'gluer', role: 'gluer', instructions: 'Bond components. Verify bond strength.' },
 ];
+const RUN_ID = Math.floor(Date.now() / 1000).toString();
 
 let token = '';
 
@@ -84,16 +85,18 @@ async function main() {
   // ── Loop 1: Enqueue workflows (one at a time, even pacing) ────────
   const enqueueLoop = (async () => {
     while (submitted < TARGET) {
+      const wfId = `stepIterator-${RUN_ID}-${submitted}`;
       const r = await api('POST', '/api/workflows/stepIterator/invoke', {
         data: {
-          name: `Widget-${submitted}`,
+          name: `Widget-${RUN_ID}-${submitted}`,
           steps: STATIONS,
         },
+        workflowId: wfId,
       });
       if (r?.workflowId) workflowIds.add(r.workflowId);
       submitted++;
       const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
-      console.log(`[${elapsed}s] Enqueued: ${submitted}/${TARGET}`);
+      console.log(`[${elapsed}s] Enqueued: ${submitted}/${TARGET} (${wfId})`);
       if (submitted < TARGET) await sleep(ENQUEUE_INTERVAL_MS);
     }
     console.log(`[${((performance.now() - t0) / 1000).toFixed(1)}s] All ${TARGET} submitted`);

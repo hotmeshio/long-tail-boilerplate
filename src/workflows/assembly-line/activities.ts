@@ -5,16 +5,11 @@
  * sandbox. Each is wrapped via proxyActivities so results are
  * checkpointed and replayed on restart.
  *
- * Two responsibilities:
- *   1. Create an escalation with signal routing so the resolve API
- *      can wake the paused child workflow.
- *   2. Signal the parent orchestrator when the child completes.
+ * Creates an escalation with signal routing so the resolve API
+ * can wake the paused child workflow.
  */
 
-import { Durable } from '@hotmeshio/hotmesh';
-
 import { EscalationService } from '@hotmeshio/long-tail';
-import { getConnection } from '@hotmeshio/long-tail/build/lib/db';
 
 // ── Create station escalation ──────────────────────────────────────
 
@@ -60,20 +55,3 @@ export async function createStationEscalation(input: {
   return escalation.id;
 }
 
-// ── Signal parent orchestrator ─────────────────────────────────────
-
-export async function signalParent(input: {
-  parentTaskQueue: string;
-  parentWorkflowType: string;
-  parentWorkflowId: string;
-  signalId: string;
-  data: any;
-}): Promise<void> {
-  const client = new Durable.Client({ connection: getConnection() });
-  const handle = await client.workflow.getHandle(
-    input.parentTaskQueue,
-    input.parentWorkflowType,
-    input.parentWorkflowId,
-  );
-  await handle.signal(input.signalId, input.data);
-}
