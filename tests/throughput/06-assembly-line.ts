@@ -10,17 +10,18 @@
  * an escalation, pauses, and resumes when signaled via the resolve API.
  *
  * Usage:
- *   npx ts-node tests/throughput/06-assembly-line.ts [target] [batchSize] [enqueueIntervalMs]
+ *   npx ts-node tests/throughput/06-assembly-line.ts [target] [enqueueIntervalMs]
+ *   RESOLVE_COOLDOWN_MS=20000 npx ts-node tests/throughput/06-assembly-line.ts 100
  *
- * Defaults: target=10, batchSize=5, enqueueInterval=3000
+ * Defaults: target=10, enqueueInterval=1000, RESOLVE_COOLDOWN_MS=10000
  */
 
 try { require('dotenv/config'); } catch {}
 
 const BASE_URL = process.env.REMOTE_URL || `http://localhost:${process.env.PORT || 3030}`;
 const TARGET = parseInt(process.argv[2] || '10', 10);
-const BATCH_SIZE = parseInt(process.argv[3] || '5', 10);
-const ENQUEUE_INTERVAL_MS = parseInt(process.argv[4] || '3000', 10);
+const ENQUEUE_INTERVAL_MS = parseInt(process.argv[3] || '1000', 10);
+const RESOLVE_COOLDOWN_MS = parseInt(process.env.RESOLVE_COOLDOWN_MS || '10000', 10);
 
 const TASK_QUEUE = 'assembly-line';
 const STATIONS = [
@@ -48,7 +49,7 @@ function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function main() {
   // 1. Login
-  console.log('1. Login');
+  console.log('1. Login!!');
   const isRemote = !!process.env.REMOTE_URL;
   const password = isRemote ? process.env.REMOTE_PASSWORD! : 'l0ngt@1l';
   const auth = await api('POST', '/api/auth/login', { username: 'superadmin', password });
@@ -63,14 +64,14 @@ async function main() {
     default_role: 'reviewer',
   });
 
-  console.log(`\nAssembly line sustained: ${TARGET} orders, ${BATCH_SIZE}/batch every ${ENQUEUE_INTERVAL_MS / 1000}s\n`);
+  console.log(`\nAssembly line sustained: ${TARGET} orders, 1/enqueue every ${ENQUEUE_INTERVAL_MS / 1000}s, resolve cooldown ${RESOLVE_COOLDOWN_MS / 1000}s\n`);
 
   // State
   const workflowIds = new Set<string>();
   let submitted = 0;
 
   // Escalation tracking: pending → claimed → resolved
-  const claimed = new Map<string, { role: string }>(); // escalationId → metadata
+  const claimed = new Map<string, { role: string; claimedAt: number }>(); // escalationId → metadata
   const resolvedIds = new Set<string>();
   let claimCount = 0;
   let resolveCount = 0;
@@ -80,23 +81,17 @@ async function main() {
 
   const expectedEscalations = TARGET * STATIONS.length;
 
-  // ── Loop 1: Enqueue workflows ─────────────────────────────────────
+  // ── Loop 1: Enqueue workflows (one at a time, even pacing) ────────
   const enqueueLoop = (async () => {
     while (submitted < TARGET) {
-      const batch = Math.min(BATCH_SIZE, TARGET - submitted);
-      const promises = Array.from({ length: batch }, (_, i) => {
-        return api('POST', '/api/workflows/stepIterator/invoke', {
-          data: {
-            name: `Widget-${submitted + i}`,
-            steps: STATIONS,
-          },
-        });
+      const r = await api('POST', '/api/workflows/stepIterator/invoke', {
+        data: {
+          name: `Widget-${submitted}`,
+          steps: STATIONS,
+        },
       });
-      const results = await Promise.all(promises);
-      for (const r of results) {
-        if (r?.workflowId) workflowIds.add(r.workflowId);
-      }
-      submitted += batch;
+      if (r?.workflowId) workflowIds.add(r.workflowId);
+      submitted++;
       const elapsed = ((performance.now() - t0) / 1000).toFixed(1);
       console.log(`[${elapsed}s] Enqueued: ${submitted}/${TARGET}`);
       if (submitted < TARGET) await sleep(ENQUEUE_INTERVAL_MS);
@@ -111,7 +106,7 @@ async function main() {
       try {
         // Poll each station role separately to avoid missing any
         for (const station of STATIONS) {
-          const resp = await api('GET', `/api/escalations?status=pending&role=${station.role}&limit=50`);
+          const resp = await api('GET', `/api/escalations?status=pending&role=${station.role}&limit=10`);
           const pending = resp?.escalations || [];
 
           for (const esc of pending) {
@@ -124,7 +119,7 @@ async function main() {
 
             try {
               await api('POST', `/api/escalations/${esc.id}/claim`);
-              claimed.set(esc.id, { role: esc.role });
+              claimed.set(esc.id, { role: esc.role, claimedAt: Date.now() });
               claimCount++;
             } catch { /* already claimed or gone */ }
           }
@@ -140,6 +135,7 @@ async function main() {
     while (resolveCount < expectedEscalations) {
       for (const [escId, meta] of claimed.entries()) {
         if (resolvedIds.has(escId)) continue;
+        if (Date.now() - meta.claimedAt < RESOLVE_COOLDOWN_MS) continue;
         try {
           await api('POST', `/api/escalations/${escId}/resolve`, {
             resolverPayload: { approved: true, station: meta.role },
@@ -187,7 +183,7 @@ async function main() {
   console.log(`${'='.repeat(60)}`);
   console.log(`  Target:          ${TARGET} orders`);
   console.log(`  Stations:        ${STATIONS.length} per order`);
-  console.log(`  Batch size:      ${BATCH_SIZE} every ${ENQUEUE_INTERVAL_MS / 1000}s`);
+  console.log(`  Enqueue interval: ${ENQUEUE_INTERVAL_MS / 1000}s`);
   console.log(`  Total time:      ${totalElapsed.toFixed(1)}s`);
   console.log(`  Submitted:       ${submitted}`);
   console.log(`  Claimed:         ${claimCount}`);
