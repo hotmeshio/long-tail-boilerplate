@@ -15,7 +15,7 @@
 import { login, api, sleep, envInt, ts } from './07-shared';
 
 const TARGET = envInt('TARGET', 100);
-const ENQUEUE_EVERY = envInt('ENQUEUE_EVERY', 1);
+const ENQUEUE_EVERY = parseFloat(process.env.ENQUEUE_EVERY || '1');
 
 const STATIONS = [
   { stationName: 'grinder', role: 'grinder', instructions: 'Grind widget to spec.' },

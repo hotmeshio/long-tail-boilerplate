@@ -7,6 +7,7 @@ try { require('dotenv/config'); } catch {}
 export const BASE_URL = process.env.REMOTE_URL || `http://localhost:${process.env.PORT || 3030}`;
 
 let token = '';
+let _userId = '';
 
 export async function api(method: string, path: string, body?: any): Promise<any> {
   const res = await fetch(`${BASE_URL}${path}`, {
@@ -27,8 +28,11 @@ export async function login(): Promise<void> {
   const password = isRemote ? process.env.REMOTE_PASSWORD! : 'l0ngt@1l';
   const auth = await api('POST', '/api/auth/login', { username: 'superadmin', password });
   token = auth.token;
+  _userId = auth.user?.id || '';
   if (!token) { console.error('Login failed'); process.exit(1); }
 }
+
+export function getUserId(): string { return _userId; }
 
 export function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
