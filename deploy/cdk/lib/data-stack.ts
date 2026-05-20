@@ -14,6 +14,8 @@ export interface DataStackProps extends cdk.StackProps {
 }
 
 export class DataStack extends cdk.Stack {
+  /** @deprecated Retained for CloudFormation export cleanup — delete after next deploy */
+  public readonly dbInstance: rds.DatabaseInstance;
   public readonly dbCluster: rds.DatabaseCluster;
   public readonly dbSecret: secretsmanager.ISecret;
   public readonly bucket: s3.Bucket;
@@ -30,9 +32,49 @@ export class DataStack extends cdk.Stack {
 
     const { vpc, dbSecurityGroup, config } = props;
 
-    // --- Aurora Serverless v2 PostgreSQL ---
+    // --- Legacy RDS instance (retained to preserve cross-stack export) ---
 
-    const parameterGroup = new rds.ParameterGroup(this, 'AuroraDbParameterGroup', {
+    const legacyParameterGroup = new rds.ParameterGroup(this, 'DbParameterGroup', {
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_16,
+      }),
+      parameters: {
+        max_connections: '200',
+        idle_in_transaction_session_timeout: '60000',
+        'tcp_keepalives_idle': '60',
+        'tcp_keepalives_interval': '10',
+        'tcp_keepalives_count': '6',
+      },
+    });
+
+    this.dbInstance = new rds.DatabaseInstance(this, 'Database', {
+      engine: rds.DatabaseInstanceEngine.postgres({
+        version: rds.PostgresEngineVersion.VER_16,
+      }),
+      instanceType: ec2.InstanceType.of(
+        ec2.InstanceClass.T4G,
+        ec2.InstanceSize.XLARGE,
+      ),
+      vpc,
+      vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+      securityGroups: [dbSecurityGroup],
+      parameterGroup: legacyParameterGroup,
+      multiAz: false,
+      allocatedStorage: 100,
+      maxAllocatedStorage: 500,
+      storageType: rds.StorageType.GP3,
+      databaseName: config.dbName,
+      credentials: rds.Credentials.fromGeneratedSecret(config.dbUsername, {
+        secretName: config.secretName('Database'),
+      }),
+      backupRetention: cdk.Duration.days(7),
+      deletionProtection: false,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    });
+
+    // --- Aurora Serverless v2 PostgreSQL (new primary) ---
+
+    const auroraParameterGroup = new rds.ParameterGroup(this, 'AuroraDbParameterGroup', {
       engine: rds.DatabaseClusterEngine.auroraPostgres({
         version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
@@ -52,7 +94,7 @@ export class DataStack extends cdk.Stack {
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroups: [dbSecurityGroup],
-      parameterGroup,
+      parameterGroup: auroraParameterGroup,
       defaultDatabaseName: config.dbName,
       credentials: rds.Credentials.fromGeneratedSecret(config.dbUsername, {
         secretName: config.secretName('AuroraDatabase'),
@@ -68,6 +110,7 @@ export class DataStack extends cdk.Stack {
       storageEncrypted: true,
     });
 
+    // Point Compute at Aurora's secret
     this.dbSecret = this.dbCluster.secret!;
 
     // --- S3 Bucket ---
