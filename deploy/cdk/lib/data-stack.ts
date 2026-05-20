@@ -110,8 +110,10 @@ export class DataStack extends cdk.Stack {
       storageEncrypted: true,
     });
 
-    // Point Compute at Aurora's secret
-    this.dbSecret = this.dbCluster.secret!;
+    // Phase 1: keep Compute pointing at legacy instance secret
+    // to preserve the cross-stack CloudFormation export.
+    // Phase 2: switch to this.dbCluster.secret! after this deploy succeeds.
+    this.dbSecret = this.dbInstance.secret!;
 
     // --- S3 Bucket ---
 
