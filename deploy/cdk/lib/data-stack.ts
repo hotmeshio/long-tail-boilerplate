@@ -112,6 +112,13 @@ export class DataStack extends cdk.Stack {
 
     this.dbSecret = this.dbCluster.secret!;
 
+    // Preserve the old cross-stack export until Compute deploys with the new one.
+    // Without this, CloudFormation rejects the update because Compute still imports it.
+    // Safe to remove after one successful deploy cycle.
+    this.exportValue(this.dbInstance.secret!.secretArn, {
+      name: 'LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73',
+    });
+
     // --- S3 Bucket ---
 
     this.bucket = new s3.Bucket(this, 'FilesBucket', {
