@@ -17,26 +17,28 @@
  *   CHECK_EVERY=30 OLDER_THAN=30 npx ts-node tests/throughput/07-resolve.ts
  */
 
-import { login, api, sleep, envInt, ageSeconds, ts } from './07-shared';
+import { login, api, sleep, envInt, ageSeconds, ts, getUserId } from './07-shared';
 
 const CHECK_EVERY = envInt('CHECK_EVERY', 60);
 const OLDER_THAN = envInt('OLDER_THAN', 60);
 const LIMIT = envInt('LIMIT', 25);
+const API_LIMIT = Math.max(100, LIMIT);
 
 let totalResolved = 0;
+let userId = '';
 
 async function resolveCycle() {
   try {
-    const resp = await api('GET', `/api/escalations?status=pending&limit=${LIMIT}&sort_by=claimed_at&order=asc`);
-    const all = resp?.escalations || [];
-    const escalations = all.filter((e: any) => e.assigned_to && e.claimed_at);
-    console.log(`[${ts()}] ${escalations.length} claimed (of ${all.length} pending)`);
+    const resp = await api('GET', `/api/escalations?status=pending&assigned_to=${userId}&limit=${API_LIMIT}&sort_by=created_at&order=asc`);
+    const escalations = (resp?.escalations || []).slice(0, LIMIT);
+    console.log(`[${ts()}] ${escalations.length} mine (${resp?.total ?? '?'} total)`);
     if (escalations.length === 0) return;
 
+    let resolved = 0;
     for (const esc of escalations) {
-      const holdTime = Math.floor(ageSeconds(esc.claimed_at));
-      if (holdTime < OLDER_THAN) {
-        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… too young (held ${holdTime}s < ${OLDER_THAN}s) — done`);
+      const age = Math.floor(ageSeconds(esc.created_at));
+      if (age < OLDER_THAN) {
+        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… too young (age ${age}s < ${OLDER_THAN}s) — done`);
         break;
       }
 
@@ -46,11 +48,14 @@ async function resolveCycle() {
           resolverPayload: { approved: true, station },
         });
         totalResolved++;
-        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… resolved ${station} (held ${holdTime}s) [total: ${totalResolved}]`);
+        resolved++;
+        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… resolved ${station} (age ${age}s) [total: ${totalResolved}]`);
       } catch (err: any) {
         console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… skip: ${err.message.slice(0, 80)}`);
       }
     }
+
+    if (resolved > 0) console.log(`[${ts()}] Resolved ${resolved} this cycle`);
   } catch (err: any) {
     console.error(`[${ts()}] Resolve poll error: ${err.message}`);
   }
@@ -58,7 +63,8 @@ async function resolveCycle() {
 
 async function main() {
   await login();
-  console.log(`[${ts()}] Resolver started — check every ${CHECK_EVERY}s, older than ${OLDER_THAN}s, limit ${LIMIT}`);
+  userId = getUserId();
+  console.log(`[${ts()}] Resolver started — user ${userId.slice(0, 8)}…, check every ${CHECK_EVERY}s, older than ${OLDER_THAN}s, limit ${LIMIT}`);
   console.log(`[${ts()}] Ctrl-C to stop\n`);
 
   while (true) {

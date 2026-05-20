@@ -22,45 +22,44 @@ import { login, api, sleep, envInt, ageSeconds, ts } from './07-shared';
 const CHECK_EVERY = envInt('CHECK_EVERY', 60);
 const OLDER_THAN = envInt('OLDER_THAN', 60);
 const LIMIT = envInt('LIMIT', 25);
-
-const ROLES = ['grinder', 'gluer'];
+const API_LIMIT = Math.max(100, LIMIT);
 
 let totalClaimed = 0;
 
 async function claimCycle() {
-  for (const role of ROLES) {
-    try {
-      const resp = await api('GET', `/api/escalations?status=pending&role=${role}&limit=${LIMIT}&sort_by=created_at&order=asc`);
-      const all = resp?.escalations || [];
-      const escalations = all.filter((e: any) => !e.assigned_to);
-      console.log(`[${ts()}] ${role}: ${escalations.length} unclaimed (of ${all.length} pending)`);
-      if (escalations.length === 0) continue;
+  try {
+    const resp = await api('GET', `/api/escalations/available?limit=${API_LIMIT}&sort_by=created_at&order=asc`);
+    const escalations = (resp?.escalations || []).slice(0, LIMIT);
+    console.log(`[${ts()}] ${escalations.length} pending (${resp?.total ?? '?'} total)`);
+    if (escalations.length === 0) return;
 
-      for (const esc of escalations) {
-        const age = Math.floor(ageSeconds(esc.created_at));
-        if (age < OLDER_THAN) {
-          console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… too young (${age}s < ${OLDER_THAN}s) — done with ${role}`);
-          break;
-        }
-
-        try {
-          await api('POST', `/api/escalations/${esc.id}/claim`);
-          totalClaimed++;
-          console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… claimed (age ${age}s) [total: ${totalClaimed}]`);
-        } catch (err: any) {
-          console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… skip: ${err.message.slice(0, 80)}`);
-        }
+    let claimed = 0;
+    for (const esc of escalations) {
+      const age = Math.floor(ageSeconds(esc.created_at));
+      if (age < OLDER_THAN) {
+        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… too young (${age}s < ${OLDER_THAN}s) — done`);
+        break;
       }
-    } catch (err: any) {
-      console.error(`[${ts()}] ${role} poll error: ${err.message}`);
+
+      try {
+        await api('POST', `/api/escalations/${esc.id}/claim`, { durationMinutes: 600 });
+        totalClaimed++;
+        claimed++;
+        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… claimed ${esc.role} (age ${age}s) [total: ${totalClaimed}]`);
+      } catch (err: any) {
+        console.log(`[${ts()}]   ↳ ${esc.id.slice(0, 8)}… skip: ${err.message.slice(0, 80)}`);
+      }
     }
+
+    if (claimed > 0) console.log(`[${ts()}] Claimed ${claimed} this cycle`);
+  } catch (err: any) {
+    console.error(`[${ts()}] Claim poll error: ${err.message}`);
   }
 }
 
 async function main() {
   await login();
   console.log(`[${ts()}] Claimer started — check every ${CHECK_EVERY}s, older than ${OLDER_THAN}s, limit ${LIMIT}`);
-  console.log(`[${ts()}] Roles: ${ROLES.join(', ')}`);
   console.log(`[${ts()}] Ctrl-C to stop\n`);
 
   while (true) {
