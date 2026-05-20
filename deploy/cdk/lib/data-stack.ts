@@ -14,7 +14,7 @@ export interface DataStackProps extends cdk.StackProps {
 }
 
 export class DataStack extends cdk.Stack {
-  public readonly dbInstance: rds.DatabaseInstance;
+  public readonly dbCluster: rds.DatabaseCluster;
   public readonly dbSecret: secretsmanager.ISecret;
   public readonly bucket: s3.Bucket;
   public readonly jwtSecret: secretsmanager.Secret;
@@ -30,11 +30,11 @@ export class DataStack extends cdk.Stack {
 
     const { vpc, dbSecurityGroup, config } = props;
 
-    // --- RDS PostgreSQL ---
+    // --- Aurora Serverless v2 PostgreSQL ---
 
-    const parameterGroup = new rds.ParameterGroup(this, 'DbParameterGroup', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16,
+    const parameterGroup = new rds.ParameterGroup(this, 'AuroraDbParameterGroup', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
       parameters: {
         max_connections: '200',
@@ -45,32 +45,30 @@ export class DataStack extends cdk.Stack {
       },
     });
 
-    this.dbInstance = new rds.DatabaseInstance(this, 'Database', {
-      engine: rds.DatabaseInstanceEngine.postgres({
-        version: rds.PostgresEngineVersion.VER_16,
+    this.dbCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
+      engine: rds.DatabaseClusterEngine.auroraPostgres({
+        version: rds.AuroraPostgresEngineVersion.VER_16_4,
       }),
-      instanceType: ec2.InstanceType.of(
-        ec2.InstanceClass.T4G,
-        ec2.InstanceSize.XLARGE,
-      ),
       vpc,
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
       securityGroups: [dbSecurityGroup],
       parameterGroup,
-      multiAz: false,
-      allocatedStorage: 100,
-      maxAllocatedStorage: 500,
-      storageType: rds.StorageType.GP3,
-      databaseName: config.dbName,
+      defaultDatabaseName: config.dbName,
       credentials: rds.Credentials.fromGeneratedSecret(config.dbUsername, {
-        secretName: config.secretName('Database'),
+        secretName: config.secretName('AuroraDatabase'),
       }),
-      backupRetention: cdk.Duration.days(7),
+      serverlessV2MinCapacity: 0.5,
+      serverlessV2MaxCapacity: 4,
+      writer: rds.ClusterInstance.serverlessV2('Writer', {
+        publiclyAccessible: false,
+      }),
+      backup: { retention: cdk.Duration.days(7) },
       deletionProtection: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      storageEncrypted: true,
     });
 
-    this.dbSecret = this.dbInstance.secret!;
+    this.dbSecret = this.dbCluster.secret!;
 
     // --- S3 Bucket ---
 
@@ -146,9 +144,9 @@ export class DataStack extends cdk.Stack {
 
     // --- Outputs ---
 
-    new cdk.CfnOutput(this, 'DbEndpoint', {
-      value: this.dbInstance.dbInstanceEndpointAddress,
-      description: 'RDS endpoint address',
+    new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+      value: this.dbCluster.clusterEndpoint.hostname,
+      description: 'Aurora Serverless v2 cluster endpoint',
     });
 
     new cdk.CfnOutput(this, 'BucketName', {
