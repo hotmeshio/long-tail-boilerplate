@@ -100,7 +100,7 @@ export class DataStack extends cdk.Stack {
         secretName: config.secretName('AuroraDatabase'),
       }),
       serverlessV2MinCapacity: 0.5,
-      serverlessV2MaxCapacity: 4,
+      serverlessV2MaxCapacity: 8,
       writer: rds.ClusterInstance.serverlessV2('Writer', {
         publiclyAccessible: false,
       }),
