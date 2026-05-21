@@ -1,5 +1,5 @@
 #!/bin/bash
-# AWS CloudWatch stats for Long Tail services
+# AWS CloudWatch stats for Long Tail services (Aurora Serverless v2)
 # Usage: ./scripts/aws-stats.sh [5m|15m|30m|1h|1d]
 
 PERIOD="${1:-5m}"
@@ -15,22 +15,33 @@ esac
 
 START=$(date -u -v-${MINS}M +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "${MINS} minutes ago" +%Y-%m-%dT%H:%M:%SZ)
 END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-DB_ID=$(aws rds describe-db-instances --query 'DBInstances[0].DBInstanceIdentifier' --output text 2>/dev/null)
-ALLOC_GB=$(aws rds describe-db-instances --query 'DBInstances[0].AllocatedStorage' --output text 2>/dev/null)
 
-# Formats avg/max percent columns (CPU%, Memory%)
+# Detect Aurora cluster
+CLUSTER_ID=$(aws rds describe-db-clusters --query 'DBClusters[0].DBClusterIdentifier' --output text 2>/dev/null)
+WRITER_ID=$(aws rds describe-db-clusters --query 'DBClusters[0].DBClusterMembers[?IsClusterWriter==`true`].DBInstanceIdentifier | [0]' --output text 2>/dev/null)
+
 fmt_pct() {
   awk '{printf "  %-28s %6.1f%%    %6.1f%%\n", $1, $2, $3}'
 }
 
-# Formats avg/max count columns (connections)
 fmt_count() {
   awk '{printf "  %-28s %6.0f      %6.0f\n", $1, $2, $3}'
 }
 
-# Formats single-value byte-to-GB columns
 fmt_gb() {
   awk '{printf "  %-28s %6.2f GB\n", $1, $2/1073741824}'
+}
+
+fmt_acu() {
+  awk '{printf "  %-28s %5.1f      %5.1f\n", $1, $2, $3}'
+}
+
+# Side-by-side: takes two metric datasets and prints them aligned
+# Usage: side_by_side "LEFT_LABEL" "$LEFT_DATA" "RIGHT_LABEL" "$RIGHT_DATA"
+side_by_side() {
+  local ll="$1" ld="$2" rl="$3" rd="$4"
+  paste <(echo "$ld" | awk '{printf "  %-19s %5.1f%% %5.1f%%", $1, $2, $3}') \
+        <(echo "$rd" | awk '{printf "  %5.1f%% %5.1f%%\n", $2, $3}') 2>/dev/null
 }
 
 echo ""
@@ -38,44 +49,47 @@ echo "════════════════════════�
 echo "  Long Tail AWS Stats — last $PERIOD"
 echo "═══════════════════════════════════════════════════"
 
+# ── Aurora ──
 echo ""
-echo "── RDS PostgreSQL ($DB_ID) ──"
-echo "  CPU:                             Avg        Max"
-RDS_CPU=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name CPUUtilization \
-  --dimensions Name=DBInstanceIdentifier,Value=$DB_ID \
+echo "── Aurora Serverless v2 ($CLUSTER_ID) ──"
+
+echo "  ACU Capacity:                    Avg        Max"
+AURORA_ACU=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name ServerlessDatabaseCapacity \
+  --dimensions Name=DBClusterIdentifier,Value=$CLUSTER_ID \
   --start-time $START --end-time $END --period $INTERVAL \
   --statistics Average Maximum \
   --query 'Datapoints | sort_by(@, &Timestamp) | [].[Timestamp,Average,Maximum]' \
   --output text 2>&1)
-echo "$RDS_CPU" | fmt_pct
+echo "$AURORA_ACU" | fmt_acu
+
+echo "  CPU (writer):                    Avg        Max"
+AURORA_CPU=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name CPUUtilization \
+  --dimensions Name=DBInstanceIdentifier,Value=$WRITER_ID \
+  --start-time $START --end-time $END --period $INTERVAL \
+  --statistics Average Maximum \
+  --query 'Datapoints | sort_by(@, &Timestamp) | [].[Timestamp,Average,Maximum]' \
+  --output text 2>&1)
+echo "$AURORA_CPU" | fmt_pct
 
 echo "  Connections:                     Avg        Max"
-RDS_CONN=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name DatabaseConnections \
-  --dimensions Name=DBInstanceIdentifier,Value=$DB_ID \
+AURORA_CONN=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name DatabaseConnections \
+  --dimensions Name=DBInstanceIdentifier,Value=$WRITER_ID \
   --start-time $START --end-time $END --period $INTERVAL \
   --statistics Average Maximum \
   --query 'Datapoints | sort_by(@, &Timestamp) | [].[Timestamp,Average,Maximum]' \
   --output text 2>&1)
-echo "$RDS_CONN" | fmt_count
+echo "$AURORA_CONN" | fmt_count
 
 echo "  Freeable Memory (GB):"
-RDS_MEM=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name FreeableMemory \
-  --dimensions Name=DBInstanceIdentifier,Value=$DB_ID \
+AURORA_MEM=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name FreeableMemory \
+  --dimensions Name=DBInstanceIdentifier,Value=$WRITER_ID \
   --start-time $START --end-time $END --period $INTERVAL \
   --statistics Average \
   --query 'Datapoints | sort_by(@, &Timestamp) | [].[Timestamp,Average]' \
   --output text 2>&1)
-echo "$RDS_MEM" | fmt_gb
+echo "$AURORA_MEM" | fmt_gb
 
-echo "  Free Storage Space (GB):"
-RDS_DISK=$(aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name FreeStorageSpace \
-  --dimensions Name=DBInstanceIdentifier,Value=$DB_ID \
-  --start-time $START --end-time $END --period $INTERVAL \
-  --statistics Average \
-  --query 'Datapoints | sort_by(@, &Timestamp) | [].[Timestamp,Average]' \
-  --output text 2>&1)
-echo "$RDS_DISK" | fmt_gb
-
+# ── ECS: API ──
 echo ""
 echo "── API Service ──"
 echo "  CPU:                             Avg        Max"
@@ -96,6 +110,7 @@ API_MEM=$(aws cloudwatch get-metric-statistics --namespace AWS/ECS --metric-name
   --output text 2>&1)
 echo "$API_MEM" | fmt_pct
 
+# ── ECS: Worker ──
 echo ""
 echo "── Worker Service ──"
 echo "  CPU:                             Avg        Max"
@@ -116,6 +131,7 @@ WRK_MEM=$(aws cloudwatch get-metric-statistics --namespace AWS/ECS --metric-name
   --output text 2>&1)
 echo "$WRK_MEM" | fmt_pct
 
+# ── Service Status ──
 echo ""
 echo "── Service Status ──"
 SVC_STATUS=$(aws ecs describe-services --cluster longtail --services api worker \
@@ -126,12 +142,12 @@ echo "$SVC_STATUS" | awk '{printf "  %-12s desired: %s  running: %s\n", $1, $2, 
 HEALTH=$(curl -s -o /dev/null -w "%{http_code}" https://longtail.hotmesh.io/health)
 
 # ── Summary ──
-# Compute rollups from captured data
-RDS_CPU_AVG=$(echo "$RDS_CPU" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
-RDS_CPU_MAX=$(echo "$RDS_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1f", m}')
-RDS_CONN_MAX=$(echo "$RDS_CONN" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.0f", m}')
-RDS_MEM_LAST=$(echo "$RDS_MEM" | awk '{v=$2} END {printf "%.2f", v/1073741824}')
-RDS_DISK_LAST=$(echo "$RDS_DISK" | awk '{v=$2} END {printf "%.2f", v/1073741824}')
+AURORA_ACU_AVG=$(echo "$AURORA_ACU" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
+AURORA_ACU_MAX=$(echo "$AURORA_ACU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1f", m}')
+AURORA_CPU_AVG=$(echo "$AURORA_CPU" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
+AURORA_CPU_MAX=$(echo "$AURORA_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1f", m}')
+AURORA_CONN_MAX=$(echo "$AURORA_CONN" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.0f", m}')
+AURORA_MEM_LAST=$(echo "$AURORA_MEM" | awk '{v=$2} END {printf "%.2f", v/1073741824}')
 API_CPU_AVG=$(echo "$API_CPU" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
 API_CPU_MAX=$(echo "$API_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1f", m}')
 API_MEM_AVG=$(echo "$API_MEM" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
@@ -141,16 +157,9 @@ WRK_CPU_MAX=$(echo "$WRK_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1
 WRK_MEM_AVG=$(echo "$WRK_MEM" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')
 WRK_MEM_MAX=$(echo "$WRK_MEM" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.1f", m}')
 
-# Tasks running vs desired
 SVC_OK=$(echo "$SVC_STATUS" | awk '{if($2==$3) ok++; n++} END {print (ok==n) ? "yes" : "no"}')
 
-# Disk usage percentage
-DISK_PCT=$(echo "$RDS_DISK" | awk -v alloc="$ALLOC_GB" '{v=$2} END {if(alloc>0) printf "%.0f", ((alloc - v/1073741824) / alloc) * 100; else print "—"}')
-
-# Health grade
-#   A = all green: health 200, all services running, peak CPU <70, disk used <80%
-#   B = minor concern: peak CPU 70-85 or disk 80-90%
-#   C = needs attention: peak CPU >85 or disk >90% or service mismatch or health down
+# Health grade (Aurora-aware)
 grade_health() {
   local grade="A"
   local notes=""
@@ -162,29 +171,27 @@ grade_health() {
     grade="C"; notes="${notes} service-count-mismatch"
   fi
 
-  # Peak CPU across all services
-  local peak_cpu=$(echo -e "$RDS_CPU\n$API_CPU\n$WRK_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.0f", m}')
+  # ACU at ceiling = scaling limit
+  local acu_max_int=$(echo "$AURORA_ACU_MAX" | awk '{printf "%.0f", $1}')
+  local acu_limit=$(aws rds describe-db-clusters --query 'DBClusters[0].ServerlessV2ScalingConfiguration.MaxCapacity' --output text 2>/dev/null)
+  if [ "$acu_max_int" -ge "$acu_limit" ] 2>/dev/null; then
+    grade="C"; notes="${notes} acu-at-ceiling(${AURORA_ACU_MAX}/${acu_limit})"
+  fi
+
+  # Peak ECS CPU
+  local peak_cpu=$(echo -e "$API_CPU\n$WRK_CPU" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.0f", m}')
   if [ "$peak_cpu" -gt 85 ] 2>/dev/null; then
-    grade="C"; notes="${notes} cpu-peak-${peak_cpu}%"
+    grade="C"; notes="${notes} ecs-cpu-peak-${peak_cpu}%"
   elif [ "$peak_cpu" -gt 70 ] 2>/dev/null; then
-    [ "$grade" = "A" ] && grade="B"; notes="${notes} cpu-peak-${peak_cpu}%"
+    [ "$grade" = "A" ] && grade="B"; notes="${notes} ecs-cpu-peak-${peak_cpu}%"
   fi
 
-  # Disk usage
-  if [ "$DISK_PCT" != "—" ] 2>/dev/null; then
-    if [ "$DISK_PCT" -gt 90 ] 2>/dev/null; then
-      grade="C"; notes="${notes} disk-${DISK_PCT}%-used"
-    elif [ "$DISK_PCT" -gt 80 ] 2>/dev/null; then
-      [ "$grade" = "A" ] && grade="B"; notes="${notes} disk-${DISK_PCT}%-used"
-    fi
-  fi
-
-  # Peak memory across ECS services
+  # Peak ECS memory
   local peak_mem=$(echo -e "$API_MEM\n$WRK_MEM" | awk 'BEGIN{m=0} {if($3>m) m=$3} END {printf "%.0f", m}')
   if [ "$peak_mem" -gt 85 ] 2>/dev/null; then
-    grade="C"; notes="${notes} mem-peak-${peak_mem}%"
+    grade="C"; notes="${notes} ecs-mem-peak-${peak_mem}%"
   elif [ "$peak_mem" -gt 70 ] 2>/dev/null; then
-    [ "$grade" = "A" ] && grade="B"; notes="${notes} mem-peak-${peak_mem}%"
+    [ "$grade" = "A" ] && grade="B"; notes="${notes} ecs-mem-peak-${peak_mem}%"
   fi
 
   if [ -z "$notes" ]; then
@@ -209,16 +216,16 @@ echo ""
 echo "  ┌─────────────────┬─────────────┬─────────────┐"
 echo "  │                 │   Avg       │   Peak      │"
 echo "  ├─────────────────┼─────────────┼─────────────┤"
-printf "  │ RDS CPU         │  %6s%%     │  %6s%%     │\n" "$RDS_CPU_AVG" "$RDS_CPU_MAX"
-printf "  │ API CPU         │  %6s%%     │  %6s%%     │\n" "$API_CPU_AVG" "$API_CPU_MAX"
-printf "  │ API Memory      │  %6s%%     │  %6s%%     │\n" "$API_MEM_AVG" "$API_MEM_MAX"
-printf "  │ Worker CPU      │  %6s%%     │  %6s%%     │\n" "$WRK_CPU_AVG" "$WRK_CPU_MAX"
-printf "  │ Worker Memory   │  %6s%%     │  %6s%%     │\n" "$WRK_MEM_AVG" "$WRK_MEM_MAX"
+printf "  │ Aurora ACU      │  %5s      │  %5s      │\n" "$AURORA_ACU_AVG" "$AURORA_ACU_MAX"
+printf "  │ Aurora CPU      │  %5s%%     │  %5s%%     │\n" "$AURORA_CPU_AVG" "$AURORA_CPU_MAX"
+printf "  │ API CPU         │  %5s%%     │  %5s%%     │\n" "$API_CPU_AVG" "$API_CPU_MAX"
+printf "  │ API Memory      │  %5s%%     │  %5s%%     │\n" "$API_MEM_AVG" "$API_MEM_MAX"
+printf "  │ Worker CPU      │  %5s%%     │  %5s%%     │\n" "$WRK_CPU_AVG" "$WRK_CPU_MAX"
+printf "  │ Worker Memory   │  %5s%%     │  %5s%%     │\n" "$WRK_MEM_AVG" "$WRK_MEM_MAX"
 echo "  └─────────────────┴─────────────┴─────────────┘"
 echo ""
-printf "  RDS Connections (peak): %s\n" "$RDS_CONN_MAX"
-printf "  RDS Freeable Memory:    %s GB\n" "$RDS_MEM_LAST"
-printf "  RDS Free Storage:       %s / %s GB (%s%% used)\n" "$RDS_DISK_LAST" "$ALLOC_GB" "$DISK_PCT"
-printf "  Services:               %s\n" "$([ "$SVC_OK" = "yes" ] && echo "all running" || echo "MISMATCH")"
-printf "  Health endpoint:        %s\n" "$([ "$HEALTH" = "200" ] && echo "OK" || echo "DOWN ($HEALTH)")"
+printf "  Aurora Connections (peak): %s\n" "$AURORA_CONN_MAX"
+printf "  Aurora Freeable Memory:    %s GB\n" "$AURORA_MEM_LAST"
+printf "  Services:                  %s\n" "$([ "$SVC_OK" = "yes" ] && echo "all running" || echo "MISMATCH")"
+printf "  Health endpoint:           %s\n" "$([ "$HEALTH" = "200" ] && echo "OK" || echo "DOWN ($HEALTH)")"
 echo ""

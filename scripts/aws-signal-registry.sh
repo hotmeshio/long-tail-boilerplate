@@ -8,7 +8,7 @@ SG="sg-08c00d1d745617c68"
 EXEC_ROLE="arn:aws:iam::162216049230:role/LongTail-Compute-ApiTaskDefExecutionRoleE6ABB053-O0qsKPiZJTz2"
 LOG_GROUP="/ecs/longtail/api"
 
-DB_SECRET=$(aws secretsmanager get-secret-value --secret-id LongTail/Database --query SecretString --output text)
+DB_SECRET=$(aws secretsmanager get-secret-value --secret-id LongTail/AuroraDatabase --query SecretString --output text)
 DB_HOST=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['host'])")
 DB_PASS=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
 CONN="postgresql://longtail:${DB_PASS}@${DB_HOST}:5432/longtail?sslmode=require"
