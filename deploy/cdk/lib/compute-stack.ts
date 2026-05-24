@@ -328,7 +328,7 @@ export class ComputeStack extends cdk.Stack {
     const workerService = new ecs.FargateService(this, 'WorkerService', {
       cluster,
       taskDefinition: workerTaskDef,
-      desiredCount: 1,
+      desiredCount: 2,
       securityGroups: [workerSecurityGroup],
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       serviceName: 'worker',
@@ -338,7 +338,7 @@ export class ComputeStack extends cdk.Stack {
     });
 
     const workerScaling = workerService.autoScaleTaskCount({
-      minCapacity: 1,
+      minCapacity: 2,
       maxCapacity: 4,
     });
     workerScaling.scaleOnCpuUtilization('WorkerCpuScaling', {

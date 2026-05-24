@@ -7,6 +7,7 @@ import { assemblyLine } from '../workflows/assembly-line';
 import { workstation } from '../workflows/assembly-line/worker';
 import { stepIterator } from '../workflows/assembly-line/iterator';
 import { reverter } from '../workflows/assembly-line/reverter';
+import { pipeline, station, printstation, printer } from '../workflows/ortho-pipeline';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
@@ -111,6 +112,51 @@ const workstationConfig: LTWorkerConfig = {
   resolverSchema: { approved: true, station: 'grinder' },
 };
 
+// ── Ortho Pipeline configs ──────────────────────────────────────────────────
+
+const ORTHO_ROLES = ['ingester', 'renderer', 'validator', 'printer', 'grinder', 'finisher', 'packager', 'shipper'];
+
+const pipelineConfig: LTWorkerConfig = {
+  description: 'Ortho pipeline — sequential manufacturing flow with nested print fleet',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
+  envelopeSchema: {
+    data: {
+      name: 'Order-001',
+      steps: [
+        { stationName: 'render-assets', role: 'renderer', instructions: 'Render 3D foot model.' },
+        { stationName: 'print-assets', role: 'printer', instructions: 'Print orthotic.', childWorkflow: 'printstation', printerSets: 3 },
+      ],
+    },
+    metadata: { certified: true, source: 'dashboard' },
+  },
+};
+
+const orthoStationConfig: LTWorkerConfig = {
+  description: 'Ortho station — child workflow for a single pipeline step. Creates escalation, waits for human, returns result.',
+  invocable: false,
+  defaultRole: 'renderer',
+  roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
+  resolverSchema: { approved: true, station: 'renderer' },
+};
+
+const printstationConfig: LTWorkerConfig = {
+  description: 'Printstation — orchestrates a fleet of 3D printers (sets × 2 feet).',
+  invocable: false,
+  defaultRole: 'printer',
+  roles: [...CERTIFIED_ROLES, 'printer'],
+};
+
+const printerConfig: LTWorkerConfig = {
+  description: 'Printer — single 3D printer child. Creates escalation (claim=pickup, resolve=done).',
+  invocable: false,
+  defaultRole: 'printer',
+  roles: [...CERTIFIED_ROLES, 'printer'],
+  resolverSchema: { approved: true, station: 'printer' },
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -121,6 +167,10 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'assembly-line', workflow: workstation, config: workstationConfig },
   { taskQueue: 'assembly-line', workflow: stepIterator, config: stepIteratorConfig },
   { taskQueue: 'assembly-line', workflow: reverter, config: reverterConfig },
+  { taskQueue: 'ortho-pipeline', workflow: pipeline, config: pipelineConfig },
+  { taskQueue: 'ortho-pipeline', workflow: station, config: orthoStationConfig },
+  { taskQueue: 'ortho-pipeline', workflow: printstation, config: printstationConfig },
+  { taskQueue: 'ortho-pipeline', workflow: printer, config: printerConfig },
 ];
 
 export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({
