@@ -14,9 +14,9 @@
  * process for local dev.
  */
 try { require('dotenv/config'); } catch {}
-import { start, NatsEventAdapter } from '@hotmeshio/long-tail';
+import { start, NatsEventAdapter, TopicService } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, seedIfEmpty } from './config';
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, seedIfEmpty } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -41,6 +41,8 @@ async function main() {
 
     agents: AGENTS,
 
+    topics: TOPICS,
+
     mcp: {
       serverFactories: MCP_SERVER_FACTORIES,
     },
@@ -54,12 +56,17 @@ async function main() {
       : undefined,
   });
 
-  // 2. Seed default users (skipped for worker-only containers)
+  // 2. Seed custom topics (start() doesn't process config.topics yet)
+  for (const t of TOPICS) {
+    await TopicService.seedTopic({ ...t, description: t.description || '', category: t.category || 'app' });
+  }
+
+  // 3. Seed default users (skipped for worker-only containers)
   if (!isWorker) {
     await seedIfEmpty();
   }
 
-  // 3. Graceful shutdown
+  // 4. Graceful shutdown
   process.on('SIGTERM', () => lt.shutdown());
   process.on('SIGINT', () => lt.shutdown());
 }
