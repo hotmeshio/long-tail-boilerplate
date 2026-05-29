@@ -8,6 +8,7 @@ import { workstation } from '../workflows/assembly-line/worker';
 import { stepIterator } from '../workflows/assembly-line/iterator';
 import { reverter } from '../workflows/assembly-line/reverter';
 import { pipeline, station, printstation, printer } from '../workflows/ortho-pipeline';
+import * as richForm from '../workflows/rich-form';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
@@ -112,6 +113,17 @@ const workstationConfig: LTWorkerConfig = {
   resolverSchema: { approved: true, station: 'grinder' },
 };
 
+const richFormConfig: LTWorkerConfig = {
+  description: 'Rich form showcase — exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, read-only, ordering',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  envelopeSchema: {
+    data: { role: REVIEWER },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Ortho Pipeline configs ──────────────────────────────────────────────────
 
 const ORTHO_ROLES = ['ingester', 'renderer', 'validator', 'printer', 'grinder', 'finisher', 'packager', 'shipper'];
@@ -163,6 +175,7 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'default', workflow: helloWorld.helloWorkflow, config: helloWorldConfig },
   { taskQueue: 'default', workflow: contentReview.reviewContent, config: contentReviewConfig },
   { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, config: screenshotConfig },
+  { taskQueue: 'default', workflow: richForm.richForm, config: richFormConfig },
   { taskQueue: 'assembly-line', workflow: assemblyLine, config: assemblyLineConfig },
   { taskQueue: 'assembly-line', workflow: workstation, config: workstationConfig },
   { taskQueue: 'assembly-line', workflow: stepIterator, config: stepIteratorConfig },
