@@ -20,7 +20,7 @@
 import {
   login, api, sleep, ts,
   PIPELINE_STEPS, DAY_PHASES,
-  BATCHES, PRINTER_SETS, DAILY_VOLUME, BASELINE_HOURS, COMPRESSION_HOURS,
+  BATCHES, PRINTER_SETS, DAILY_VOLUME, BASELINE_HOURS, COMPRESSION_HOURS, HOLD_S,
   compressedBatchSize, compressionWindowMs,
   PipelineStepDef,
 } from './08-shared';
@@ -92,7 +92,8 @@ async function main() {
         },
       } : {}),
     })),
-    pipeline: steps.map((s, i) => ({
+    holdSeconds: HOLD_S,
+    pipeline: PIPELINE_STEPS.map((s, i) => ({
       step: i,
       station: s.stationName,
       role: s.role,

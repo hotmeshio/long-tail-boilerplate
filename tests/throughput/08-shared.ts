@@ -18,14 +18,14 @@ export interface PipelineStepDef {
   printerSets?: number;
 }
 
-export const PIPELINE_STEPS: PipelineStepDef[] = [
-  { stationName: 'render-assets',   role: 'renderer',  instructions: 'Render 3D foot model from scan data.' },
-  { stationName: 'validate-assets', role: 'validator',  instructions: 'Validate mesh integrity and dimensional tolerances.' },
-  { stationName: 'print-assets',    role: 'printer',    instructions: 'Print orthotic from validated model.', childWorkflow: 'printstation' },
-  { stationName: 'grind-assets',    role: 'grinder',    instructions: 'Grind printed orthotic to final contour.' },
-  { stationName: 'finish-assets',   role: 'finisher',   instructions: 'Apply finish coat and surface treatment.' },
-  { stationName: 'package-assets',  role: 'packager',   instructions: 'Package orthotic with documentation.' },
-  { stationName: 'ship-assets',     role: 'shipper',    instructions: 'Ship completed order to provider.' },
+export const PIPELINE_STEPS: (PipelineStepDef & { realDurationMinutes: number })[] = [
+  { stationName: 'render-assets',   role: 'renderer',  realDurationMinutes: 30, instructions: 'Render 3D foot model from scan data.' },
+  { stationName: 'validate-assets', role: 'validator',  realDurationMinutes: 15, instructions: 'Validate mesh integrity and dimensional tolerances.' },
+  { stationName: 'print-assets',    role: 'printer',    realDurationMinutes: 45, instructions: 'Print orthotic from validated model.', childWorkflow: 'printstation' },
+  { stationName: 'grind-assets',    role: 'grinder',    realDurationMinutes: 20, instructions: 'Grind printed orthotic to final contour.' },
+  { stationName: 'finish-assets',   role: 'finisher',   realDurationMinutes: 25, instructions: 'Apply finish coat and surface treatment.' },
+  { stationName: 'package-assets',  role: 'packager',   realDurationMinutes: 10, instructions: 'Package orthotic with documentation.' },
+  { stationName: 'ship-assets',     role: 'shipper',    realDurationMinutes: 5,  instructions: 'Ship completed order to provider.' },
 ];
 
 // ── Day-phase mapping (orthodics manufacturing) ──────────────────────────
@@ -59,6 +59,15 @@ export function compressedBatchSize(): number {
 
 export function compressionWindowMs(): number {
   return COMPRESSION_HOURS * 60 * 60 * 1000;
+}
+
+// ── Hold time ────────────────────────────────────────────────────────
+
+/** Minimum seconds an item is held before resolving. Default 4s. */
+export const HOLD_S = parseFloat(process.env.HOLD_S || '4');
+
+export function holdMsForRole(_role: string): number {
+  return HOLD_S * 1000;
 }
 
 // ── Random schedule generation ───────────────────────────────────────────

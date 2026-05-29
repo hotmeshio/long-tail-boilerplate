@@ -17,7 +17,7 @@
  *   BASELINE_HOURS    — real work hours per day (default 8)
  *   COMPRESSION_HOURS — compressed hours per day (default 1)
  *   PRINTER_SETS      — printer sets per order (default 3)
- *   MIN_HOLD_S        — min seconds after claimed_at before resolving (default 5)
+ *   (hold times are derived from compression ratio × real station durations)
  *   POLL_MS           — ms between polls (default 2000)
  *
  * Usage:
@@ -28,7 +28,7 @@
 import {
   login, api, sleep, ts, envInt, ageSeconds, getUserId,
   DAY_ROLES, PRINTER_SETS, BATCHES,
-  compressedBatchSize, compressionWindowMs,
+  compressedBatchSize, compressionWindowMs, holdMsForRole,
 } from './08-shared';
 
 const DAY = envInt('DAY', 0);
@@ -43,7 +43,6 @@ if (!RUN_ID) {
   process.exit(1);
 }
 
-const MIN_HOLD_S = envInt('MIN_HOLD_S', 5);
 const POLL_MS = envInt('POLL_MS', 2000);
 
 const roles = DAY_ROLES[DAY];
@@ -61,15 +60,16 @@ let totalClaimed = 0;
 let totalResolved = 0;
 let userId = '';
 
-// ── Claim: grab all available escalations matching roles + batch ─────
+// ── Claim: grab up to maxPerPoll matching escalations ────────────────
 
-async function claimAll(batchTag: string): Promise<number> {
+async function claimBatch(batchTag: string, maxPerPoll: number): Promise<number> {
   try {
     const resp = await api('GET', `/api/escalations/available?limit=100&sort_by=created_at&order=asc`);
     const escalations = resp?.escalations || [];
     let claimed = 0;
 
     for (const esc of escalations) {
+      if (claimed >= maxPerPoll) break;
       if (!roles.includes(esc.role)) continue;
       if (!(esc.workflow_id || '').includes(batchTag)) continue;
 
@@ -77,7 +77,7 @@ async function claimAll(batchTag: string): Promise<number> {
         await api('POST', `/api/escalations/${esc.id}/claim`, { durationMinutes: 600 });
         totalClaimed++;
         claimed++;
-        console.log(`[${ts()}]   [claim] ${esc.id.slice(0, 8)}… (${esc.role}) [${totalClaimed} total]`);
+        console.log(`[${ts()}]   [claim] ${esc.id} (${esc.role}) wf=${esc.workflow_id || ''} [${totalClaimed} total]`);
       } catch {
         // Already claimed
       }
@@ -89,20 +89,22 @@ async function claimAll(batchTag: string): Promise<number> {
   }
 }
 
-// ── Resolve: resolve all claimed escalations held long enough ────────
+// ── Resolve: resolve up to maxPerPoll held-long-enough escalations ───
 
-async function resolveAll(batchTag: string): Promise<number> {
+async function resolveBatch(batchTag: string, maxPerPoll: number): Promise<number> {
   try {
     const resp = await api('GET', `/api/escalations?status=pending&assigned_to=${userId}&limit=100&sort_by=created_at&order=asc`);
     const escalations = resp?.escalations || [];
     let resolved = 0;
 
     for (const esc of escalations) {
+      if (resolved >= maxPerPoll) break;
       if (!roles.includes(esc.role)) continue;
       if (!(esc.workflow_id || '').includes(batchTag)) continue;
 
       const holdTime = esc.claimed_at ? ageSeconds(esc.claimed_at) : 0;
-      if (holdTime < MIN_HOLD_S) continue;
+      const minHoldS = holdMsForRole(esc.role) / 1000;
+      if (holdTime < minHoldS) continue;
 
       try {
         await api('POST', `/api/escalations/${esc.id}/resolve`, {
@@ -110,7 +112,7 @@ async function resolveAll(batchTag: string): Promise<number> {
         });
         totalResolved++;
         resolved++;
-        console.log(`[${ts()}]   [resolve] ${esc.id.slice(0, 8)}… (${esc.role}) held ${Math.floor(holdTime)}s [${totalResolved} total]`);
+        console.log(`[${ts()}]   [resolve] ${esc.id} (${esc.role}) held ${Math.floor(holdTime)}s/${Math.floor(minHoldS)}s wf=${esc.workflow_id || ''} [${totalResolved} total]`);
       } catch (err: any) {
         console.error(`[${ts()}]   [resolve] ${esc.id.slice(0, 8)}… error: ${err.message.slice(0, 60)}`);
       }
@@ -131,21 +133,27 @@ async function runCycle(cycleNum: number): Promise<void> {
   let cycleClaimed = 0;
   let done = false;
 
-  console.log(`[${ts()}] ── Cycle ${cycleNum} ── batch ${targetBatch} (${target} items for [${roleCsv}])`);
+  // Claims spread across the window (realistic pacing).
+  // Resolves drain all eligible items each poll (they've already waited their hold time).
+  const windowMs = compressionWindowMs();
+  const pollsPerWindow = Math.floor(windowMs / POLL_MS);
+  const claimPerPoll = Math.max(1, Math.ceil(target / pollsPerWindow));
 
-  // Claim loop — grabs all available matching escalations each poll
+  console.log(`[${ts()}] ── Cycle ${cycleNum} ── batch ${targetBatch} (${target} items for [${roleCsv}], ~${claimPerPoll} claims/poll over ${(windowMs / 1000).toFixed(0)}s)`);
+
+  // Claim loop — paced: up to claimPerPoll per poll
   const claimLoop = async () => {
     while (!done) {
-      const found = await claimAll(batchTag);
+      const found = await claimBatch(batchTag, claimPerPoll);
       cycleClaimed += found;
       if (!done) await sleep(POLL_MS);
     }
   };
 
-  // Resolve loop — resolves all held-long-enough escalations each poll
+  // Resolve loop — drains all eligible items each poll (no cap)
   const resolveLoop = async () => {
     while (!done) {
-      await resolveAll(batchTag);
+      await resolveBatch(batchTag, target);
       if (!done) await sleep(POLL_MS);
     }
   };
@@ -179,7 +187,7 @@ async function main() {
   console.log(`[${ts()}] Day ${DAY} resolver started — roles: [${roleCsv}]`);
   console.log(`[${ts()}]   Run: ${RUN_ID}`);
   console.log(`[${ts()}]   User: ${userId.slice(0, 8)}…`);
-  console.log(`[${ts()}]   Items/cycle: ${target}, min hold: ${MIN_HOLD_S}s, poll: ${POLL_MS}ms`);
+  console.log(`[${ts()}]   Items/cycle: ${target}, hold: ${(holdMsForRole('') / 1000).toFixed(0)}s, poll: ${POLL_MS}ms`);
   console.log(`[${ts()}]   Initial delay: ${(initialDelay / 60_000).toFixed(1)}min (DAY ${DAY} × ${(windowMs / 60_000).toFixed(1)}min)`);
   console.log(`[${ts()}]   Ctrl-C to stop\n`);
 

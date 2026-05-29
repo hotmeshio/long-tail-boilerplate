@@ -12,7 +12,12 @@ export async function greet(input: { name: string }): Promise<{
   greetedAt: string;
   identity: Record<string, unknown>;
 }> {
-  const identity = getActivityIdentity();
+  let identity: ReturnType<typeof getActivityIdentity> | null = null;
+  try {
+    identity = getActivityIdentity();
+  } catch {
+    // No IAM context (e.g., cron-invoked workflow)
+  }
 
   return {
     message: `Hello, ${input.name}!`,
