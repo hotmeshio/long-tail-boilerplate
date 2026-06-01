@@ -1,0 +1,92 @@
+# Multi-container override — mirrors AWS topology.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.multi.yml up -d --build
+#
+# Replaces the single `app` with: api (1) + worker (2) + NATS
+
+services:
+  app:
+    # Disable the single-container app
+    profiles: [disabled]
+
+  api:
+    build:
+      context: .
+      target: dev
+    ports:
+      - "${PORT:-3030}:3030"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ROLE: api
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      LT_S3_ENDPOINT: http://minio:9000
+      LT_S3_PUBLIC_ENDPOINT: http://localhost:9002
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: dev_api_secret
+      NATS_WS_URL: ws://localhost:9222
+      NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./scripts:/app/scripts
+      - ./tsconfig.json:/app/tsconfig.json
+
+  worker-1:
+    build:
+      context: .
+      target: dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ROLE: worker
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      LT_S3_ENDPOINT: http://minio:9000
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: dev_api_secret
+      NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./tsconfig.json:/app/tsconfig.json
+
+  worker-2:
+    build:
+      context: .
+      target: dev
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ROLE: worker
+      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      LT_S3_ENDPOINT: http://minio:9000
+      NATS_URL: nats://nats:4222
+      NATS_TOKEN: dev_api_secret
+      NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./tsconfig.json:/app/tsconfig.json
