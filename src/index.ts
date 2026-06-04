@@ -66,7 +66,8 @@ async function main() {
     // NATS event bus — enabled when NATS_URL is set.
     // docker-compose sets: NATS_URL, NATS_WS_TARGET, NATS_TOKEN
     // CDK sets the same three via config and Secrets Manager.
-    // wsUrl is auto-derived from request headers (X-Forwarded-Proto/Host).
+    // wsProxy: internal target the server proxies to.
+    // wsUrl: auto-derived from request headers (X-Forwarded-Proto/Host).
     events: process.env.NATS_URL
       ? {
           nats: {
