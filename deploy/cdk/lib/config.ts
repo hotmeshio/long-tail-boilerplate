@@ -75,9 +75,6 @@ export function loadConfig(app: cdk.App) {
     /** Internal NATS URL via Cloud Map */
     natsUrl: `nats://nats.${serviceDiscoveryNamespace}:4222`,
 
-    /** Public NATS WebSocket URL (TLS terminated at ALB) */
-    natsWsUrl: `wss://${domainName}:9222`,
-
     /** GitHub Actions deploy role name */
     deployRoleName: `${projectName}-GithubActionsDeployRole`,
   };
