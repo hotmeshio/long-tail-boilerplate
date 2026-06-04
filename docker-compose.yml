@@ -15,7 +15,7 @@ services:
       LT_S3_PUBLIC_ENDPOINT: http://localhost:9002
       NATS_URL: nats://nats:4222
       NATS_TOKEN: dev_api_secret
-      NATS_WS_URL: ws://localhost:9222
+      NATS_WS_TARGET: ws://nats:9222
       NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
     depends_on:
       postgres:

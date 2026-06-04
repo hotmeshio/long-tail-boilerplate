@@ -104,8 +104,8 @@ export class ComputeStack extends cdk.Stack {
     // --- NATS Event Bus ---
     // Lightweight pub/sub for cross-server event delivery.
     // Workers and API servers publish events to NATS (port 4222).
-    // Browser dashboard connects directly to NATS via WebSocket (port 9222).
-    // No Socket.IO relay — one event bus, one subscription, no intermediary.
+    // Browser dashboard connects via reverse proxy through the ALB on port 443.
+    // Long Tail's built-in proxy bridges wss://{domain}/nats-ws to ws://nats:9222.
 
     const natsLogGroup = new logs.LogGroup(this, 'NatsLogGroup', {
       logGroupName: config.logGroup('nats'),
@@ -179,40 +179,6 @@ export class ComputeStack extends cdk.Stack {
       }),
     });
 
-    // ── NATS WebSocket Listener (port 9222) ───────────────────────────────
-    // Browser dashboard connects directly to NATS via WebSocket.
-    // TLS terminates at ALB; NATS serves plaintext WebSocket internally.
-
-    const natsWsListener = this.alb.addListener('NatsWsListener', {
-      port: 9222,
-      protocol: elbv2.ApplicationProtocol.HTTPS,
-      certificates: [certificate],
-      defaultAction: elbv2.ListenerAction.fixedResponse(404, {
-        contentType: 'text/plain',
-        messageBody: 'Not Found',
-      }),
-    });
-
-    natsWsListener.addTargets('NatsWsTarget', {
-      port: 9222,
-      protocol: elbv2.ApplicationProtocol.HTTP,
-      targets: [natsService.loadBalancerTarget({
-        containerName: 'nats',
-        containerPort: 9222,
-      })],
-      healthCheck: {
-        path: '/',
-        port: '8222',
-        protocol: elbv2.Protocol.HTTP,
-        interval: cdk.Duration.seconds(30),
-        timeout: cdk.Duration.seconds(10),
-        healthyThresholdCount: 2,
-        unhealthyThresholdCount: 3,
-      },
-      priority: 1,
-      conditions: [elbv2.ListenerCondition.pathPatterns(['/*'])],
-    });
-
     // ── API Service ─────────────────────────────────────────────────────────
     // Dashboard + REST API. Readonly workflow observers for dashboard visibility.
     // Runs the conditional seed on first boot.
@@ -237,7 +203,7 @@ export class ComputeStack extends cdk.Stack {
         APP_ROLE: 'api',
         PORT: '3030',
         NATS_URL: config.natsUrl,
-        NATS_WS_URL: config.natsWsUrl,
+        NATS_WS_TARGET: `ws://nats.${config.serviceDiscoveryNamespace}:9222`,
       },
       secrets: {
         ...sharedSecrets,
@@ -367,9 +333,5 @@ export class ComputeStack extends cdk.Stack {
       description: 'Application URL',
     });
 
-    new cdk.CfnOutput(this, 'NatsWsUrl', {
-      value: config.natsWsUrl,
-      description: 'NATS WebSocket URL for browser connections',
-    });
   }
 }

@@ -12,9 +12,21 @@
  * The `APP_ROLE` env var splits this into two container images
  * (api + worker) in production, or runs everything in one
  * process for local dev.
+ *
+ * ## NATS event bus
+ *
+ * When `NATS_URL` is set (docker-compose and CDK both set it),
+ * NATS replaces Socket.IO as the event transport. All three vars
+ * flow through the declarative `events.nats` config:
+ *
+ * | Env var         | Purpose                                      |
+ * |-----------------|----------------------------------------------|
+ * | NATS_URL        | Internal server-to-NATS connection (4222)     |
+ * | NATS_WS_TARGET  | Internal NATS WS endpoint for reverse proxy   |
+ * | NATS_TOKEN      | Auth token (Secrets Manager in AWS, hardcoded locally) |
  */
 try { require('dotenv/config'); } catch {}
-import { start, NatsEventAdapter, TopicService } from '@hotmeshio/long-tail';
+import { start, TopicService } from '@hotmeshio/long-tail';
 
 import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, seedIfEmpty } from './config';
 
@@ -51,8 +63,19 @@ async function main() {
       strategy: 'mcp',
     },
 
+    // NATS event bus — enabled when NATS_URL is set.
+    // docker-compose sets: NATS_URL, NATS_WS_TARGET, NATS_TOKEN
+    // CDK sets the same three via config and Secrets Manager.
+    // wsProxy: internal target the server proxies to.
+    // wsUrl: auto-derived from request headers (X-Forwarded-Proto/Host).
     events: process.env.NATS_URL
-      ? { adapters: [new NatsEventAdapter({ url: process.env.NATS_URL, token: process.env.NATS_TOKEN })] }
+      ? {
+          nats: {
+            url: process.env.NATS_URL,
+            wsProxy: process.env.NATS_WS_TARGET,
+            token: process.env.NATS_TOKEN,
+          },
+        }
       : undefined,
   });
 
