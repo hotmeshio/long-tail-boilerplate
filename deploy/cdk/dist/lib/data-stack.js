@@ -43,8 +43,8 @@ class DataStack extends cdk.Stack {
     constructor(scope, id, props) {
         super(scope, id, props);
         const { vpc, dbSecurityGroup, config } = props;
-        // --- RDS PostgreSQL ---
-        const parameterGroup = new rds.ParameterGroup(this, 'DbParameterGroup', {
+        // --- Legacy RDS instance (retained to preserve cross-stack export) ---
+        const legacyParameterGroup = new rds.ParameterGroup(this, 'DbParameterGroup', {
             engine: rds.DatabaseInstanceEngine.postgres({
                 version: rds.PostgresEngineVersion.VER_16,
             }),
@@ -60,11 +60,11 @@ class DataStack extends cdk.Stack {
             engine: rds.DatabaseInstanceEngine.postgres({
                 version: rds.PostgresEngineVersion.VER_16,
             }),
-            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.MEDIUM),
+            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T4G, ec2.InstanceSize.XLARGE),
             vpc,
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
             securityGroups: [dbSecurityGroup],
-            parameterGroup,
+            parameterGroup: legacyParameterGroup,
             multiAz: false,
             allocatedStorage: 100,
             maxAllocatedStorage: 500,
@@ -74,10 +74,51 @@ class DataStack extends cdk.Stack {
                 secretName: config.secretName('Database'),
             }),
             backupRetention: cdk.Duration.days(7),
-            deletionProtection: true,
+            deletionProtection: false,
             removalPolicy: cdk.RemovalPolicy.RETAIN,
         });
-        this.dbSecret = this.dbInstance.secret;
+        // --- Aurora Serverless v2 PostgreSQL (new primary) ---
+        const auroraParameterGroup = new rds.ParameterGroup(this, 'AuroraDbParameterGroup', {
+            engine: rds.DatabaseClusterEngine.auroraPostgres({
+                version: rds.AuroraPostgresEngineVersion.VER_16_4,
+            }),
+            parameters: {
+                max_connections: '200',
+                idle_in_transaction_session_timeout: '60000',
+                'tcp_keepalives_idle': '60',
+                'tcp_keepalives_interval': '10',
+                'tcp_keepalives_count': '6',
+            },
+        });
+        this.dbCluster = new rds.DatabaseCluster(this, 'AuroraCluster', {
+            engine: rds.DatabaseClusterEngine.auroraPostgres({
+                version: rds.AuroraPostgresEngineVersion.VER_16_4,
+            }),
+            vpc,
+            vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },
+            securityGroups: [dbSecurityGroup],
+            parameterGroup: auroraParameterGroup,
+            defaultDatabaseName: config.dbName,
+            credentials: rds.Credentials.fromGeneratedSecret(config.dbUsername, {
+                secretName: config.secretName('AuroraDatabase'),
+            }),
+            serverlessV2MinCapacity: 0.5,
+            serverlessV2MaxCapacity: 8,
+            writer: rds.ClusterInstance.serverlessV2('Writer', {
+                publiclyAccessible: false,
+            }),
+            backup: { retention: cdk.Duration.days(7) },
+            deletionProtection: true,
+            removalPolicy: cdk.RemovalPolicy.RETAIN,
+            storageEncrypted: true,
+        });
+        this.dbSecret = this.dbCluster.secret;
+        // Preserve the old cross-stack export until Compute deploys with the new one.
+        // Without this, CloudFormation rejects the update because Compute still imports it.
+        // Safe to remove after one successful deploy cycle.
+        this.exportValue(this.dbInstance.secret.secretArn, {
+            name: 'LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73',
+        });
         // --- S3 Bucket ---
         this.bucket = new s3.Bucket(this, 'FilesBucket', {
             bucketName: config.bucketName(cdk.Stack.of(this).account, cdk.Stack.of(this).region),
@@ -141,9 +182,9 @@ class DataStack extends cdk.Stack {
             },
         });
         // --- Outputs ---
-        new cdk.CfnOutput(this, 'DbEndpoint', {
-            value: this.dbInstance.dbInstanceEndpointAddress,
-            description: 'RDS endpoint address',
+        new cdk.CfnOutput(this, 'AuroraClusterEndpoint', {
+            value: this.dbCluster.clusterEndpoint.hostname,
+            description: 'Aurora Serverless v2 cluster endpoint',
         });
         new cdk.CfnOutput(this, 'BucketName', {
             value: this.bucket.bucketName,

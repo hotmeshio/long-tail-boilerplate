@@ -21,15 +21,30 @@
       ]
     }
   ],
-  "/LongTail-Data/DbEndpoint": [
+  "/LongTail-Data/ExportLongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "DbEndpoint"
+      "data": "ExportLongTailDataExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
     },
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:149:5)",
+        "...DataStack.exportValue in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:118:10)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraClusterEndpoint": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterEndpoint"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:196:5)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -43,7 +58,7 @@
     {
       "type": "aws:cdk:creationStack",
       "data": [
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:154:5)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:201:5)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -84,7 +99,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:48:23)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:50:23)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -99,7 +114,37 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:48:23)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:50:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraDbParameterGroup/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraDbParameterGroupF30B5A8A"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraCluster/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraCluster23D869C0"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -114,7 +159,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Bucket2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:77:19)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:124:19)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -129,7 +174,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:103:22)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:150:22)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -144,7 +189,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:111:24)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:158:24)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -159,7 +204,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:116:26)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:163:26)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -174,7 +219,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:121:34)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:168:34)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -189,7 +234,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:126:31)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:173:31)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -204,7 +249,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:131:36)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:178:36)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -219,7 +264,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Secret2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:139:28)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:186:28)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -277,10 +322,10 @@
       ]
     }
   ],
-  "/LongTail-Data/Exports/Output{\"Ref\":\"DatabaseSecretAttachmentE5D1B020\"}": [
+  "/LongTail-Data/Exports/Output{\"Ref\":\"AuroraClusterSecretAttachmentDB8032DA\"}": [
     {
       "type": "aws:cdk:logicalId",
-      "data": "ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+      "data": "ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
     },
     {
       "type": "aws:cdk:creationStack",
@@ -377,7 +422,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:48:23)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:50:23)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -392,7 +437,52 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:48:23)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:50:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraCluster/Subnets/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterSubnetsF3E9E6AD"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraCluster/Secret/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "LongTailDataAuroraClusterSecret68EDBED83fdaad7efa858a3daf9490cf0a702aeb"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraCluster/Writer/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterWriterAA1AB06C"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -407,7 +497,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new Bucket2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:77:19)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:124:19)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -422,7 +512,22 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new DatabaseInstance2 in aws-cdk-lib...",
-        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:48:23)",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:50:23)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
+  "/LongTail-Data/AuroraCluster/Secret/Attachment/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "AuroraClusterSecretAttachmentDB8032DA"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...new DatabaseCluster2 in aws-cdk-lib...",
+        "new DataStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/data-stack.ts:90:22)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:25:14)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]

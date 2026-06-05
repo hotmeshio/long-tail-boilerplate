@@ -86,9 +86,12 @@ class NetworkStack extends cdk.Stack {
         this.natsSecurityGroup.connections.allowFrom(this.appSecurityGroup, ec2.Port.tcp(4222), 'API tasks to NATS');
         this.natsSecurityGroup.connections.allowFrom(this.workerSecurityGroup, ec2.Port.tcp(4222), 'Worker tasks to NATS');
         // ALB forwards browser WebSocket connections to NATS (port 9222)
-        // and checks health on the monitoring port (8222)
+        // and checks health on the monitoring port (8222).
+        // Kept for ECS stability — will be removed in a follow-up deploy.
         this.natsSecurityGroup.connections.allowFrom(this.albSecurityGroup, ec2.Port.tcp(9222), 'ALB to NATS WebSocket');
         this.natsSecurityGroup.connections.allowFrom(this.albSecurityGroup, ec2.Port.tcp(8222), 'ALB health check to NATS monitoring');
+        // API reverse-proxies browser WebSocket connections to NATS (port 9222)
+        this.natsSecurityGroup.connections.allowFrom(this.appSecurityGroup, ec2.Port.tcp(9222), 'API reverse proxy to NATS WebSocket');
         this.dbSecurityGroup = new ec2.SecurityGroup(this, 'DbSecurityGroup', {
             vpc: this.vpc,
             description: 'Security group for Long Tail RDS instance',

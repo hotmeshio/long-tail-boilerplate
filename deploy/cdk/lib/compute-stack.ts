@@ -179,6 +179,40 @@ export class ComputeStack extends cdk.Stack {
       }),
     });
 
+    // ── NATS WebSocket Listener (port 9222) ───────────────────────────────
+    // Kept for ECS service stability. Will be removed in a follow-up deploy
+    // once the reverse proxy (via /nats-ws on port 443) is confirmed working.
+
+    const natsWsListener = this.alb.addListener('NatsWsListener', {
+      port: 9222,
+      protocol: elbv2.ApplicationProtocol.HTTPS,
+      certificates: [certificate],
+      defaultAction: elbv2.ListenerAction.fixedResponse(404, {
+        contentType: 'text/plain',
+        messageBody: 'Not Found',
+      }),
+    });
+
+    natsWsListener.addTargets('NatsWsTarget', {
+      port: 9222,
+      protocol: elbv2.ApplicationProtocol.HTTP,
+      targets: [natsService.loadBalancerTarget({
+        containerName: 'nats',
+        containerPort: 9222,
+      })],
+      healthCheck: {
+        path: '/',
+        port: '8222',
+        protocol: elbv2.Protocol.HTTP,
+        interval: cdk.Duration.seconds(30),
+        timeout: cdk.Duration.seconds(10),
+        healthyThresholdCount: 2,
+        unhealthyThresholdCount: 3,
+      },
+      priority: 1,
+      conditions: [elbv2.ListenerCondition.pathPatterns(['/*'])],
+    });
+
     // ── API Service ─────────────────────────────────────────────────────────
     // Dashboard + REST API. Readonly workflow observers for dashboard visibility.
     // Runs the conditional seed on first boot.
