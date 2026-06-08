@@ -147,12 +147,12 @@ describe('NATS Event Delivery', () => {
     log('workflow', `claimed escalation ${escalationId}`);
 
     const event = await waitForEvent(
-      (e) => e.type === 'escalation.claimed' && events.indexOf(e) >= startCount,
+      (e) => e.type?.endsWith('.claimed') && e.type.startsWith('system.escalation.') && events.indexOf(e) >= startCount,
     );
-    expect(event.subject).toBe('lt.events.escalation.claimed');
-    expect(event.type).toBe('escalation.claimed');
+    expect(event.subject).toBe(`lt.events.${event.type}`);
+    expect(event.type).toMatch(/^system\.escalation\..+\.claimed$/);
     expect(event.timestamp).toBeDefined();
-    log('nats', `received escalation.claimed on subject ${event.subject}`);
+    log('nats', `received ${event.type} on subject ${event.subject}`);
   }, 30_000);
 
   it('receives escalation.resolved event on NATS after resolving', async () => {
@@ -167,12 +167,12 @@ describe('NATS Event Delivery', () => {
     log('workflow', `resolved escalation ${esc.id}`);
 
     const event = await waitForEvent(
-      (e) => e.type === 'escalation.resolved' && events.indexOf(e) >= startCount,
+      (e) => e.type?.endsWith('.resolved') && e.type.startsWith('system.escalation.') && events.indexOf(e) >= startCount,
     );
-    expect(event.subject).toBe('lt.events.escalation.resolved');
-    expect(event.type).toBe('escalation.resolved');
+    expect(event.subject).toBe(`lt.events.${event.type}`);
+    expect(event.type).toMatch(/^system\.escalation\..+\.resolved$/);
     expect(event.timestamp).toBeDefined();
-    log('nats', `received escalation.resolved on subject ${event.subject}`);
+    log('nats', `received ${event.type} on subject ${event.subject}`);
   }, 30_000);
 
   it('proves end-to-end: all NATS events have correct structure', async () => {
@@ -183,9 +183,9 @@ describe('NATS Event Delivery', () => {
     log('nats', `total events captured: ${events.length}`);
     log('nats', `event types seen: ${types.join(', ')}`);
 
-    // The escalation lifecycle events prove NATS cross-server delivery
-    expect(types).toContain('escalation.claimed');
-    expect(types).toContain('escalation.resolved');
+    // The escalation lifecycle events prove NATS cross-server delivery (system.escalation.{id}.claimed/resolved)
+    expect(types.some((t) => t.endsWith('.claimed'))).toBe(true);
+    expect(types.some((t) => t.endsWith('.resolved'))).toBe(true);
 
     // Every event with a type must follow the subject convention
     const typedEvents = events.filter((e) => e.type);
