@@ -794,6 +794,10 @@
         "Value": "us-west-1"
        },
        {
+        "Name": "BASE_URL",
+        "Value": "https://longtail.hotmesh.io"
+       },
+       {
         "Name": "APP_ROLE",
         "Value": "api"
        },
@@ -806,13 +810,13 @@
         "Value": "nats://nats.longtail.local:4222"
        },
        {
-        "Name": "NATS_WS_URL",
-        "Value": "wss://longtail.hotmesh.io:9222"
+        "Name": "NATS_WS_TARGET",
+        "Value": "ws://nats.longtail.local:9222"
        }
       ],
       "Essential": true,
       "Image": {
-       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:71b8452da7f3bfaba9d1a94c87dfafe23f55b1ee9107a4788dcf146790655259"
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:ad66a22605046666c0d19f50a57063f90c6e3694cabe9c4181b627eee2ba2797"
       },
       "LogConfiguration": {
        "LogDriver": "awslogs",
@@ -839,7 +843,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":host::"
           ]
@@ -853,7 +857,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":username::"
           ]
@@ -867,7 +871,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":password::"
           ]
@@ -881,9 +885,45 @@
         }
        },
        {
-        "Name": "OAUTH_CONFIG",
+        "Name": "OAUTH_GOOGLE_CLIENT_ID",
         "ValueFrom": {
-         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":google_client_id::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OAUTH_GOOGLE_CLIENT_SECRET",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":google_client_secret::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OAUTH_ENCRYPTION_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":encryption_key::"
+          ]
+         ]
         }
        },
        {
@@ -1033,7 +1073,7 @@
        ],
        "Effect": "Allow",
        "Resource": {
-        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
        }
       },
       {
@@ -1427,6 +1467,10 @@
         "Value": "us-west-1"
        },
        {
+        "Name": "BASE_URL",
+        "Value": "https://longtail.hotmesh.io"
+       },
+       {
         "Name": "APP_ROLE",
         "Value": "worker"
        },
@@ -1437,7 +1481,7 @@
       ],
       "Essential": true,
       "Image": {
-       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:71b8452da7f3bfaba9d1a94c87dfafe23f55b1ee9107a4788dcf146790655259"
+       "Fn::Sub": "162216049230.dkr.ecr.us-west-1.${AWS::URLSuffix}/cdk-hnb659fds-container-assets-162216049230-us-west-1:ad66a22605046666c0d19f50a57063f90c6e3694cabe9c4181b627eee2ba2797"
       },
       "LogConfiguration": {
        "LogDriver": "awslogs",
@@ -1458,7 +1502,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":host::"
           ]
@@ -1472,7 +1516,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":username::"
           ]
@@ -1486,7 +1530,7 @@
           "",
           [
            {
-            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
            },
            ":password::"
           ]
@@ -1500,9 +1544,45 @@
         }
        },
        {
-        "Name": "OAUTH_CONFIG",
+        "Name": "OAUTH_GOOGLE_CLIENT_ID",
         "ValueFrom": {
-         "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":google_client_id::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OAUTH_GOOGLE_CLIENT_SECRET",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":google_client_secret::"
+          ]
+         ]
+        }
+       },
+       {
+        "Name": "OAUTH_ENCRYPTION_KEY",
+        "ValueFrom": {
+         "Fn::Join": [
+          "",
+          [
+           {
+            "Fn::ImportValue": "LongTail-Data:ExportsOutputRefOAuthProvidersD351A2518F4FBFBD"
+           },
+           ":encryption_key::"
+          ]
+         ]
         }
        },
        {
@@ -1647,7 +1727,7 @@
        ],
        "Effect": "Allow",
        "Resource": {
-        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefDatabaseSecretAttachmentE5D1B020633AEB73"
+        "Fn::ImportValue": "LongTail-Data:ExportsOutputRefAuroraClusterSecretAttachmentDB8032DAFDEEBE73"
        }
       },
       {
@@ -1739,7 +1819,7 @@
      "MaximumPercent": 200,
      "MinimumHealthyPercent": 100
     },
-    "DesiredCount": 1,
+    "DesiredCount": 2,
     "EnableECSManagedTags": false,
     "EnableExecuteCommand": true,
     "LaunchType": "FARGATE",
@@ -1788,7 +1868,7 @@
    "Type": "AWS::ApplicationAutoScaling::ScalableTarget",
    "Properties": {
     "MaxCapacity": 4,
-    "MinCapacity": 1,
+    "MinCapacity": 2,
     "ResourceId": {
      "Fn::Join": [
       "",
@@ -1889,7 +1969,7 @@
   "CDKMetadata": {
    "Type": "AWS::CDK::Metadata",
    "Properties": {
-    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21R0W7bMAz8lr4r6uChH5Am2DCg2Ao77wUjswJrRTREykVg+N8Ly83ibAUE8HhHniiqstVDZb/dwbtsXNttAh3t2Ci4zsC7vIzoxI67kEUxmd1rvMAfkDwoHkC6Pb5SJCWOc8G/DEcFiphW3Gdvg2kgh3PTBTYOAhxDsd1xjjoZWaSWxPGA6WzH50QDKO6j/IYTSg+Lx1f0/1dMJrAXOz6x/5k497N0wZMhONmx5lA6SnzmQO5c/AuaDAYQJRcY2iMEiI6iHyo7bvs+kIP5hU8M7WPRlqXd5Os6EsX4WXPBK/0AyaP+nXOdfuFS52XudT4ZdOkFRFDF7tl1mH6dwON2ZmbN1tizkHI6P4KggasvZGVxECh6O15/Zp6hLPSWWcIhgeso+mbpu27vhphM4qz48N2O2xodp7bsu6AGdZpMma9R8BS9qVE4p+Ub/2Tts04mcov2Te6HqrLzuXsTok3KUemEtl7iBx0sBJrdAgAA"
+    "Analytics": "v2:deflate64:H4sIAAAAAAAA/21R0W7bMAz8lr4rWuctH5Am6DCg2Ao77wUjswJrRTREKkVg+N8Hy83ibH3i8Y48UWRlq3Vl7+/gXVau7VaBDnZoFFxn4F1eBnRih23IopjM9jVe4CMkD4p7kG6HrxRJieNU8C/DUYEipgX30dtgOpHDqekCGwcBDqHYbjlHHY3MUkvi+ITpbIfnRCdQ3EX5BUeUHmaPz+j/nxhNYC92eGL/I3HuJ+mCR0NwtEPNoXSU+MyB3Ln4FzQaDCBKLjC0BwgQHUV/quyw6ftADqYfPjG0D0Wbl3aTL+tIFONHzQUv9D0kj/p3zmX6iUud57mX+WjQpRcQQRW7Y9dh+nkEj5uJmTRbY89Cyun8AIIGrr6QlcVBoOjtcL3MNENZ6C0zh30C11H0zdx33d4NMZrEWXH9zQ6bGh2ntuy7oAZ1HE2Zr1HwFL2pUTin+Yy/s/ZZRxO5RfsmX07Vd/t1be/v3oRolXJUOqKt5/gHfjn4DN0CAAA="
    },
    "Metadata": {
     "aws:cdk:path": "LongTail-Compute/CDKMetadata/Default"
@@ -1909,10 +1989,6 @@
   "ServiceUrl": {
    "Description": "Application URL",
    "Value": "https://longtail.hotmesh.io"
-  },
-  "NatsWsUrl": {
-   "Description": "NATS WebSocket URL for browser connections",
-   "Value": "wss://longtail.hotmesh.io:9222"
   }
  },
  "Parameters": {

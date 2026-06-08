@@ -52,6 +52,11 @@ export class NetworkStack extends cdk.Stack {
       ec2.Port.tcp(443),
       'HTTPS from anywhere',
     );
+    this.albSecurityGroup.addIngressRule(
+      ec2.Peer.anyIpv4(),
+      ec2.Port.tcp(9222),
+      'NATS WebSocket from anywhere (TLS terminated at ALB)',
+    );
     this.appSecurityGroup = new ec2.SecurityGroup(this, 'AppSecurityGroup', {
       vpc: this.vpc,
       description: 'Security group for Long Tail API Fargate tasks',
@@ -81,6 +86,19 @@ export class NetworkStack extends cdk.Stack {
       this.workerSecurityGroup,
       ec2.Port.tcp(4222),
       'Worker tasks to NATS',
+    );
+    // ALB forwards browser WebSocket connections to NATS (port 9222)
+    // and checks health on the monitoring port (8222).
+    // Kept for ECS stability — will be removed in a follow-up deploy.
+    this.natsSecurityGroup.connections.allowFrom(
+      this.albSecurityGroup,
+      ec2.Port.tcp(9222),
+      'ALB to NATS WebSocket',
+    );
+    this.natsSecurityGroup.connections.allowFrom(
+      this.albSecurityGroup,
+      ec2.Port.tcp(8222),
+      'ALB health check to NATS monitoring',
     );
     // API reverse-proxies browser WebSocket connections to NATS (port 9222)
     this.natsSecurityGroup.connections.allowFrom(

@@ -116,7 +116,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:61:29)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:60:29)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -131,7 +131,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...Connections.allowFrom in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:65:39)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:64:39)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -146,7 +146,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:71:32)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:70:32)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -161,7 +161,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:76:30)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:75:30)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -176,7 +176,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...Connections.allowFrom in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:81:40)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:80:40)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -191,7 +191,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...Connections.allowFrom in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:86:40)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:85:40)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -227,6 +227,21 @@
       ]
     }
   ],
+  "/LongTail-Network/NatsSecurityGroup/from LongTailNetworkAppSecurityGroup7830FEA9:9222": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "NatsSecurityGroupfromLongTailNetworkAppSecurityGroup7830FEA992229BDA0C58"
+    },
+    {
+      "type": "aws:cdk:creationStack",
+      "data": [
+        "...Connections.allowFrom in aws-cdk-lib...",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:104:40)",
+        "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
+        "...node internals, ts-node, ts-node, ts-node..."
+      ]
+    }
+  ],
   "/LongTail-Network/DbSecurityGroup/Resource": [
     {
       "type": "aws:cdk:logicalId",
@@ -236,7 +251,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...new SecurityGroup2 in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:104:28)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:110:28)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -251,7 +266,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...Connections.allowFrom in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:110:38)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:116:38)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]
@@ -266,7 +281,7 @@
       "type": "aws:cdk:creationStack",
       "data": [
         "...Connections.allowFrom in aws-cdk-lib...",
-        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:115:38)",
+        "new NetworkStack (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/lib/network-stack.ts:121:38)",
         "<anonymous> (/Users/lucasbirdeau/Documents/github/long-tail-boilerplate/deploy/cdk/bin/app.ts:22:17)",
         "...node internals, ts-node, ts-node, ts-node..."
       ]

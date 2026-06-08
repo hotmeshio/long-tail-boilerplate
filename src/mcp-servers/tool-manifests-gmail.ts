@@ -2,6 +2,7 @@ export const GMAIL_TOOLS = [
   {
     name: 'gmail_search',
     description: 'Search Gmail inbox for messages matching a query. Returns message IDs and snippets. Uses Gmail search syntax (e.g., "from:user@example.com", "subject:invoice", "after:2024/01/01").',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -14,6 +15,7 @@ export const GMAIL_TOOLS = [
   {
     name: 'gmail_read',
     description: 'Read the full content of a Gmail message by ID. Returns headers (from, to, subject, date) and decoded body text.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -25,6 +27,7 @@ export const GMAIL_TOOLS = [
   {
     name: 'gmail_summarize',
     description: 'Fetch all messages in a Gmail thread and produce a structured summary. Returns thread metadata and a concatenated view of all messages for LLM summarization.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -36,6 +39,7 @@ export const GMAIL_TOOLS = [
   {
     name: 'gmail_extract',
     description: 'Read a Gmail message and extract structured data. Returns the raw message content along with parsed headers, suitable for downstream extraction by an LLM.',
+    read_safe: true,
     inputSchema: {
       type: 'object',
       properties: {
@@ -52,6 +56,7 @@ export const GMAIL_TOOLS = [
   {
     name: 'gmail_draft',
     description: 'Create a draft email in Gmail. The draft appears in the Drafts folder and can be reviewed before sending.',
+    read_safe: false,
     inputSchema: {
       type: 'object',
       properties: {

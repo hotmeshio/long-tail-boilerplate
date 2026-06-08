@@ -55,7 +55,9 @@ class ComputeStack extends cdk.Stack {
             POSTGRES_USER: ecs.Secret.fromSecretsManager(dbSecret, 'username'),
             POSTGRES_PASSWORD: ecs.Secret.fromSecretsManager(dbSecret, 'password'),
             JWT_SECRET: ecs.Secret.fromSecretsManager(jwtSecret),
-            OAUTH_CONFIG: ecs.Secret.fromSecretsManager(oauthSecret),
+            OAUTH_GOOGLE_CLIENT_ID: ecs.Secret.fromSecretsManager(oauthSecret, 'google_client_id'),
+            OAUTH_GOOGLE_CLIENT_SECRET: ecs.Secret.fromSecretsManager(oauthSecret, 'google_client_secret'),
+            OAUTH_ENCRYPTION_KEY: ecs.Secret.fromSecretsManager(oauthSecret, 'encryption_key'),
             API_KEYS: ecs.Secret.fromSecretsManager(apiKeysSecret),
             ANTHROPIC_API_KEY: ecs.Secret.fromSecretsManager(anthropicApiKeySecret),
             OPENAI_API_KEY: ecs.Secret.fromSecretsManager(openaiApiKeySecret),
@@ -68,6 +70,7 @@ class ComputeStack extends cdk.Stack {
             LT_STORAGE_BACKEND: 's3',
             LT_S3_BUCKET: bucket.bucketName,
             LT_S3_REGION: cdk.Stack.of(this).region,
+            BASE_URL: `https://${config.domainName}`,
         };
         // --- ECS Cluster ---
         const cluster = new ecs.Cluster(this, 'Cluster', {
@@ -82,8 +85,8 @@ class ComputeStack extends cdk.Stack {
         // --- NATS Event Bus ---
         // Lightweight pub/sub for cross-server event delivery.
         // Workers and API servers publish events to NATS (port 4222).
-        // Browser dashboard connects directly to NATS via WebSocket (port 9222).
-        // No Socket.IO relay — one event bus, one subscription, no intermediary.
+        // Browser dashboard connects via reverse proxy through the ALB on port 443.
+        // Long Tail's built-in proxy bridges wss://{domain}/nats-ws to ws://nats:9222.
         const natsLogGroup = new logs.LogGroup(this, 'NatsLogGroup', {
             logGroupName: config.logGroup('nats'),
             retention: logs.RetentionDays.ONE_WEEK,
@@ -149,8 +152,8 @@ class ComputeStack extends cdk.Stack {
             }),
         });
         // ── NATS WebSocket Listener (port 9222) ───────────────────────────────
-        // Browser dashboard connects directly to NATS via WebSocket.
-        // TLS terminates at ALB; NATS serves plaintext WebSocket internally.
+        // Kept for ECS service stability. Will be removed in a follow-up deploy
+        // once the reverse proxy (via /nats-ws on port 443) is confirmed working.
         const natsWsListener = this.alb.addListener('NatsWsListener', {
             port: 9222,
             protocol: elbv2.ApplicationProtocol.HTTPS,
@@ -200,7 +203,7 @@ class ComputeStack extends cdk.Stack {
                 APP_ROLE: 'api',
                 PORT: '3030',
                 NATS_URL: config.natsUrl,
-                NATS_WS_URL: config.natsWsUrl,
+                NATS_WS_TARGET: `ws://nats.${config.serviceDiscoveryNamespace}:9222`,
             },
             secrets: {
                 ...sharedSecrets,
@@ -281,7 +284,7 @@ class ComputeStack extends cdk.Stack {
         const workerService = new ecs.FargateService(this, 'WorkerService', {
             cluster,
             taskDefinition: workerTaskDef,
-            desiredCount: 1,
+            desiredCount: 2,
             securityGroups: [workerSecurityGroup],
             vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
             serviceName: 'worker',
@@ -290,7 +293,7 @@ class ComputeStack extends cdk.Stack {
             enableExecuteCommand: true,
         });
         const workerScaling = workerService.autoScaleTaskCount({
-            minCapacity: 1,
+            minCapacity: 2,
             maxCapacity: 4,
         });
         workerScaling.scaleOnCpuUtilization('WorkerCpuScaling', {
@@ -310,10 +313,6 @@ class ComputeStack extends cdk.Stack {
         new cdk.CfnOutput(this, 'ServiceUrl', {
             value: `https://${config.domainName}`,
             description: 'Application URL',
-        });
-        new cdk.CfnOutput(this, 'NatsWsUrl', {
-            value: config.natsWsUrl,
-            description: 'NATS WebSocket URL for browser connections',
         });
     }
 }

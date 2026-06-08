@@ -11,7 +11,9 @@ export interface DataStackProps extends cdk.StackProps {
     config: DeployConfig;
 }
 export declare class DataStack extends cdk.Stack {
+    /** @deprecated Retained for CloudFormation export cleanup — delete after next deploy */
     readonly dbInstance: rds.DatabaseInstance;
+    readonly dbCluster: rds.DatabaseCluster;
     readonly dbSecret: secretsmanager.ISecret;
     readonly bucket: s3.Bucket;
     readonly jwtSecret: secretsmanager.Secret;
