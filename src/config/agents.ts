@@ -13,14 +13,14 @@ export const AGENTS: LTAgentConfig[] = [
     ],
     subscriptions: [
       {
-        topic: 'workflow.failed',
+        topic: 'system.workflow.*.failed',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
         execute_as: 'superadmin',
         input_mapping: { data: { error: '{event.status}', workflowId: '{event.workflowId}' } },
       },
       {
-        topic: 'activity.failed',
+        topic: 'system.activity.*.*.failed',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
         execute_as: 'superadmin',
@@ -44,7 +44,7 @@ export const AGENTS: LTAgentConfig[] = [
         input_mapping: { data: { topic: '{event.type}', source: '{event.source}', payload: '{event.data}' } },
       },
       {
-        topic: 'knowledge.stored',
+        topic: 'system.knowledge.*.stored',
         reaction_type: 'durable',
         workflow_type: 'helloWorkflow',
         execute_as: 'superadmin',

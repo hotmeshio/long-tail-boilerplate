@@ -26,7 +26,7 @@
  * | NATS_TOKEN      | Auth token (Secrets Manager in AWS, hardcoded locally) |
  */
 try { require('dotenv/config'); } catch {}
-import { start, TopicService } from '@hotmeshio/long-tail';
+import { start } from '@hotmeshio/long-tail';
 
 import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, seedIfEmpty } from './config';
 
@@ -79,12 +79,7 @@ async function main() {
       : undefined,
   });
 
-  // 2. Seed custom topics (start() doesn't process config.topics yet)
-  for (const t of TOPICS) {
-    await TopicService.seedTopic({ ...t, description: t.description || '', category: t.category || 'app' });
-  }
-
-  // 3. Seed default users (skipped for worker-only containers)
+  // 2. Seed default users (skipped for worker-only containers)
   if (!isWorker) {
     await seedIfEmpty();
   }
