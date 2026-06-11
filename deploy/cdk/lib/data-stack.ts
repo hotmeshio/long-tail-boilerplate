@@ -103,11 +103,15 @@ export class DataStack extends cdk.Stack {
       serverlessV2MaxCapacity: 8,
       writer: rds.ClusterInstance.serverlessV2('Writer', {
         publiclyAccessible: false,
+        enablePerformanceInsights: true,
+        performanceInsightRetention: rds.PerformanceInsightRetention.DEFAULT,
       }),
       backup: { retention: cdk.Duration.days(7) },
       deletionProtection: true,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
       storageEncrypted: true,
+      cloudwatchLogsExports: ['postgresql'],
+      monitoringInterval: cdk.Duration.seconds(60),
     });
 
     this.dbSecret = this.dbCluster.secret!;
