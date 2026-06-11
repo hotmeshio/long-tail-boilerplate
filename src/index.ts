@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, seedIfEmpty } from './config';
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, seedIfEmpty } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -50,6 +50,8 @@ async function main() {
     },
 
     workers: isApi ? READONLY_OBSERVERS : WORKERS,
+
+    graphWorkflows: GRAPH_WORKFLOWS,
 
     agents: AGENTS,
 
