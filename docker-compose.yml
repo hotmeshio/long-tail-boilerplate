@@ -16,6 +16,9 @@ services:
       NATS_URL: nats://nats:4222
       NATS_TOKEN: dev_api_secret
       NATS_WS_TARGET: ws://nats:9222
+      # Seeds the superadmin on a fresh DB so the throughput scripts (07-shared
+      # login: superadmin / l0ngt@1l) work after `docker compose down -v`.
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-l0ngt@1l}
       NODE_OPTIONS: --max-old-space-size=3072 --max-semi-space-size=64
     depends_on:
       postgres:
