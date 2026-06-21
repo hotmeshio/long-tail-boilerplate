@@ -7,7 +7,7 @@ import { assemblyLine } from '../workflows/assembly-line';
 import { workstation } from '../workflows/assembly-line/worker';
 import { stepIterator } from '../workflows/assembly-line/iterator';
 import { reverter } from '../workflows/assembly-line/reverter';
-import { pipeline, station, printstation, printer } from '../workflows/ortho-pipeline';
+import { pipeline, station, printstation, printer, stationEfficient, printstationEfficient, printerEfficient } from '../workflows/ortho-pipeline';
 import * as richForm from '../workflows/rich-form';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
@@ -169,6 +169,33 @@ const printerConfig: LTWorkerConfig = {
   resolverSchema: { approved: true, station: 'printer' },
 };
 
+// ── Efficient (atomic-escalation) variants ──────────────────────────────────
+// Same shape as the legacy leaves; each writes its escalation atomically in
+// Leg1 via conditionLT(config). Resolved through the identical dashboard path.
+
+const orthoStationEfficientConfig: LTWorkerConfig = {
+  description: 'Ortho station (efficient) — atomic-escalation child. Writes the escalation in Leg1, waits, returns.',
+  invocable: false,
+  defaultRole: 'renderer',
+  roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
+  resolverSchema: { approved: true, station: 'renderer' },
+};
+
+const printstationEfficientConfig: LTWorkerConfig = {
+  description: 'Printstation (efficient) — orchestrates a fleet of efficient 3D printers (sets × 2 feet).',
+  invocable: false,
+  defaultRole: 'printer',
+  roles: [...CERTIFIED_ROLES, 'printer'],
+};
+
+const printerEfficientConfig: LTWorkerConfig = {
+  description: 'Printer (efficient) — single 3D printer child, escalation written atomically in Leg1.',
+  invocable: false,
+  defaultRole: 'printer',
+  roles: [...CERTIFIED_ROLES, 'printer'],
+  resolverSchema: { approved: true, station: 'printer' },
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -184,6 +211,9 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'ortho-pipeline', workflow: station, config: orthoStationConfig },
   { taskQueue: 'ortho-pipeline', workflow: printstation, config: printstationConfig },
   { taskQueue: 'ortho-pipeline', workflow: printer, config: printerConfig },
+  { taskQueue: 'ortho-pipeline', workflow: stationEfficient, config: orthoStationEfficientConfig },
+  { taskQueue: 'ortho-pipeline', workflow: printstationEfficient, config: printstationEfficientConfig },
+  { taskQueue: 'ortho-pipeline', workflow: printerEfficient, config: printerEfficientConfig },
 ];
 
 export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({

@@ -126,7 +126,8 @@ async function resolveBatch(batchTag: string, maxPerPoll: number): Promise<numbe
 
 async function runCycle(cycleNum: number): Promise<void> {
   const targetBatch = cycleNum;
-  const batchTag = `ortho-${RUN_ID}-b${targetBatch}-`;
+  const wfPrefix = process.env.EFFICIENT === '1' ? 'ortho-eff' : 'ortho';
+  const batchTag = `${wfPrefix}-${RUN_ID}-b${targetBatch}-`;
   const target = itemsPerCycle();
   const cycleStart = Date.now();
   let cycleResolved = 0;

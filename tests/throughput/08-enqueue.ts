@@ -27,12 +27,23 @@ import {
 
 const RUN_ID = process.env.RUN_ID || Math.floor(Date.now() / 1000).toString();
 
+// EFFICIENT=1 routes every step to its atomic-escalation child (stationEfficient
+// / printstationEfficient), so the escalation row is written in the workflow's
+// Leg1 checkpoint instead of via a separate createStationEscalation activity +
+// enrich. Same workload, same dashboard resolve path — fewer moving parts.
+const EFFICIENT = process.env.EFFICIENT === '1';
+const WF_PREFIX = EFFICIENT ? 'ortho-eff' : 'ortho';
+
 function buildSteps(): PipelineStepDef[] {
   return PIPELINE_STEPS.map((step) => {
     if (step.stationName === 'print-assets') {
-      return { ...step, printerSets: PRINTER_SETS };
+      return {
+        ...step,
+        printerSets: PRINTER_SETS,
+        ...(EFFICIENT ? { childWorkflow: 'printstationEfficient' } : {}),
+      };
     }
-    return step;
+    return EFFICIENT ? { ...step, childWorkflow: 'stationEfficient' } : step;
   });
 }
 
@@ -128,7 +139,7 @@ async function main() {
     console.log(`[${ts()}] ── Batch ${batch} ── (${batchSize} orders over ${(windowMs / 60_000).toFixed(1)}min)`);
 
     for (let i = 0; i < batchSize; i++) {
-      const wfId = `ortho-${RUN_ID}-b${batch}-${i}`;
+      const wfId = `${WF_PREFIX}-${RUN_ID}-b${batch}-${i}`;
       try {
         const r = await api('POST', '/api/workflows/pipeline/invoke', {
           data: { name: `Ortho-${RUN_ID}-b${batch}-${i}`, steps },

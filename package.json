@@ -41,6 +41,8 @@
     "shop:remote:claim": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/07-claim.ts",
     "shop:remote:resolve": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/07-resolve.ts",
     "ortho:run": "ts-node tests/throughput/08-run.ts",
+    "ortho:efficient:run": "EFFICIENT=1 ts-node tests/throughput/08-run.ts",
+    "ortho:efficient:enqueue": "EFFICIENT=1 ts-node tests/throughput/08-enqueue.ts",
     "ortho:drain": "ts-node tests/throughput/08-drain.ts",
     "ortho:enqueue": "ts-node tests/throughput/08-enqueue.ts",
     "ortho:day1": "DAY=1 ts-node tests/throughput/08-day-resolver.ts",
@@ -49,6 +51,7 @@
     "ortho:day4": "DAY=4 ts-node tests/throughput/08-day-resolver.ts",
     "ortho:remote:run": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/08-run.ts",
     "ortho:remote:enqueue": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/08-enqueue.ts",
+    "ortho:remote:efficient:run": "REMOTE_URL=https://longtail.hotmesh.io EFFICIENT=1 ts-node tests/throughput/08-run.ts",
     "ortho:remote:day1": "REMOTE_URL=https://longtail.hotmesh.io DAY=1 ts-node tests/throughput/08-day-resolver.ts",
     "ortho:remote:day2": "REMOTE_URL=https://longtail.hotmesh.io DAY=2 ts-node tests/throughput/08-day-resolver.ts",
     "ortho:remote:day3": "REMOTE_URL=https://longtail.hotmesh.io DAY=3 ts-node tests/throughput/08-day-resolver.ts",
@@ -74,8 +77,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.20.1",
-    "@hotmeshio/long-tail": "^0.5.1",
+    "@hotmeshio/hotmesh": "^0.22.6",
+    "@hotmeshio/long-tail": "^0.5.5",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",
