@@ -12,7 +12,9 @@
 
 import { spawn, ChildProcess } from 'child_process';
 
-const RUN_ID = Math.floor(Date.now() / 1000).toString();
+// RESUME=<runId> skips the enqueuer and resumes day resolvers for an existing run.
+const RESUME = process.env.RESUME || '';
+const RUN_ID = RESUME || Math.floor(Date.now() / 1000).toString();
 
 const env = {
   ...process.env,
@@ -63,12 +65,15 @@ process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
 
 async function main() {
-  console.log(`[orchestrator] RUN_ID=${RUN_ID}`);
+  console.log(`[orchestrator] RUN_ID=${RUN_ID}${RESUME ? ' (RESUME)' : ''}`);
   console.log(`[orchestrator] Config: DAILY_VOLUME=${env.DAILY_VOLUME} BASELINE_HOURS=${env.BASELINE_HOURS} COMPRESSION_HOURS=${env.COMPRESSION_HOURS} BATCHES=${env.BATCHES} PRINTER_SETS=${env.PRINTER_SETS}`);
-  console.log(`[orchestrator] Launching enqueuer + 4 day resolvers...\n`);
 
-  // Launch enqueuer
-  launch('enqueue', ['tests/throughput/08-enqueue.ts']);
+  if (RESUME) {
+    console.log(`[orchestrator] Resume mode — skipping enqueuer, starting all day resolvers.\n`);
+  } else {
+    console.log(`[orchestrator] Launching enqueuer + 4 day resolvers...\n`);
+    launch('enqueue', ['tests/throughput/08-enqueue.ts']);
+  }
 
   // Launch day resolvers
   for (let day = 1; day <= 4; day++) {
