@@ -27,7 +27,7 @@
 
 import {
   login, api, sleep, ts, envInt, ageSeconds, getUserId,
-  DAY_ROLES, PRINTER_SETS, BATCHES,
+  DAY_ROLES, PRINTER_SETS, BATCHES, HOLD_S,
   compressedBatchSize, compressionWindowMs, holdMsForRole,
 } from './08-shared';
 
@@ -44,6 +44,10 @@ if (!RUN_ID) {
 }
 
 const POLL_MS = envInt('POLL_MS', 2000);
+const START_CYCLE = envInt('START_CYCLE', 0);
+// Seconds without a new resolve before advancing a stalled cycle.
+// Only fires once cycleResolved > 0 so Day3/Day4 don't skip while waiting for upstream.
+const STALL_S = parseFloat(process.env.STALL_S || String(Math.max(15, HOLD_S * 3)));
 
 const roles = DAY_ROLES[DAY];
 const roleCsv = roles.join(', ');
@@ -57,7 +61,7 @@ function itemsPerCycle(): number {
 }
 
 let totalClaimed = 0;
-let totalResolved = 0;
+let totalResolved = 0; // seeded in main() when START_CYCLE > 0
 let userId = '';
 
 // ── Claim: grab up to maxPerPoll matching escalations ────────────────
@@ -78,8 +82,11 @@ async function claimBatch(batchTag: string, maxPerPoll: number): Promise<number>
         totalClaimed++;
         claimed++;
         console.log(`[${ts()}]   [claim] ${esc.id} (${esc.role}) wf=${esc.workflow_id || ''} [${totalClaimed} total]`);
-      } catch {
-        // Already claimed
+      } catch (err: any) {
+        const msg = (err?.message || String(err)).slice(0, 80);
+        if (!msg.includes('409') && !msg.includes('conflict') && !msg.includes('already')) {
+          console.warn(`[${ts()}]   [claim] ${esc.id.slice(0, 8)}… err: ${msg}`);
+        }
       }
     }
     return claimed;
@@ -143,10 +150,19 @@ async function runCycle(cycleNum: number): Promise<void> {
   console.log(`[${ts()}] ── Cycle ${cycleNum} ── batch ${targetBatch} (${target} items for [${roleCsv}], ~${claimPerPoll} claims/poll over ${(windowMs / 1000).toFixed(0)}s)`);
 
   // Claim loop — paced: up to claimPerPoll per poll
+  let quietPolls = 0;
   const claimLoop = async () => {
     while (!done) {
       const found = await claimBatch(batchTag, claimPerPoll);
       cycleClaimed += found;
+      if (found === 0) {
+        quietPolls++;
+        if (quietPolls % 10 === 0) {
+          console.log(`[${ts()}]   ... cycle ${cycleNum} — waiting for ${batchTag} items (${quietPolls * POLL_MS / 1000}s)`);
+        }
+      } else {
+        quietPolls = 0;
+      }
       if (!done) await sleep(POLL_MS);
     }
   };
@@ -159,15 +175,33 @@ async function runCycle(cycleNum: number): Promise<void> {
     }
   };
 
-  // Watchdog — stop when resolved count hits target
+  // Watchdog — stop when target hit, or when stalled with no new progress.
+  // Two thresholds:
+  //   cycleResolved > 0 → stall after STALL_S seconds (mid-cycle gap or missing item)
+  //   cycleResolved = 0 → stall after STALL_S * 4 seconds (already-done cycle on resume)
+  // Any new resolve resets the counter, so Day3/Day4 safely wait for upstream.
   const watchdog = async () => {
+    let lastResolved = totalResolved;
+    let stalledFor = 0;
     while (!done) {
-      cycleResolved = totalResolved - (target * cycleNum);
-      if (cycleResolved >= target) {
-        done = true;
-        break;
-      }
       await sleep(1000);
+      cycleResolved = totalResolved - (target * cycleNum);
+      if (cycleResolved >= target) { done = true; break; }
+      if (totalResolved > lastResolved) {
+        stalledFor = 0;
+        lastResolved = totalResolved;
+      } else {
+        stalledFor++;
+        const threshold = cycleResolved > 0 ? STALL_S : STALL_S * 2;
+        if (stalledFor >= threshold) {
+          if (cycleResolved > 0) {
+            console.warn(`[${ts()}]   ⚠ Cycle ${cycleNum} stalled ${stalledFor}s with ${cycleResolved}/${target} resolved — advancing`);
+          } else {
+            console.log(`[${ts()}]   Cycle ${cycleNum} — no items after ${stalledFor}s — advancing`);
+          }
+          done = true; break;
+        }
+      }
     }
   };
 
@@ -181,8 +215,14 @@ async function main() {
   await login();
   userId = getUserId();
 
+  if (START_CYCLE > 0) {
+    totalResolved = START_CYCLE * itemsPerCycle();
+    console.log(`[${ts()}]   Resuming from cycle ${START_CYCLE} (totalResolved seeded to ${totalResolved})`);
+  }
+
   const windowMs = compressionWindowMs();
-  const initialDelay = DAY * windowMs;
+  const resuming = START_CYCLE > 0 || !!process.env.RESUME;
+  const initialDelay = resuming ? 0 : DAY * windowMs;
   const target = itemsPerCycle();
 
   console.log(`[${ts()}] Day ${DAY} resolver started — roles: [${roleCsv}]`);
@@ -197,7 +237,7 @@ async function main() {
     await sleep(initialDelay);
   }
 
-  for (let cycle = 0; cycle < BATCHES; cycle++) {
+  for (let cycle = START_CYCLE; cycle < BATCHES; cycle++) {
     await runCycle(cycle);
   }
 

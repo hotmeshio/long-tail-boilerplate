@@ -89,21 +89,27 @@ async function main() {
 
   console.log(`[${ts()}] Found escalation id=${escalation.id} role=${escalation.role} signal_key=${escalation.signal_key ?? 'null'}`);
 
-  // 6. Assert shape
-  if (EFFICIENT) {
-    if (!escalation.signal_key) {
-      console.error(`[${ts()}] FAIL — efficient path: expected signal_key to be set, got ${JSON.stringify(escalation.signal_key)}`);
-      console.error(`[${ts()}]   Schema hot-swap v15→v16 likely did not occur on this deployment.`);
-      process.exit(1);
+  // 6. Assert shape — both station and stationEfficient now use conditionLT
+  //    (atomic Leg1 write), so both must have signal_key set.
+  //    Distinguish the paths by workflow_type in the escalation.
+  if (!escalation.signal_key) {
+    console.error(`[${ts()}] FAIL — expected signal_key to be set on both paths (conditionLT Leg1 write).`);
+    console.error(`[${ts()}]   Got signal_key=${JSON.stringify(escalation.signal_key)}`);
+    if (EFFICIENT) {
+      console.error(`[${ts()}]   (efficient path: stationEfficient workflow_type expected)`);
+    } else {
+      console.error(`[${ts()}]   (legacy path: station workflow_type expected — was conditionLT deployed?)`);
     }
-    console.log(`[${ts()}] PASS shape — signal_key is set (atomic Leg1 write confirmed)`);
-  } else {
-    if (escalation.signal_key) {
-      console.error(`[${ts()}] FAIL — legacy path: expected signal_key=null, got ${JSON.stringify(escalation.signal_key)}`);
-      process.exit(1);
-    }
-    console.log(`[${ts()}] PASS shape — signal_key is null (legacy two-step path confirmed)`);
+    process.exit(1);
   }
+  console.log(`[${ts()}] PASS shape — signal_key is set (atomic Leg1 write confirmed)`);
+
+  const expectedType = EFFICIENT ? 'stationEfficient' : 'station';
+  if (escalation.workflow_type !== expectedType) {
+    console.error(`[${ts()}] FAIL — expected workflow_type=${expectedType}, got ${escalation.workflow_type}`);
+    process.exit(1);
+  }
+  console.log(`[${ts()}] PASS type  — workflow_type=${escalation.workflow_type}`);
 
   // 7. Claim
   await api('POST', `/api/escalations/${escalation.id}/claim`, { durationMinutes: 5 });
