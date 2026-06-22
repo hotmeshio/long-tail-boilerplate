@@ -74,7 +74,7 @@ async function main() {
   while (Date.now() < deadline) {
     const resp = await api('GET', '/api/escalations/available?limit=100&sort_by=created_at&order=asc');
     const available = resp?.escalations || [];
-    escalation = available.find((e: any) => e.workflow_id === wfId);
+    escalation = available.find((e: any) => (e.workflow_id || '').startsWith(wfId));
     if (escalation) break;
     await sleep(POLL_INTERVAL_MS);
   }
