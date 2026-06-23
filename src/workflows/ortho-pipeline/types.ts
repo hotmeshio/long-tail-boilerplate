@@ -16,6 +16,6 @@ export interface PipelineStep {
 
 export interface StepResult {
   stationName: string;
-  resolution: Record<string, any>;
+  resolution: Record<string, any> | false | null;
   completedAt: string;
 }
