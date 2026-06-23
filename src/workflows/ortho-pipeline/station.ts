@@ -2,45 +2,33 @@
  * Station — generic child workflow for the ortho pipeline.
  *
  * Each station:
- *   1. Creates an escalation assigned to its role
- *   2. Pauses (condition) until a human claims and resolves
+ *   1. Creates an escalation assigned to its role (via conditionLT Leg1 atomic write)
+ *   2. Pauses until a human claims and resolves
  *   3. Returns the result — parent receives via executeChild
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
+import { conditionLT } from '@hotmeshio/long-tail';
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 import type { PipelineStep, StepResult } from './types';
-import * as activities from './activities';
-
-type ActivitiesType = typeof activities;
-
-const { createStationEscalation } =
-  Durable.workflow.proxyActivities<ActivitiesType>({ activities });
 
 export async function station(envelope: LTEnvelope): Promise<any> {
-  const {
-    stationName,
-    role,
-    instructions,
-  } = envelope.data as PipelineStep;
+  const { stationName, role, instructions } = envelope.data as PipelineStep;
 
   const ctx = Durable.workflow.workflowInfo();
   const localSignalId = `station-done-${ctx.workflowId}`;
 
-  await createStationEscalation({
+  const resolution = await conditionLT<Record<string, any>>(localSignalId, {
     role,
-    stationName,
-    instructions,
-    workflowId: ctx.workflowId,
+    type: 'orthoPipeline',
+    subtype: stationName,
+    priority: 2,
+    description: instructions,
     workflowType: 'station',
-    taskQueue: 'ortho-pipeline',
-    signalId: localSignalId,
+    metadata: { station: stationName },
+    envelope: { station: stationName },
   });
-
-  const resolution = await Durable.workflow.condition<Record<string, any>>(
-    localSignalId,
-  ) as Record<string, any>;
 
   const result: StepResult = {
     stationName,
