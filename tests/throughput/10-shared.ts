@@ -59,6 +59,22 @@ export const COMPRESSION_HOURS = process.env.COMPRESSION_HOURS !== undefined ? p
 export const CREW_IDLE_TICK_S = parseInt(process.env.CREW_IDLE_TICK_S || '2', 10);
 /** Idle ticks the crew tolerates before self-terminating once demand goes quiet. */
 export const CREW_MAX_IDLE = parseInt(process.env.CREW_MAX_IDLE || '300', 10);
+/**
+ * Cap on `ready` adverts the broker reads per pond per iteration — its capacity horizon.
+ * Raise this for large fleets: with 200 printers, setting to 60 lets the broker dispatch
+ * 60 jobs per iteration instead of the default 10, avoiding the 20-iteration lag.
+ */
+export const MAX_ADVERTS = process.env.MAX_ADVERTS !== undefined
+  ? parseInt(process.env.MAX_ADVERTS, 10)
+  : DEFAULT_MAX_ADVERTS;
+/**
+ * Max conditions opened concurrently in the broker's harvest step. Caps the NATS
+ * signal burst — each open condition is a live subscription. Lower values are safer
+ * for local Docker; raise for production (AWS handles 100+).
+ */
+export const CONDITION_CHUNK_SIZE = process.env.CONDITION_CHUNK_SIZE !== undefined
+  ? parseInt(process.env.CONDITION_CHUNK_SIZE, 10)
+  : 20;
 
 export const FILAMENT = process.env.FILAMENT || 'pla';
 
@@ -102,7 +118,7 @@ export async function fleetSnapshot(diabetic = DIABETIC, runId = RUN_ID): Promis
   const role = PRINTER_POND[fleetKind(diabetic)];
   const prefix = `print-${runId}-`;
   const count = (status: string, state: string) =>
-    api('POST', '/api/escalations/search-by-facets', { role, facets: { state }, status, limit: 1000 })
+    api('POST', '/api/escalations/search-by-facets', { role, facets: { state }, status, limit: 5000 })
       .then((r: any) => (r?.escalations || []).filter((e: any) => (e.metadata?.printerId || '').startsWith(prefix)).length)
       .catch(() => 0);
   const [idle, inflight, prints, refills] = await Promise.all([

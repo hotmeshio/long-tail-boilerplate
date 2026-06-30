@@ -36,6 +36,8 @@ export DIABETIC="${DIABETIC:-}"
 # 10-shared defaults the wave gap to a brisk 5s so small runs aren't silent.
 if [ -n "${WAVE_GAP_S:-}" ]; then export WAVE_GAP_S; fi
 if [ -n "${COMPRESSION_HOURS:-}" ]; then export COMPRESSION_HOURS; fi
+if [ -n "${MAX_ADVERTS:-}" ]; then export MAX_ADVERTS; fi
+if [ -n "${CONDITION_CHUNK_SIZE:-}" ]; then export CONDITION_CHUNK_SIZE; fi
 
 # One shared RUN_ID isolates this run's fleet + orders.
 export RUN_ID="${RUN_ID:-$(date +%s)}"

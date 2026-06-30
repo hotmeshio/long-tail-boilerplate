@@ -66,6 +66,8 @@
     "print:assert": "ts-node tests/throughput/10-assert.ts",
     "print:remote:run": "REMOTE_URL=https://longtail.hotmesh.io bash tests/throughput/10-farm.sh",
     "print:remote:smoke": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/10-shift.ts",
+    "print:pressure": "FLEET_SIZE=200 DAILY_VOLUME=300 BATCHES=20 WAVE_GAP_S=10 MAX_ADVERTS=60 CONDITION_CHUNK_SIZE=20 bash tests/throughput/10-farm.sh",
+    "print:remote:pressure": "REMOTE_URL=https://longtail.hotmesh.io FLEET_SIZE=200 DAILY_VOLUME=300 BATCHES=20 WAVE_GAP_S=10 MAX_ADVERTS=60 CONDITION_CHUNK_SIZE=100 bash tests/throughput/10-farm.sh",
     "test:nats": "vitest run --config tests/integration/vitest.config.ts tests/integration/nats-events.test.ts",
     "test:self-test": "vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
     "test:self-test:remote": "REMOTE_URL=https://longtail.hotmesh.io vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",

@@ -56,32 +56,39 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
     carried: d.carried ?? [],
   });
 
-  // ── 2. Harvest: await all printer callbacks in parallel ────────────────────
-  // Each condition is event-driven — printers that finished during the activity
-  // loop have already signaled; their conditions resolve immediately here.
+  // ── 2. Harvest: await printer callbacks in chunks ─────────────────────────
+  // Open conditions in batches of CONDITION_CHUNK to avoid overwhelming the
+  // NATS signal bus. Printers that completed during the activity resolve each
+  // chunk immediately once their condition row is open — zero additional wait.
+  const CONDITION_CHUNK = d.conditionChunkSize ?? 20;
   if (pairings.length) {
-    const dones = await Promise.all(
-      pairings.map((p: BrokerPairing) =>
-        Durable.workflow.condition<PrintCallbackPayload>(p.callbackKey, {
-          role: PRINTER_POND[fleetKind(p.diabetic)],
-          type: PRINT_WORKFLOWS.PRINTER,
-          subtype: PRINTER_STATE.PRINTING,
-          priority: 2,
-          description: `Printer ${p.printerId} printing insole for order ${p.group.originId}`,
-          metadata: {
-            [PRINTER_FACETS.PRINTER_ID]: p.printerId,
-            [PRINTER_FACETS.STATE]: PRINTER_STATE.PRINTING,
-            orderId: p.group.originId,
-          },
-        }),
-      ),
-    );
+    const dones: PrintCallbackPayload[] = [];
+    for (let ci = 0; ci < pairings.length; ci += CONDITION_CHUNK) {
+      const chunk = pairings.slice(ci, ci + CONDITION_CHUNK);
+      const chunkDones = await Promise.all(
+        chunk.map((p: BrokerPairing) =>
+          Durable.workflow.condition<PrintCallbackPayload>(p.callbackKey, {
+            role: PRINTER_POND[fleetKind(p.diabetic)],
+            type: PRINT_WORKFLOWS.PRINTER,
+            subtype: PRINTER_STATE.PRINTING,
+            priority: 2,
+            description: `Printer ${p.printerId} printing insole for order ${p.group.originId}`,
+            metadata: {
+              [PRINTER_FACETS.PRINTER_ID]: p.printerId,
+              [PRINTER_FACETS.STATE]: PRINTER_STATE.PRINTING,
+              orderId: p.group.originId,
+            },
+          }),
+        ),
+      );
+      dones.push(...(chunkDones as PrintCallbackPayload[]));
+    }
 
     // ── 3. Settle: group by order, call settleOrder once per order ───────────
     const byOrder = new Map<string, { group: ClaimedGroup; printerIds: string[]; lastDone: PrintCallbackPayload }>();
     for (let i = 0; i < pairings.length; i++) {
       const p = pairings[i];
-      const done = dones[i] as PrintCallbackPayload;
+      const done = dones[i];
       const existing = byOrder.get(p.group.originId);
       if (existing) {
         existing.printerIds.push(done.printerId);

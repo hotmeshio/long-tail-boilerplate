@@ -15,7 +15,7 @@
 import {
   login, api, sleep, ts,
   RUN_ID, DIABETIC, FLEET_SIZE, EOL_RUNS,
-  CREW_IDLE_TICK_S, CREW_MAX_IDLE, DEFAULT_MAX_ADVERTS,
+  CREW_IDLE_TICK_S, CREW_MAX_IDLE, MAX_ADVERTS, CONDITION_CHUNK_SIZE,
   PRINT_ROUTING_QUEUE, PRINT_WORKFLOWS,
   buildFleet, operators, fleetSnapshot,
 } from './10-shared';
@@ -58,7 +58,8 @@ async function main() {
   await invoke(PRINT_WORKFLOWS.BROKER, `broker-${RUN_ID}`, {
     brokerId: op.brokerId,
     maxIdleRuns: CREW_MAX_IDLE,
-    maxAdverts: DEFAULT_MAX_ADVERTS,
+    maxAdverts: MAX_ADVERTS,
+    conditionChunkSize: CONDITION_CHUNK_SIZE,
   });
   await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-${RUN_ID}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId });
   await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-${RUN_ID}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId });

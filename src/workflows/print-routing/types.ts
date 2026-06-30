@@ -348,6 +348,12 @@ export interface BrokerData {
   claimMinutes?: number;
   /** Max `ready` adverts read per iteration (capacity horizon). */
   maxAdverts?: number;
+  /**
+   * Max conditions opened concurrently in the harvest step. Caps the NATS
+   * signal burst — each open condition is a live subscription. Default 20 is
+   * safe for local Docker; raise for production (AWS NATS handles ~200+).
+   */
+  conditionChunkSize?: number;
 }
 
 export interface BrokerTotals {
