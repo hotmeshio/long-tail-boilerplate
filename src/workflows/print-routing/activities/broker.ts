@@ -1,12 +1,14 @@
 /**
- * Broker activities — the market maker's side effects. The broker claims orders by
- * priority (demand), batch-locks the printer set it anticipated (supply), hands each
- * printer its job, and — once the printer reports — settles the order. The escalation
- * queue is the rendezvous bus for every handoff.
+ * Broker activities — the market maker's side effects.
  *
- *   claimOrdersForCapacity   → anticipate free printers, claim that many orders by priority
- *   lockPrintersAndHandoff   → best-effort batch-claim printers, hand each its job
- *   settleOrder              → resolve an order's insoles and wake the order workflow
+ *   dispatchBatch          → the hot loop: scan both ponds, match orders to printers,
+ *                            hand off jobs. Runs N iterations internally so the workflow
+ *                            only checkpoints once per batch, not once per iteration.
+ *   settleOrder            → resolve an order's insoles and wake the order workflow.
+ *
+ * `claimOrdersForCapacity` and `lockPrintersAndHandoff` are internal helpers called
+ * directly by `dispatchBatch` (no proxy overhead — plain async functions in the same
+ * activity context).
  */
 
 import { createClient } from '@hotmeshio/long-tail';
@@ -36,24 +38,21 @@ import type {
   SizeClass,
 } from '../types';
 
-// ── Step 1: anticipate capacity, claim orders by priority ────────────────────
+// ── Internal: anticipate capacity, claim orders by priority ──────────────────
 
-/**
- * Read the free printers (availability is a query, not a hash), bucket them by
- * capability, and claim that many complete orders per bucket in PRIORITY order —
- * the ordered, pluggable rule list the broker was handed, not a fixed sort.
- * Claiming demand sized to anticipated supply keeps priority the deciding factor
- * and stops the broker from over-claiming orders it cannot place.
- */
-export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPlan> {
+async function claimOrdersForCapacity(input: {
+  diabetic: boolean;
+  brokerId: string;
+  priorityRules?: string[];
+  claimMinutes?: number;
+  maxAdverts?: number;
+}): Promise<ClaimPlan> {
   const kind = fleetKind(input.diabetic);
   const orderPond = ORDER_POND[kind];
   const printerPond = PRINTER_POND[kind];
   const orderBy = composePriorityOrder(input.priorityRules);
   const durationMinutes = input.claimMinutes ?? DEFAULT_BROKER_CLAIM_MINUTES;
 
-  // The broker runs as its operator — a principal holding the printer + order pond
-  // roles. Bind the auth once on the SDK client; every call goes through it.
   const lt = createClient({ auth: { userId: input.brokerId } });
 
   const ready = await lt.escalations.searchByFacets({
@@ -64,11 +63,9 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
     limit: input.maxAdverts ?? DEFAULT_MAX_ADVERTS,
   });
   if (ready.status !== 200) throw new Error(`searchByFacets failed: ${ready.error}`);
-  const { escalations } = ready.data;
 
-  // Free printers per filament, split by size — xl is the scarce, larger machine.
   const capacity = new Map<string, { xl: number; std: number }>();
-  for (const e of escalations) {
+  for (const e of ready.data.escalations) {
     const m = (e.metadata ?? {}) as Record<string, any>;
     const filament = m[PRINTER_FACETS.FILAMENT];
     const sizeClass = m[PRINTER_FACETS.SIZE_CLASS] as SizeClass;
@@ -97,33 +94,19 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
   const buckets: ClaimedOrderBucket[] = [];
   let matched = 0;
   for (const [filament, { xl, std }] of capacity) {
-    // xl orders claim xl printers first (the scarce resource, a hard fit).
     const xlGroups = xl > 0 ? await claim(filament, 'xl', xl) : [];
-    // standard orders fall to standard printers, with leftover xl printers as overflow.
     const stdCapacity = std + (xl - xlGroups.length);
     const stdGroups = stdCapacity > 0 ? await claim(filament, 'standard', stdCapacity) : [];
-    // Push xl before standard so the lock step spends xl printers on xl orders first.
-    if (xlGroups.length) { buckets.push({ filament, sizeClass: 'xl', groups: xlGroups }); matched += xlGroups.length; }
-    if (stdGroups.length) { buckets.push({ filament, sizeClass: 'standard', groups: stdGroups }); matched += stdGroups.length; }
+    if (xlGroups.length) { buckets.push({ filament, sizeClass: 'xl', groups: xlGroups, diabetic: input.diabetic }); matched += xlGroups.length; }
+    if (stdGroups.length) { buckets.push({ filament, sizeClass: 'standard', groups: stdGroups, diabetic: input.diabetic }); matched += stdGroups.length; }
   }
   return { buckets, matched };
 }
 
-// ── Step 2: batch-lock the printer set, hand off the jobs ────────────────────
+// ── Internal: batch-lock the printer set, hand off the jobs ──────────────────
 
-/**
- * For each claimed order, atomically lock exactly N printers — one per insole — then
- * hand each printer its individual job. Every insole of an order prints in parallel
- * on its own dedicated machine. `allOrNone: true` guarantees the full set is claimed
- * or the order is carried; partial printer sets never leave an order half-started.
- *
- * A standard order tries standard-class printers first; if unavailable it overflows
- * to xl. An xl order is xl-only. `phase` namespaces callback keys so multiple lock
- * passes in one tick stay unique.
- */
-export async function lockPrintersAndHandoff(input: {
+async function lockPrintersAndHandoff(input: {
   diabetic: boolean;
-  /** Broker operator — holds the printer pond role (resolves adverts via the public API). */
   brokerId: string;
   brokerWorkflowId: string;
   tick: number;
@@ -138,7 +121,6 @@ export async function lockPrintersAndHandoff(input: {
   const unplaced: ClaimedOrderBucket[] = [];
   let seq = 0;
 
-  // The broker runs as its operator (printer pond role) — auth bound once on the client.
   const lt = createClient({ auth: { userId: input.brokerId } });
 
   for (const bucket of input.buckets) {
@@ -148,8 +130,6 @@ export async function lockPrintersAndHandoff(input: {
       const needed = group.members.length;
       let placed = false;
 
-      // Try each eligible printer class in order (standard first, xl as overflow).
-      // allOrNone=true: either we claim all N printers or none — never a partial set.
       for (const printerClass of eligiblePrinterClasses(bucket.sizeClass)) {
         const locked = await lt.escalations.claimByFacets({
           query: {
@@ -168,55 +148,124 @@ export async function lockPrintersAndHandoff(input: {
         const printers = locked.data.claimed;
 
         if (printers.length === needed) {
-          // Full set acquired — hand each printer exactly one insole job.
           for (let i = 0; i < needed; i++) {
             const advert = printers[i];
             const m = (advert.metadata ?? {}) as Record<string, any>;
             const printerId = m[PRINTER_FACETS.PRINTER_ID];
             const callbackKey = `cb-${input.brokerWorkflowId}-${printerId}-t${input.tick}-${input.phase}${seq++}`;
-            const job: PrinterJobPayload = {
-              orderId: group.originId,
-              units: 1,
-              callbackKey,
-              brokerWorkflowId: input.brokerWorkflowId,
-            };
-            // Resolve as the broker operator — atomic: marks advert resolved AND wakes
-            // the parked printer with its job in a single call.
+            const job: PrinterJobPayload = { orderId: group.originId, units: 1, callbackKey, brokerWorkflowId: input.brokerWorkflowId };
             await lt.escalations.resolve({ id: advert.id, resolverPayload: job });
-            pairings.push({ callbackKey, printerId, group });
+            pairings.push({ callbackKey, printerId, group, diabetic: input.diabetic });
           }
           placed = true;
           break;
         }
-        // Fewer than needed available in this class — allOrNone rolled back; try overflow.
       }
 
-      if (!placed) {
-        bucketUnplaced.push(group);
-      }
+      if (!placed) bucketUnplaced.push(group);
     }
 
     if (bucketUnplaced.length) {
-      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: bucketUnplaced });
+      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: bucketUnplaced, diabetic: input.diabetic });
     }
   }
   return { pairings, unplaced };
 }
 
-// ── Step 3: settle an order once its printer reports done ────────────────────
+// ── dispatchBatch — the hot loop activity ─────────────────────────────────────
+
+/**
+ * The broker's hot path. Runs `maxIterations` iterations internally — no durable
+ * checkpoint per iteration, only one when the activity returns. Each iteration:
+ *   1. Serve both ponds (standard + diabetic) in sequence.
+ *   2. Place any carried orders (already claimed, aging).
+ *   3. If the backlog is clear, claim fresh demand sized to available printers.
+ *   4. Sleep `activeSleepMs` if work was done, `idleSleepMs` if idle.
+ *
+ * Returns all pairings accumulated across iterations (the workflow opens their
+ * callback conditions and settles once all printers report back).
+ */
+export async function dispatchBatch(input: {
+  brokerId: string;
+  brokerWorkflowId: string;
+  tick: number;
+  priorityRules?: string[];
+  claimMinutes?: number;
+  maxAdverts?: number;
+  maxIterations: number;
+  idleSleepMs: number;
+  activeSleepMs: number;
+  carried: ClaimedOrderBucket[];
+}): Promise<{ pairings: BrokerPairing[]; unplaced: ClaimedOrderBucket[]; didWork: boolean }> {
+  const allPairings: BrokerPairing[] = [];
+  let carried = input.carried;
+  let totalPlaced = 0;
+
+  for (let i = 0; i < input.maxIterations; i++) {
+    let iterationPlaced = 0;
+    const newCarried: ClaimedOrderBucket[] = [];
+
+    for (const diabetic of [false, true] as const) {
+      try {
+        const kindCarried = carried.filter(b => b.diabetic === diabetic);
+
+        // Place carries for this pond first.
+        if (kindCarried.length > 0) {
+          const r = await lockPrintersAndHandoff({
+            diabetic, brokerId: input.brokerId, brokerWorkflowId: input.brokerWorkflowId,
+            tick: input.tick, phase: `i${i}k${diabetic ? 1 : 0}c`, claimMinutes: input.claimMinutes,
+            buckets: kindCarried,
+          });
+          allPairings.push(...r.pairings);
+          newCarried.push(...r.unplaced);
+          iterationPlaced += r.pairings.length;
+        }
+
+        // Claim fresh demand only when the backlog for this pond is clear.
+        const stillCarrying = newCarried.some(b => b.diabetic === diabetic);
+        if (!stillCarrying) {
+          const fresh = await claimOrdersForCapacity({
+            diabetic, brokerId: input.brokerId,
+            priorityRules: input.priorityRules, claimMinutes: input.claimMinutes, maxAdverts: input.maxAdverts,
+          });
+          if (fresh.matched > 0) {
+            const r = await lockPrintersAndHandoff({
+              diabetic, brokerId: input.brokerId, brokerWorkflowId: input.brokerWorkflowId,
+              tick: input.tick, phase: `i${i}k${diabetic ? 1 : 0}f`, claimMinutes: input.claimMinutes,
+              buckets: fresh.buckets,
+            });
+            allPairings.push(...r.pairings);
+            newCarried.push(...r.unplaced);
+            iterationPlaced += r.pairings.length;
+          }
+        }
+      } catch (err: any) {
+        // Skip ponds we don't have permission to access — this lets the broker
+        // operator hold only a subset of pond roles without crashing the activity.
+        if (err?.message?.includes('role with full') || err?.message?.includes('403')) continue;
+        throw err;
+      }
+    }
+
+    carried = newCarried;
+    totalPlaced += iterationPlaced;
+
+    const sleepMs = (iterationPlaced > 0 || carried.length > 0) ? input.activeSleepMs : input.idleSleepMs;
+    await new Promise<void>(r => setTimeout(r, sleepMs));
+  }
+
+  return { pairings: allPairings, unplaced: carried, didWork: totalPlaced > 0 };
+}
+
+// ── settleOrder — resolve an order once its printer reports done ──────────────
 
 export async function settleOrder(input: {
   group: ClaimedGroup;
   printerId: string;
   done: PrintCallbackPayload;
-  /** Broker operator — a principal holding the order pond role (RBAC). */
   brokerId: string;
 }): Promise<void> {
   const { group, printerId, done, brokerId } = input;
-  // One set-based resolve over the whole origin group — `WHERE id = ANY AND
-  // status='pending'` in a single statement. Members are bookkeeping demand adverts
-  // (no signal_key); the order is woken collectively by the signalOrder below, so no
-  // per-row signal delivery is needed and the N+1 loop (partial-failure window) is gone.
   const lt = createClient({ auth: { userId: brokerId } });
   await lt.escalations.resolveByIds({ ids: group.members.map((m) => m.id), resolverPayload: { printerId } });
   const head = group.members[0];

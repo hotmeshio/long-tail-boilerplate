@@ -20,7 +20,7 @@
 
 import {
   login, api, sleep, ts,
-  DIABETIC, DAILY_VOLUME, BATCHES, FLEET_SIZE, EOL_RUNS, DEFAULT_MAX_ADVERTS,
+  DIABETIC, DAILY_VOLUME, BATCHES, FLEET_SIZE, EOL_RUNS,
   PRINT_ROUTING_QUEUE, PRINT_WORKFLOWS,
   buildOrders, operators, batchSize, waveGapMs,
 } from './10-shared';
@@ -44,14 +44,12 @@ async function main() {
   const totalInsoles = orders.reduce((s, o) => s + o.units.length, 0);
 
   // Stall budget: max acceptable gap between any two order convergences.
-  // Covers the worst case: all printers hit refill simultaneously (technician
-  // processes FLEET_SIZE jobs sequentially) + broker carry-rounds to re-place
-  // orders once printers are back. Use env override when the default is too tight.
-  const brokerCount = Math.ceil(FLEET_SIZE / DEFAULT_MAX_ADVERTS);
-  const carryRounds = Math.ceil(DAILY_VOLUME / Math.max(1, brokerCount * 2));
+  // With a singleton broker, the worst case is the refill cycle (technician
+  // processes FLEET_SIZE jobs sequentially) + one dispatchBatch turnaround
+  // (~10s: activity loop + settle + continueAsNew overhead).
   const STALL_MS = process.env.STALL_MS
     ? parseInt(process.env.STALL_MS, 10)
-    : Math.max(60_000, FLEET_SIZE * 3_000 + carryRounds * 10_000);
+    : Math.max(60_000, FLEET_SIZE * 600 + 10_000);
 
   console.log(`[demand] ${ts()} ${DAILY_VOLUME} orders (${totalInsoles} insoles) in ${BATCHES} waves of ~${size} (gap ${(gap / 1000).toFixed(1)}s) | fleet capacity≈${capacity} runs | stall budget=${(STALL_MS / 1000).toFixed(0)}s`);
   if (capacity < totalInsoles) {

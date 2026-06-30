@@ -1,16 +1,27 @@
 /**
- * printBroker — the market maker. A looping durable singleton (run several per fleet
- * for throughput; carry-forward keeps them disjoint). Each tick: place the carried
- * backlog, claim fresh demand by priority sized to free capacity, batch-lock the
- * printers and hand off, then harvest every printer's completion in parallel and
- * settle. The broker is the durable coordinator; the saga is crash-safe-forward.
+ * printBroker — the singleton market maker. One per factory floor; idempotently
+ * named so crash-and-restart is a no-op. Each outer tick:
+ *
+ *   1. dispatchBatch (activity)  — inner hot loop: scan both ponds, place carries,
+ *                                  claim fresh demand, hand off. Runs maxIterations
+ *                                  internally before returning so only ONE durable
+ *                                  checkpoint fires per batch, not one per iteration.
+ *   2. Promise.all(conditions)   — await every printer's callback (event-driven,
+ *                                  not polling — resolves instantly for printers
+ *                                  that finished during the activity loop).
+ *   3. settleOrder × orders      — resolve insoles + signal the order workflow.
+ *   4. continueAsNew             — checkpoint carries + cumulative totals.
+ *
+ * The broker self-terminates after `maxIdleRuns` consecutive dispatchBatch calls
+ * that placed nothing and had no carries — useful for bounded test runs.
+ * In production set `maxIdleRuns` to a very large number.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
 
 import type { LTEnvelope, ClaimedGroup } from '@hotmeshio/long-tail';
 
-import { claimOrdersForCapacity, lockPrintersAndHandoff, settleOrder, LOOP_DEFAULTS } from './proxy';
+import { dispatchBatch, settleOrder, LOOP_DEFAULTS } from './proxy';
 import {
   fleetKind,
   PRINTER_POND,
@@ -22,59 +33,37 @@ import type {
   BrokerData,
   BrokerTotals,
   BrokerPairing,
-  ClaimedOrderBucket,
   PrintCallbackPayload,
 } from '../types';
 
 export async function printBroker(envelope: LTEnvelope): Promise<any> {
   const d = envelope.data as BrokerData;
   const ctx = Durable.workflow.workflowInfo();
-  const printerPond = PRINTER_POND[fleetKind(d.diabetic)];
   const cumulative: BrokerTotals = d.cumulative ?? { ordersPrinted: 0, runs: 0 };
-  const tick = cumulative.runs; // deterministic per-tick counter — callback-key uniqueness
-  const carried: ClaimedOrderBucket[] = d.carried ?? [];
+  const tick = cumulative.runs;
 
-  const pairings: BrokerPairing[] = [];
-  const unplaced: ClaimedOrderBucket[] = [];
+  // ── 1. Dispatch: one activity call, N iterations inside ────────────────────
+  const { pairings, unplaced, didWork } = await dispatchBatch({
+    brokerId: d.brokerId,
+    brokerWorkflowId: ctx.workflowId,
+    tick,
+    priorityRules: d.priorityRules,
+    claimMinutes: d.claimMinutes,
+    maxAdverts: d.maxAdverts,
+    maxIterations: d.maxIterations ?? LOOP_DEFAULTS.maxIterations,
+    idleSleepMs: d.idleSleepMs ?? LOOP_DEFAULTS.idleSleepMs,
+    activeSleepMs: d.activeSleepMs ?? LOOP_DEFAULTS.activeSleepMs,
+    carried: d.carried ?? [],
+  });
 
-  // 1. Place the carried backlog first — already claimed and aging, so it has
-  //    priority over fresh demand. Whatever still finds no printer is carried on.
-  if (carried.length) {
-    const r = await lockPrintersAndHandoff({
-      diabetic: d.diabetic, brokerId: d.brokerId, brokerWorkflowId: ctx.workflowId,
-      tick, phase: 'c', claimMinutes: d.claimMinutes, buckets: carried,
-    });
-    pairings.push(...r.pairings);
-    unplaced.push(...r.unplaced);
-  }
-
-  // 2. Claim fresh demand only once the backlog is placed — when printers are
-  //    scarce, holding the backlog beats piling on claims we cannot put to work.
-  if (unplaced.length === 0) {
-    const fresh = await claimOrdersForCapacity({
-      diabetic: d.diabetic, brokerId: d.brokerId,
-      priorityRules: d.priorityRules, claimMinutes: d.claimMinutes, maxAdverts: d.maxAdverts,
-    });
-    if (fresh.matched > 0) {
-      const r = await lockPrintersAndHandoff({
-        diabetic: d.diabetic, brokerId: d.brokerId, brokerWorkflowId: ctx.workflowId,
-        tick, phase: 'f', claimMinutes: d.claimMinutes, buckets: fresh.buckets,
-      });
-      pairings.push(...r.pairings);
-      unplaced.push(...r.unplaced);
-    }
-  }
-
-  // 3. Harvest in parallel — each pairing is one printer/insole. N printers per order
-  //    all print simultaneously; we await all N callbacks with a single Promise.all.
-  //    After all callbacks arrive, group by order and settle each order exactly once
-  //    (resolveByIds all its insoles + signal the order workflow). Tick time is
-  //    max(print-time) across the whole fleet regardless of order count.
+  // ── 2. Harvest: await all printer callbacks in parallel ────────────────────
+  // Each condition is event-driven — printers that finished during the activity
+  // loop have already signaled; their conditions resolve immediately here.
   if (pairings.length) {
     const dones = await Promise.all(
-      pairings.map((p) =>
+      pairings.map((p: BrokerPairing) =>
         Durable.workflow.condition<PrintCallbackPayload>(p.callbackKey, {
-          role: printerPond,
+          role: PRINTER_POND[fleetKind(p.diabetic)],
           type: PRINT_WORKFLOWS.PRINTER,
           subtype: PRINTER_STATE.PRINTING,
           priority: 2,
@@ -88,8 +77,7 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
       ),
     );
 
-    // Collect all printer callbacks per order; settle each order once all its
-    // printers have reported (one settleOrder call per order, not per pairing).
+    // ── 3. Settle: group by order, call settleOrder once per order ───────────
     const byOrder = new Map<string, { group: ClaimedGroup; printerIds: string[]; lastDone: PrintCallbackPayload }>();
     for (let i = 0; i < pairings.length; i++) {
       const p = pairings[i];
@@ -111,22 +99,15 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
   }
   cumulative.runs += 1;
 
-  // The broker is working whenever it printed or is still carrying a backlog.
-  const working = pairings.length > 0 || unplaced.length > 0;
+  // ── 4. Idle check + continueAsNew ─────────────────────────────────────────
   const maxIdleRuns = d.maxIdleRuns ?? LOOP_DEFAULTS.maxIdleRuns;
-  const idleRuns = working ? 0 : (d.idleRuns ?? 0) + 1;
+  const idleRuns = didWork ? 0 : (d.idleRuns ?? 0) + 1;
   if (idleRuns >= maxIdleRuns) {
     return { type: 'return' as const, data: { ...cumulative, stopped: 'idle' } };
   }
 
-  const tickSecs = working
-    ? (d.tickSeconds ?? LOOP_DEFAULTS.tickSeconds)
-    : (d.idleTickSeconds ?? LOOP_DEFAULTS.idleTickSeconds);
-  await Durable.workflow.sleep(`${tickSecs} seconds`);
-
-  const nextEnvelope: LTEnvelope = {
+  await Durable.workflow.continueAsNew({
     data: { ...d, cumulative, idleRuns, carried: unplaced },
     metadata: envelope.metadata ?? {},
-  };
-  await Durable.workflow.continueAsNew(nextEnvelope);
+  } as LTEnvelope);
 }

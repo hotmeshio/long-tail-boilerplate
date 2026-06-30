@@ -69,7 +69,11 @@ export function allOperatorSeeds(): OperatorSeed[] {
     const k = fleetKind(diabetic);
     const u = UUIDS[k];
     const rolesByOp: Record<OperatorRole, string[]> = {
-      broker: [PRINTER_POND[k], ORDER_POND[k]],
+      // Singleton broker serves both ponds — standard operator gets all four
+      // pond roles so it can scan and claim in both standard and diabetic queues.
+      broker: k === 'standard'
+        ? [PRINTER_POND.standard, ORDER_POND.standard, PRINTER_POND.diabetic, ORDER_POND.diabetic]
+        : [PRINTER_POND[k], ORDER_POND[k]],
       technician: [PRINTER_POND[k]],
       inspector: [FARMER_POND[k]],
       orderer: [ORDER_POND[k]],

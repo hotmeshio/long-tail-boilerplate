@@ -302,6 +302,8 @@ export interface ClaimedOrderBucket {
   filament: string;
   sizeClass: SizeClass;
   groups: ClaimedGroup[];
+  /** Which pond this bucket belongs to (false = standard, true = diabetic). */
+  diabetic: boolean;
 }
 
 /** Orders the broker claimed this tick, grouped by capability bucket. */
@@ -315,28 +317,36 @@ export interface BrokerPairing {
   callbackKey: string;
   printerId: string;
   group: ClaimedGroup;
+  /** Which pond this pairing belongs to — used to derive the callback condition role. */
+  diabetic: boolean;
 }
 
 // ── Broker & technician (outsiders) ──────────────────────────────────────────
 
+/**
+ * Singleton broker state — carried across every `continueAsNew`. The broker
+ * serves BOTH ponds (standard + diabetic) in a single `dispatchBatch` activity
+ * loop; it is not tied to one fleet kind.
+ */
 export interface BrokerData {
-  diabetic: boolean;
-  /** Broker operator — a principal holding the printer AND order pond roles. The broker
-   *  resolves printer adverts (handoff) and order members (settle) through the gated
-   *  public API, so it must run as an authorized operator. */
+  /** Broker operator — a principal holding both printer AND order pond roles. */
   brokerId: string;
-  tickSeconds?: number;
-  idleTickSeconds?: number;
+  /** Loop iterations per `dispatchBatch` activity call before checkpointing. */
+  maxIterations?: number;
+  /** Sleep between idle iterations (no work found), ms. */
+  idleSleepMs?: number;
+  /** Sleep between active iterations (work placed), ms. */
+  activeSleepMs?: number;
   maxIdleRuns?: number;
   cumulative?: BrokerTotals;
   idleRuns?: number;
-  /** Orders claimed but not yet placed on a printer — carried across continueAsNew. */
+  /** Orders claimed but not yet placed — carried across continueAsNew. */
   carried?: ClaimedOrderBucket[];
-  /** Ordered priority-rule names (see policy/priority.ts). Defaults to the standing policy. */
+  /** Ordered priority-rule names (see policy/priority.ts). */
   priorityRules?: string[];
-  /** Claim TTL in minutes (orphan-recovery floor). Defaults to DEFAULT_BROKER_CLAIM_MINUTES. */
+  /** Claim TTL in minutes (orphan-recovery floor). */
   claimMinutes?: number;
-  /** Max `ready` adverts read per tick (capacity horizon). Defaults to DEFAULT_MAX_ADVERTS. */
+  /** Max `ready` adverts read per iteration (capacity horizon). */
   maxAdverts?: number;
 }
 

@@ -38,10 +38,9 @@ async function main() {
 
   const op = operators();
   const fleet = buildFleet();
-  const loop = { diabetic: DIABETIC, idleTickSeconds: CREW_IDLE_TICK_S, maxIdleRuns: CREW_MAX_IDLE };
-  const brokerCount = Math.ceil(FLEET_SIZE / DEFAULT_MAX_ADVERTS);
+  const crew = { idleTickSeconds: CREW_IDLE_TICK_S, maxIdleRuns: CREW_MAX_IDLE };
 
-  console.log(`[supply] ${ts()} powering on ${FLEET_SIZE} printers + ${brokerCount} broker(s) + crew (kind=${DIABETIC ? 'diabetic' : 'standard'}, maxAdverts=${DEFAULT_MAX_ADVERTS}/broker)`);
+  console.log(`[supply] ${ts()} powering on ${FLEET_SIZE} printers + 1 broker (both ponds) + crew`);
 
   // 1. Make the supply workflows invocable over HTTP (kept non-invocable by default
   //    so only printShift clutters the dashboard).
@@ -54,14 +53,15 @@ async function main() {
     await invoke(PRINT_WORKFLOWS.PRINTER, spec.printerId, { ...spec, operatorId: op.printerOperatorId });
   }
 
-  // 3. Start the autonomous crew — brokers scale with fleet size (one per maxAdverts
-  //    slice) so each broker's Promise.all harvest stays bounded; technician and
-  //    inspector are singletons (their work is idempotent by query).
-  for (let i = 0; i < brokerCount; i++) {
-    await invoke(PRINT_WORKFLOWS.BROKER, `broker-${RUN_ID}-${i}`, { ...loop, brokerId: op.brokerId, maxAdverts: DEFAULT_MAX_ADVERTS });
-  }
-  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-${RUN_ID}`, { ...loop, technicianId: op.technicianId });
-  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-${RUN_ID}`, { ...loop, inspectorId: op.inspectorId });
+  // 3. Start the autonomous crew — singleton broker serves both ponds; technician
+  //    and inspector are singletons scoped to this run's fleet kind.
+  await invoke(PRINT_WORKFLOWS.BROKER, `broker-${RUN_ID}`, {
+    brokerId: op.brokerId,
+    maxIdleRuns: CREW_MAX_IDLE,
+    maxAdverts: DEFAULT_MAX_ADVERTS,
+  });
+  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-${RUN_ID}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId });
+  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-${RUN_ID}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId });
 
   // Sentinel the farm orchestrator waits for before releasing demand.
   console.log(`[supply] ${ts()} SUPPLY READY RUN_ID=${RUN_ID}`);
