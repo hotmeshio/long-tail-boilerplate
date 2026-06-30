@@ -8,6 +8,16 @@ import { workstation } from '../workflows/assembly-line/worker';
 import { stepIterator } from '../workflows/assembly-line/iterator';
 import { reverter } from '../workflows/assembly-line/reverter';
 import { pipeline, station, printstation, printer, stationEfficient, printstationEfficient, printerEfficient } from '../workflows/ortho-pipeline';
+import {
+  printOrder,
+  printer as printRoutingPrinter,
+  printBroker,
+  farmTechnician,
+  farmInspector,
+  printShift,
+} from '../workflows/print-routing';
+import { ALL_PRINT_ROLES, PRINT_ROUTING_QUEUE } from '../workflows/print-routing/types';
+import { operatorIds } from '../workflows/print-routing/operators';
 import * as richForm from '../workflows/rich-form';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
@@ -196,6 +206,63 @@ const printerEfficientConfig: LTWorkerConfig = {
   resolverSchema: { approved: true, station: 'printer' },
 };
 
+// ── Print Routing configs ───────────────────────────────────────────────────
+// An order→printer print farm where printers are first-class durable workflows.
+// Two convergent surfaces on one primitive (the escalation queue): orders (demand)
+// and printer adverts (supply), matched by an autonomous broker while a technician
+// (refills) and inspector (signoff/reprints) close the loops. Runs on its own
+// queue and its own `print-farm-*` / `printer-pool-*` roles — fully additive.
+// Operators are seeded by `scripts/print-seed.ts` (npm run print:seed).
+
+const PRINT_OPERATORS = operatorIds(false); // standard fleet's stable operator ids
+
+const printShiftConfig: LTWorkerConfig = {
+  description: 'Print shift — invocable entry: powers on the fleet + dispatcher, feeds order waves, drains, retires idle machines. Runs the whole print farm end to end.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+  envelopeSchema: {
+    data: { diabetic: false, ...PRINT_OPERATORS },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const printOrderConfig: LTWorkerConfig = {
+  description: 'Print order — demand + convergence owner. Enqueues the order’s insoles, parks, and reprints any rejected unit through the same funnel until done.',
+  invocable: false,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+};
+
+const printRoutingPrinterConfig: LTWorkerConfig = {
+  description: 'Printer — supply. One durable workflow per machine: advertises itself, runs the handed-off job, refills, retires.',
+  invocable: false,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+};
+
+const printBrokerConfig: LTWorkerConfig = {
+  description: 'Print broker — the market maker. Claims demand by priority, locks supply, hands off, harvests, settles. Carries backlog across continueAsNew.',
+  invocable: false,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+};
+
+const farmTechnicianConfig: LTWorkerConfig = {
+  description: 'Farm technician — resolves needs-filament adverts (refills) so retired-for-maintenance printers come back online.',
+  invocable: false,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+};
+
+const farmInspectorConfig: LTWorkerConfig = {
+  description: 'Farm inspector — the farmer. Signs off finished orders and triggers reprints on defects.',
+  invocable: false,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -214,6 +281,12 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'ortho-pipeline', workflow: stationEfficient, config: orthoStationEfficientConfig },
   { taskQueue: 'ortho-pipeline', workflow: printstationEfficient, config: printstationEfficientConfig },
   { taskQueue: 'ortho-pipeline', workflow: printerEfficient, config: printerEfficientConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: printShift, config: printShiftConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: printOrder, config: printOrderConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: printRoutingPrinter, config: printRoutingPrinterConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: printBroker, config: printBrokerConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmTechnician, config: farmTechnicianConfig },
+  { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmInspector, config: farmInspectorConfig },
 ];
 
 export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({
