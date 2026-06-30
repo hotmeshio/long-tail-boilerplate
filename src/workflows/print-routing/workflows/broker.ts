@@ -8,7 +8,7 @@
 
 import { Durable } from '@hotmeshio/hotmesh';
 
-import type { LTEnvelope } from '@hotmeshio/long-tail';
+import type { LTEnvelope, ClaimedGroup } from '@hotmeshio/long-tail';
 
 import { claimOrdersForCapacity, lockPrintersAndHandoff, settleOrder, LOOP_DEFAULTS } from './proxy';
 import {
@@ -65,12 +65,11 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
     }
   }
 
-  // 3. Harvest in parallel — each wait is an ESCALATION at the digital/physical
-  //    boundary. Every callback key opens a `printing` escalation (the in-flight job,
-  //    queryable: created-at = print start, resolved-at = done, the duration between).
-  //    The printer reports its outcome by RESOLVING that row, which both resumes this
-  //    collated wait and records the outcome on the row. The fleet prints concurrently
-  //    and we wait concurrently, so a tick takes ~max(print-time). Settle in parallel.
+  // 3. Harvest in parallel — each pairing is one printer/insole. N printers per order
+  //    all print simultaneously; we await all N callbacks with a single Promise.all.
+  //    After all callbacks arrive, group by order and settle each order exactly once
+  //    (resolveByIds all its insoles + signal the order workflow). Tick time is
+  //    max(print-time) across the whole fleet regardless of order count.
   if (pairings.length) {
     const dones = await Promise.all(
       pairings.map((p) =>
@@ -79,7 +78,7 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
           type: PRINT_WORKFLOWS.PRINTER,
           subtype: PRINTER_STATE.PRINTING,
           priority: 2,
-          description: `Printer ${p.printerId} printing order ${p.group.originId}`,
+          description: `Printer ${p.printerId} printing insole for order ${p.group.originId}`,
           metadata: {
             [PRINTER_FACETS.PRINTER_ID]: p.printerId,
             [PRINTER_FACETS.STATE]: PRINTER_STATE.PRINTING,
@@ -88,12 +87,28 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
         }),
       ),
     );
-    await Promise.all(
-      pairings.map((p, i) => settleOrder({ group: p.group, printerId: p.printerId, done: dones[i] as PrintCallbackPayload, brokerId: d.brokerId })),
-    );
-  }
 
-  cumulative.ordersPrinted += pairings.length;
+    // Collect all printer callbacks per order; settle each order once all its
+    // printers have reported (one settleOrder call per order, not per pairing).
+    const byOrder = new Map<string, { group: ClaimedGroup; printerIds: string[]; lastDone: PrintCallbackPayload }>();
+    for (let i = 0; i < pairings.length; i++) {
+      const p = pairings[i];
+      const done = dones[i] as PrintCallbackPayload;
+      const existing = byOrder.get(p.group.originId);
+      if (existing) {
+        existing.printerIds.push(done.printerId);
+        existing.lastDone = done;
+      } else {
+        byOrder.set(p.group.originId, { group: p.group, printerIds: [done.printerId], lastDone: done });
+      }
+    }
+    await Promise.all(
+      [...byOrder.values()].map(({ group, printerIds, lastDone }) =>
+        settleOrder({ group, printerId: printerIds[0], done: lastDone, brokerId: d.brokerId }),
+      ),
+    );
+    cumulative.ordersPrinted += byOrder.size;
+  }
   cumulative.runs += 1;
 
   // The broker is working whenever it printed or is still carrying a backlog.

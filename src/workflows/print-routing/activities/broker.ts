@@ -112,18 +112,14 @@ export async function claimOrdersForCapacity(input: BrokerData): Promise<ClaimPl
 // ── Step 2: batch-lock the printer set, hand off the jobs ────────────────────
 
 /**
- * Best-effort batch-claim printers for each bucket of claimed orders, then hand
- * each locked printer its job by resolving its advert — which wakes the printer
- * (Path 0) with `{ orderId, callbackKey, brokerWorkflowId }`. The broker waits on
- * `callbackKey` next; the printer signals it on completion.
+ * For each claimed order, atomically lock exactly N printers — one per insole — then
+ * hand each printer its individual job. Every insole of an order prints in parallel
+ * on its own dedicated machine. `allOrNone: true` guarantees the full set is claimed
+ * or the order is carried; partial printer sets never leave an order half-started.
  *
- * Holding beats releasing: take as many free printers as `claimByFacets` can lock
- * (FOR UPDATE SKIP LOCKED), place that many orders, and return the rest as
- * `unplaced` for the broker to carry. Partial placement keeps the fleet busy where
- * an all-or-none set lock would idle, or livelock, under broker contention. A
- * standard order takes a standard printer first, then overflows to a larger xl
- * printer; an xl order is xl-only. `phase` namespaces the callback keys so multiple
- * lock passes in one tick stay unique.
+ * A standard order tries standard-class printers first; if unavailable it overflows
+ * to xl. An xl order is xl-only. `phase` namespaces callback keys so multiple lock
+ * passes in one tick stay unique.
  */
 export async function lockPrintersAndHandoff(input: {
   diabetic: boolean;
@@ -146,50 +142,62 @@ export async function lockPrintersAndHandoff(input: {
   const lt = createClient({ auth: { userId: input.brokerId } });
 
   for (const bucket of input.buckets) {
-    if (!bucket.groups.length) continue;
-    let remaining = bucket.groups;
-    for (const printerClass of eligiblePrinterClasses(bucket.sizeClass)) {
-      if (!remaining.length) break;
-      const locked = await lt.escalations.claimByFacets({
-        query: {
-          role: printerPond,
-          facets: {
-            [PRINTER_FACETS.STATE]: PRINTER_STATE.READY,
-            [PRINTER_FACETS.FILAMENT]: bucket.filament,
-            [PRINTER_FACETS.SIZE_CLASS]: printerClass,
-          },
-        },
-        limit: remaining.length,
-        durationMinutes,
-      });
-      if (locked.status !== 200) throw new Error(`claimByFacets failed: ${locked.error}`);
-      const printers = locked.data.claimed;
+    const bucketUnplaced: ClaimedGroup[] = [];
 
-      const place = Math.min(printers.length, remaining.length);
-      for (let i = 0; i < place; i++) {
-        const group = remaining[i];
-        const advert = printers[i];
-        const m = (advert.metadata ?? {}) as Record<string, any>;
-        const printerId = m[PRINTER_FACETS.PRINTER_ID];
-        const callbackKey = `cb-${input.brokerWorkflowId}-${printerId}-t${input.tick}-${input.phase}${seq++}`;
-        const job: PrinterJobPayload = {
-          orderId: group.originId,
-          units: group.members.length,
-          callbackKey,
-          brokerWorkflowId: input.brokerWorkflowId,
-        };
-        // Resolve as the broker operator. A printer advert is an efficient (signal_key)
-        // row, so this marks it resolved AND delivers the job to the parked printer in
-        // one atomic call.
-        await lt.escalations.resolve({ id: advert.id, resolverPayload: job });
-        pairings.push({ callbackKey, printerId, group });
+    for (const group of bucket.groups) {
+      const needed = group.members.length;
+      let placed = false;
+
+      // Try each eligible printer class in order (standard first, xl as overflow).
+      // allOrNone=true: either we claim all N printers or none — never a partial set.
+      for (const printerClass of eligiblePrinterClasses(bucket.sizeClass)) {
+        const locked = await lt.escalations.claimByFacets({
+          query: {
+            role: printerPond,
+            facets: {
+              [PRINTER_FACETS.STATE]: PRINTER_STATE.READY,
+              [PRINTER_FACETS.FILAMENT]: bucket.filament,
+              [PRINTER_FACETS.SIZE_CLASS]: printerClass,
+            },
+          },
+          limit: needed,
+          allOrNone: true,
+          durationMinutes,
+        });
+        if (locked.status !== 200) throw new Error(`claimByFacets failed: ${locked.error}`);
+        const printers = locked.data.claimed;
+
+        if (printers.length === needed) {
+          // Full set acquired — hand each printer exactly one insole job.
+          for (let i = 0; i < needed; i++) {
+            const advert = printers[i];
+            const m = (advert.metadata ?? {}) as Record<string, any>;
+            const printerId = m[PRINTER_FACETS.PRINTER_ID];
+            const callbackKey = `cb-${input.brokerWorkflowId}-${printerId}-t${input.tick}-${input.phase}${seq++}`;
+            const job: PrinterJobPayload = {
+              orderId: group.originId,
+              units: 1,
+              callbackKey,
+              brokerWorkflowId: input.brokerWorkflowId,
+            };
+            // Resolve as the broker operator — atomic: marks advert resolved AND wakes
+            // the parked printer with its job in a single call.
+            await lt.escalations.resolve({ id: advert.id, resolverPayload: job });
+            pairings.push({ callbackKey, printerId, group });
+          }
+          placed = true;
+          break;
+        }
+        // Fewer than needed available in this class — allOrNone rolled back; try overflow.
       }
-      remaining = remaining.slice(place);
+
+      if (!placed) {
+        bucketUnplaced.push(group);
+      }
     }
 
-    if (remaining.length) {
-      // No printer for these orders this tick — carry them, still claimed.
-      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: remaining });
+    if (bucketUnplaced.length) {
+      unplaced.push({ filament: bucket.filament, sizeClass: bucket.sizeClass, groups: bucketUnplaced });
     }
   }
   return { pairings, unplaced };

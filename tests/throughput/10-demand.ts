@@ -20,12 +20,11 @@
 
 import {
   login, api, sleep, ts,
-  DIABETIC, DAILY_VOLUME, BATCHES, FLEET_SIZE, EOL_RUNS,
+  DIABETIC, DAILY_VOLUME, BATCHES, FLEET_SIZE, EOL_RUNS, DEFAULT_MAX_ADVERTS,
   PRINT_ROUTING_QUEUE, PRINT_WORKFLOWS,
   buildOrders, operators, batchSize, waveGapMs,
 } from './10-shared';
 
-const STALL_MS = parseInt(process.env.STALL_MS || '120000', 10); // give up after this with no new completions
 const TIMEOUT_MS = parseInt(process.env.TIMEOUT_MS || '900000', 10);
 
 async function main() {
@@ -42,10 +41,21 @@ async function main() {
   const size = batchSize();
   const gap = waveGapMs();
   const capacity = FLEET_SIZE * EOL_RUNS;
+  const totalInsoles = orders.reduce((s, o) => s + o.units.length, 0);
 
-  console.log(`[demand] ${ts()} ${DAILY_VOLUME} orders in ${BATCHES} waves of ~${size} (gap ${(gap / 1000).toFixed(1)}s) | fleet capacity≈${capacity} runs`);
-  if (capacity < DAILY_VOLUME) {
-    console.log(`[demand] ${ts()} WARNING: capacity (${capacity}) < orders (${DAILY_VOLUME}) — run may stall once supply exhausts. Raise FLEET_SIZE.`);
+  // Stall budget: max acceptable gap between any two order convergences.
+  // Covers the worst case: all printers hit refill simultaneously (technician
+  // processes FLEET_SIZE jobs sequentially) + broker carry-rounds to re-place
+  // orders once printers are back. Use env override when the default is too tight.
+  const brokerCount = Math.ceil(FLEET_SIZE / DEFAULT_MAX_ADVERTS);
+  const carryRounds = Math.ceil(DAILY_VOLUME / Math.max(1, brokerCount * 2));
+  const STALL_MS = process.env.STALL_MS
+    ? parseInt(process.env.STALL_MS, 10)
+    : Math.max(60_000, FLEET_SIZE * 3_000 + carryRounds * 10_000);
+
+  console.log(`[demand] ${ts()} ${DAILY_VOLUME} orders (${totalInsoles} insoles) in ${BATCHES} waves of ~${size} (gap ${(gap / 1000).toFixed(1)}s) | fleet capacity≈${capacity} runs | stall budget=${(STALL_MS / 1000).toFixed(0)}s`);
+  if (capacity < totalInsoles) {
+    console.log(`[demand] ${ts()} WARNING: capacity (${capacity} printer-runs) < insoles (${totalInsoles}) — run will stall once supply exhausts. Raise FLEET_SIZE.`);
   }
 
   const t0 = performance.now();
