@@ -8,7 +8,6 @@
 
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { conditionLT } from '@hotmeshio/long-tail';
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 
 import { runPrintJob } from './proxy';
@@ -45,15 +44,13 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
     // Needs filament — advertise maintenance; a technician resolves "added filament".
     if (runsUntilRefill <= 0) {
       const refillSignal = `refill-${ctx.workflowId}-r${totalRuns}`;
-      await conditionLT<RefillPayload>(refillSignal, {
+      await Durable.workflow.condition<RefillPayload>(refillSignal, {
         role: printerPond,
         type: PRINT_WORKFLOWS.PRINTER,
         subtype: PRINTER_STATE.MAINTENANCE,
         priority: 1,
         description: `Printer ${d.printerId} needs filament (after run ${totalRuns})`,
-        workflowType: PRINT_WORKFLOWS.PRINTER,
         metadata: { ...baseFacets, [PRINTER_FACETS.STATE]: PRINTER_STATE.MAINTENANCE, [PRINTER_FACETS.RUNS_UNTIL_REFILL]: 0 },
-        envelope: { printerId: d.printerId, state: PRINTER_STATE.MAINTENANCE },
       });
       runsUntilRefill = REFILL_INTERVAL;
       refills += 1;
@@ -63,15 +60,13 @@ export async function printer(envelope: LTEnvelope): Promise<any> {
     // Ready — advertise availability. The broker resolves this advert with a job
     // (orderId + a callback key); the printer runs it and signals the broker back.
     const readySignal = `ready-${ctx.workflowId}-r${totalRuns}`;
-    const job = await conditionLT<PrinterJobPayload>(readySignal, {
+    const job = await Durable.workflow.condition<PrinterJobPayload>(readySignal, {
       role: printerPond,
       type: PRINT_WORKFLOWS.PRINTER,
       subtype: PRINTER_STATE.READY,
       priority: 2,
       description: `Printer ${d.printerId} ready (run ${totalRuns + 1})`,
-      workflowType: PRINT_WORKFLOWS.PRINTER,
       metadata: { ...baseFacets, [PRINTER_FACETS.STATE]: PRINTER_STATE.READY, [PRINTER_FACETS.RUNS_UNTIL_REFILL]: runsUntilRefill },
-      envelope: { printerId: d.printerId, state: PRINTER_STATE.READY },
     });
 
     // A power-down command (a `ready` advert resolved with no job) retires the

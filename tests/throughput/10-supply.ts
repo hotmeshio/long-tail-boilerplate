@@ -29,8 +29,12 @@ async function makeInvocable(workflowType: string): Promise<void> {
   });
 }
 
-async function invoke(workflowType: string, workflowId: string, data: Record<string, any>): Promise<void> {
-  await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId });
+async function invoke(workflowType: string, workflowId: string, data: Record<string, any>, idempotent = false): Promise<void> {
+  try {
+    await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId });
+  } catch (err: any) {
+    if (!idempotent || !String(err?.message ?? '').includes('Duplicate')) throw err;
+  }
 }
 
 async function main() {
@@ -53,16 +57,19 @@ async function main() {
     await invoke(PRINT_WORKFLOWS.PRINTER, spec.printerId, { ...spec, operatorId: op.printerOperatorId });
   }
 
-  // 3. Start the autonomous crew — singleton broker serves both ponds; technician
-  //    and inspector are singletons scoped to this run's fleet kind.
-  await invoke(PRINT_WORKFLOWS.BROKER, `broker-${RUN_ID}`, {
+  // 3. Start the autonomous crew — fixed IDs make them persistent singletons across
+  //    runs. A broker-print that is already running is a no-op (idempotent invoke);
+  //    printers come and go by advertising or not, and the crew works with whatever
+  //    is currently presenting escalations — exactly the production model.
+  const fleetLabel = DIABETIC ? 'diabetic' : 'standard';
+  await invoke(PRINT_WORKFLOWS.BROKER, 'broker-print', {
     brokerId: op.brokerId,
     maxIdleRuns: CREW_MAX_IDLE,
     maxAdverts: MAX_ADVERTS,
     conditionChunkSize: CONDITION_CHUNK_SIZE,
-  });
-  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-${RUN_ID}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId });
-  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-${RUN_ID}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId });
+  }, true);
+  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId }, true);
+  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId }, true);
 
   // Sentinel the farm orchestrator waits for before releasing demand.
   console.log(`[supply] ${ts()} SUPPLY READY RUN_ID=${RUN_ID}`);

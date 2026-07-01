@@ -97,11 +97,14 @@ export async function printBroker(envelope: LTEnvelope): Promise<any> {
         byOrder.set(p.group.originId, { group: p.group, printerIds: [done.printerId], lastDone: done });
       }
     }
-    await Promise.all(
-      [...byOrder.values()].map(({ group, printerIds, lastDone }) =>
-        settleOrder({ group, printerId: printerIds[0], done: lastDone, brokerId: d.brokerId }),
-      ),
-    );
+    const orderEntries = [...byOrder.values()];
+    for (let oi = 0; oi < orderEntries.length; oi += CONDITION_CHUNK) {
+      await Promise.all(
+        orderEntries.slice(oi, oi + CONDITION_CHUNK).map(({ group, printerIds, lastDone }) =>
+          settleOrder({ group, printerId: printerIds[0], done: lastDone, brokerId: d.brokerId }),
+        ),
+      );
+    }
     cumulative.ordersPrinted += byOrder.size;
   }
   cumulative.runs += 1;

@@ -18,6 +18,7 @@
 #   WAVE_GAP_S         — seconds between waves (default 5; the pressure-gradient knob)
 #   COMPRESSION_HOURS  — alt: spread all waves across this window (ortho-style compression)
 #   DIABETIC           — 1 to run the diabetic fleet (default standard)
+#   RESET              — 1 to power down idling printers from a prior run before starting
 #
 # Capacity rule: FLEET_SIZE × 10 (EOL runs) must exceed DAILY_VOLUME or demand
 # stalls once the fleet retires. Seed operators first: npm run print:seed
@@ -37,7 +38,13 @@ export DIABETIC="${DIABETIC:-}"
 if [ -n "${WAVE_GAP_S:-}" ]; then export WAVE_GAP_S; fi
 if [ -n "${COMPRESSION_HOURS:-}" ]; then export COMPRESSION_HOURS; fi
 if [ -n "${MAX_ADVERTS:-}" ]; then export MAX_ADVERTS; fi
-if [ -n "${CONDITION_CHUNK_SIZE:-}" ]; then export CONDITION_CHUNK_SIZE; fi
+if [ -n "${CONDITION_CHUNK_SIZE:-}" ]; then
+  if [ "$CONDITION_CHUNK_SIZE" -gt 20 ]; then
+    echo "[farm] ERROR: CONDITION_CHUNK_SIZE=$CONDITION_CHUNK_SIZE exceeds the durable workflow Promise.all limit of 20." >&2
+    exit 1
+  fi
+  export CONDITION_CHUNK_SIZE
+fi
 
 # One shared RUN_ID isolates this run's fleet + orders.
 export RUN_ID="${RUN_ID:-$(date +%s)}"
@@ -58,8 +65,18 @@ trap cleanup SIGINT SIGTERM EXIT
 
 echo "[farm] ════════════════════════════════════════"
 echo "[farm] RUN_ID=$RUN_ID  fleet=$FLEET_SIZE  orders=$DAILY_VOLUME  waves=$BATCHES"
-echo "[farm] Powering on supply surface..."
 echo "[farm] ════════════════════════════════════════"
+
+# Optional reset: power down idling printers from a prior run so they don't
+# pollute this run's supply pool. Without this, old printers sitting on
+# pending `ready` adverts would be found and claimed by the new broker.
+if [ "${RESET:-}" = "1" ]; then
+  echo "[farm] RESET=1 — powering down idling printers from prior run..."
+  $TS_NODE tests/throughput/10-reset.ts
+  echo ""
+fi
+
+echo "[farm] Powering on supply surface..."
 
 # Step 1: Start supply, tee output, wait for the SUPPLY READY sentinel.
 SUPPLY_LOG=$(mktemp)

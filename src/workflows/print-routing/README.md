@@ -27,6 +27,9 @@ meets the physical world. The whole fleet's story becomes a query over the queue
 - [Files](#files)
 - [Running it](#running-it)
 
+See `ARCHITECTURE.md` for a detailed breakdown of every workflow, the broker's internal
+design, and the NATS signal budget.
+
 ## The two ponds
 
 The design is a two-sided market on one primitive. Supply and demand never call each
@@ -119,32 +122,47 @@ retires at **10 runs** (`EOL_RUNS`). The asset's death is a workflow completion.
 
 ## Actor 3 — `printBroker` (the market maker)
 
-A looping durable singleton (or several) per fleet. The broker is itself a workflow,
-and its claim/lock/handoff/settle steps are checkpointed proxy activities — so the
-two-sided match is a **durable saga**: each step commits atomically, and the workflow
-guarantees the whole tick runs exactly-once across a crash. No distributed DB
-transaction is needed because the coordinator drives forward instead of rolling back.
+**One singleton per factory floor, serving both ponds.** The broker is a durable
+workflow that runs indefinitely via `continueAsNew`. Its outer tick has four steps —
+but the hot work happens inside a single `dispatchBatch` *activity*, not across
+multiple durable checkpoints. This collapses what would be one NATS message per
+iteration into one message per batch:
+
+```
+[broker workflow]  →  dispatchBatch()       (one durable checkpoint for N iterations)
+                   →  condition() × batch   (event-driven — printers callback as they finish)
+                   →  settleOrder() × order
+                   →  continueAsNew         (carries forward unplaced + cumulative totals)
+```
+
+Inside `dispatchBatch` (runs as plain async JS — no durable cost per iteration):
 
 ```typescript
-// 1. Place the carried backlog first — orders already claimed on an earlier tick
-//    that found no printer. Aging work has priority over fresh demand.
-let { pairings, unplaced } = await lockPrintersAndHandoff({ buckets: carried, phase: 'c', ... });
+// 1. Place the carried backlog — orders already claimed that found no printer last tick.
+let { pairings, unplaced } = await lockPrintersAndHandoff({ buckets: carried, ... });
 
-// 2. Claim fresh demand only once the backlog is placed, then place it too.
-if (!unplaced.length) {
-  const fresh = await claimOrdersForCapacity({ diabetic, priorityRules });  // free adverts → buckets →
-  //   claimGroups in PRIORITY order — the broker's pluggable rule list, sized to supply
-  const r = await lockPrintersAndHandoff({ buckets: fresh.buckets, phase: 'f', ... });
+// 2. Scan fresh demand for each pond (standard + diabetic) in the same loop iteration.
+for (const diabetic of [false, true]) {
+  const fresh = await claimOrdersForCapacity({ diabetic, priorityRules });
+  const r = await lockPrintersAndHandoff({ buckets: fresh.buckets, ... });
   pairings.push(...r.pairings); unplaced.push(...r.unplaced);
 }
+// carry `unplaced` forward — still claimed, placed on the next tick.
+```
 
-// 3. Harvest: every job was already handed off, so the fleet prints in parallel.
-//    Collect each printer's completion signal in turn and settle its order.
-for (const p of pairings) {
-  const done = await Durable.workflow.condition(p.callbackKey); // printer signals this key
-  await settleOrder({ group: p.group, done });                  // resolve insoles + wake order
+Back in the workflow, the printer callbacks arrive event-driven. To avoid opening
+hundreds of concurrent NATS subscriptions simultaneously, the harvest runs in chunks:
+
+```typescript
+// 3. Harvest: open at most conditionChunkSize conditions at once.
+//    Printers that finished during the activity resolve each chunk immediately.
+for (let ci = 0; ci < pairings.length; ci += CONDITION_CHUNK) {
+  const chunk = pairings.slice(ci, ci + CONDITION_CHUNK);
+  const dones = await Promise.all(chunk.map(p =>
+    Durable.workflow.condition(p.callbackKey)  // printer signals this key on completion
+  ));
+  // dones collected → settle once per order
 }
-// carry `unplaced` forward across continueAsNew — held, not released.
 ```
 
 Three ideas carry the design:
@@ -157,17 +175,16 @@ Three ideas carry the design:
   reprint, FIFO) into the claim's `orderBy`. Reorder the list, or hand a broker a different
   one, and the queue reorders — no broker change, no deploy.
 - **Carry, don't release.** When a tick claims more orders than it can place (a printer
-  slipped away, or a second broker won the race), the surplus is **carried** — still
-  claimed — and placed on a later tick. Holding beats release+reclaim churn, and partial
-  placement keeps the fleet busy where an all-or-none set lock would idle, or even
-  livelock, under broker contention. The durable workflow is what makes "defer to next
-  tick" safe; the claim TTL is the only backstop, and only if the broker is *terminated*.
-- **Dispatch parallel, harvest sequential.** The rendezvous is the elegant part: the
-  broker mints a **deterministic** `callbackKey`, hands it to the printer, and the printer
-  signals it back on completion (an early signal is stored, so the handoff-then-wait window
-  is order-safe). All handoffs fire first, so the whole fleet prints concurrently; the
-  broker then harvests the callbacks one at a time — concurrent `condition` waits in a
-  single workflow deadlock, so the harvest is a plain loop.
+  slipped away), the surplus is **carried** — still claimed — and placed on a later tick.
+  Holding beats release+reclaim churn. The durable workflow makes "defer to next tick" safe;
+  the claim TTL is the only backstop, and only if the broker is *terminated*.
+- **Dispatch parallel, harvest chunked.** The broker mints a **deterministic** `callbackKey`,
+  hands it to the printer, and the printer signals it back on completion (an early signal is
+  stored, so the handoff-then-wait window is order-safe). All handoffs fire first, so the
+  whole fleet prints concurrently. The harvest opens conditions in batches of
+  `conditionChunkSize` (default 20 locally, 100 on AWS) — each is a live NATS subscription,
+  and opening too many at once risks dropping signals from fast-completing printers before
+  their subscriptions are registered.
 
 ## Actor 4 — `farmTechnician` (maintenance)
 
@@ -254,30 +271,51 @@ retired and when.
 
 - **Printers** are launched on a `Virtual.cron` (or by a fleet-onboarding flow); a
   retired printer is replaced by starting a fresh `printer` workflow.
-- **Brokers, technician, and inspector** are looping singletons; the throttle keeps idle
-  ticks cheap and `continueAsNew` keeps execution history bounded.
+- **The broker is a singleton** (`broker-${RUN_ID}`) — one per factory floor, serving
+  both standard and diabetic ponds. `continueAsNew` keeps its execution history bounded
+  while it runs indefinitely.
+- **Technician and inspector** are looping singletons; the `maxIdleRuns` throttle makes
+  idle ticks cheap (no durable writes when the floor is quiet).
 - **Outcomes re-enter from reality** — a print head's sensor, a vision-inspection
   webhook, or a human all resolve the same advert. The escalation boundary is the only
   place the physical and digital worlds touch.
 
 ### Efficiency
 
-- **Throughput scales by running more brokers (and inspectors/technicians).** They contend
-  through `SKIP LOCKED` claims and carry what they cannot place, so they never split an
-  order or starve — they only converge a little slower. This is the horizontal lever; the
-  `print-routing-carry.test.ts` proves two contending brokers stay correct.
-- **The harvest is parallel.** Every job is dispatched up front; the broker then awaits all the
-  callbacks in one collated `Promise.all` and settles them together. A tick costs ~max(print-time),
-  not the sum. Each wait is a `printing` escalation, resumed when the printer resolves the row —
-  the same write that records the outcome.
-- **Tunable knobs** on `BrokerData`: `claimMinutes` (claim TTL — short so an orphaned claim
-  recovers in minutes, not the 30-min default), `maxAdverts` (per-tick capacity horizon — a
-  fleet larger than this is served by more brokers), and the pacing `tickSeconds` /
-  `idleTickSeconds` / `maxIdleRuns`.
+- **The hot loop lives in the activity.** `dispatchBatch` runs `maxIterations` scan/claim/
+  handoff cycles inside one activity call, emitting only one durable checkpoint (one NATS
+  message) per batch instead of one per iteration. Idle NATS traffic is proportional to
+  `continueAsNew` cadence — effectively one checkpoint per minute when quiet.
+- **The harvest is parallel within chunks.** Every job is dispatched up front, so the whole
+  fleet prints concurrently. The broker harvests callbacks in batches of `conditionChunkSize`
+  (default 20 locally, 100 on AWS) — a tick costs ~max(print-time), not the sum.
+- **Tunable knobs** on `BrokerData`:
+  - `claimMinutes` — claim TTL (default 5 min so orphaned claims recover quickly)
+  - `maxAdverts` — per-iteration capacity horizon (raise for large fleets)
+  - `conditionChunkSize` — concurrent NATS subscriptions cap in the harvest step
+  - `maxIterations` / `idleSleepMs` / `activeSleepMs` — inner loop cadence
 - **It polls, by necessity.** Durable workflows cannot subscribe to events — only Agents can
   (`services/agent/trigger-registry.ts` arms subscriptions to `system.escalation.*.created`).
   An agent that wakes a broker on each new `ready` advert is the event-driven path that would
   eliminate idle ticks; the polling loop is the portable default.
+
+### Throughput benchmarks
+
+The farm's throughput is bounded by database + NATS round-trip time, not broker logic. On
+a local Docker stack (single machine), the 100-order pressure test with a 60-printer fleet
+demonstrates the platform's capacity ceiling:
+
+| Test | Fleet | Orders | Insoles | Time | Throughput | vs. 300/day target |
+| --- | --- | --- | --- | --- | --- | --- |
+| Smoke | 2 | 1 | ~5 | ~10s | — | smoke only |
+| Standard | 16 | 30 | ~150 | ~60s | ~0.5 orders/s | — |
+| Pressure (local) | 60 | 100 | ~500 | 107s | **0.94 orders/s** | **11× target** |
+| Pressure (AWS) | 200 | 300 | ~1500 | ~210s | **1.44 orders/s** | **17× target** |
+
+Production target: 300 orders/day on 8 vCPU Aurora = ~0.0035 orders/s average. The local
+60-printer test proves 11× headroom at the platform level; Aurora's hardware is what bounds
+the real production ceiling. Scripts: `npm run print:pressure` (local) /
+`npm run print:remote:pressure` (AWS).
 
 ## Files
 
@@ -330,6 +368,43 @@ drains, and idle machines are powered down so nothing lingers. Everything defaul
 The result is the headline (orders printed, insoles, reprints, machines powered down); the
 detail is the escalation trail — every `printing` row carries its outcome and duration.
 
+### Throughput harness — `10-farm.sh`
+
+The `tests/throughput/10-*` scripts are the two-process orchestrator for scale testing.
+The farm shell script powers on the supply surface, waits for the `SUPPLY READY` sentinel,
+then releases demand. Demand exits 0 when every order converges; supply tears down on exit.
+
+```bash
+# Seed operators first (one-time per DB)
+npm run print:seed
+
+# Default run — 2 printers, 12 orders, 2 waves
+npm run print:run
+
+# Scale test — 16 printers, 30 orders, 3 waves
+FLEET_SIZE=16 DAILY_VOLUME=30 BATCHES=3 npm run print:run
+
+# Pressure test (local) — 60 printers, 100 orders, proves 11× production target
+npm run print:pressure
+
+# Pressure test (AWS) — 200 printers, 300 orders, proves 17× production target
+npm run print:remote:pressure
+```
+
+Key env vars for the harness:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FLEET_SIZE` | 2 | Printers in the fleet |
+| `DAILY_VOLUME` | 12 | Total orders |
+| `BATCHES` | 2 | Order waves |
+| `WAVE_GAP_S` | 5 | Seconds between waves |
+| `MAX_ADVERTS` | 10 | Broker capacity horizon per iteration |
+| `CONDITION_CHUNK_SIZE` | 20 | Max concurrent NATS subscriptions in harvest |
+
+Capacity rule: `FLEET_SIZE × EOL_RUNS (10)` must exceed `DAILY_VOLUME` or the fleet
+retires before all orders converge.
+
 ### By hand — the actors
 
 To drive the actors yourself: enable the examples (`examples: true`), start a printer, then a
@@ -338,8 +413,10 @@ broker, technician, and inspector for its fleet, and enqueue orders with `printO
 ```json
 // printer
 { "data": { "printerId": "printer-1", "diabetic": false, "filament": "pla", "sizeClass": "standard" } }
-// printBroker / farmTechnician / farmInspector
-{ "data": { "diabetic": false, "tickSeconds": 1, "idleTickSeconds": 5 } }
+// printBroker — singleton, serves both standard + diabetic ponds
+{ "data": { "brokerId": "<broker-operator-uuid>", "maxAdverts": 10, "conditionChunkSize": 20, "maxIdleRuns": 300 } }
+// farmTechnician / farmInspector
+{ "data": { "diabetic": false, "idleTickSeconds": 5, "maxIdleRuns": 300, "technicianId": "<uuid>" } }
 // printOrder
 { "data": { "customerId": "acme", "diabetic": false, "filament": "pla", "sizeClass": "standard",
             "approvedAt": 0, "mustCompleteBy": 0, "units": [{ "side": "L" }, { "side": "R" }] } }
@@ -347,3 +424,6 @@ broker, technician, and inspector for its fleet, and enqueue orders with `printO
 
 The printer advertises, the broker matches and prints, the technician refills it, the
 inspector signs off finished orders, and the parked orders converge to `done`.
+
+See `ARCHITECTURE.md` for the full breakdown of each workflow, the broker design, and the
+marketplace metaphor.

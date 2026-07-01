@@ -55,8 +55,12 @@ async function makeInvocable(workflowType: string) {
     invocable: true, task_queue: PRINT_ROUTING_QUEUE, default_role: 'reviewer',
   });
 }
-async function invoke(workflowType: string, workflowId: string, data: Record<string, any>) {
-  await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId });
+async function invoke(workflowType: string, workflowId: string, data: Record<string, any>, idempotent = false) {
+  try {
+    await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId });
+  } catch (err: any) {
+    if (!idempotent || !String(err?.message ?? '').includes('Duplicate')) throw err;
+  }
 }
 async function result(workflowId: string): Promise<any | null> {
   try {
@@ -88,9 +92,10 @@ async function drainPending() {
  */
 async function startCrew() {
   const loop = { diabetic: DIABETIC, idleTickSeconds: 2, maxIdleRuns: 1200 };
-  await invoke(PRINT_WORKFLOWS.BROKER, `broker-${RUN}`, { ...loop, brokerId: OP.brokerId });
-  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-${RUN}`, { ...loop, technicianId: OP.technicianId });
-  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-${RUN}`, { ...loop, inspectorId: OP.inspectorId });
+  const fleetLabel = DIABETIC ? 'diabetic' : 'standard';
+  await invoke(PRINT_WORKFLOWS.BROKER, 'broker-print', { ...loop, brokerId: OP.brokerId }, true);
+  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { ...loop, technicianId: OP.technicianId }, true);
+  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { ...loop, inspectorId: OP.inspectorId }, true);
 }
 
 /** Start a section's printers and enqueue its orders — does NOT wait. The shared crew serves them. */

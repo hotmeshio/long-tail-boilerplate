@@ -8,7 +8,6 @@
 
 import { Durable } from '@hotmeshio/hotmesh';
 
-import { conditionLT } from '@hotmeshio/long-tail';
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 
 import { enqueueOrderUnits } from './proxy';
@@ -16,7 +15,6 @@ import {
   roleForOrder,
   fleetKind,
   FARMER_POND,
-  PRINT_WORKFLOWS,
   ORDER_SIGNOFF_TYPE,
   SIGNOFF_FACETS,
   PRINT_SOURCE,
@@ -52,13 +50,12 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
     // The defect is transient: declared failures surface on the first print; a
     // reprint of the same unit succeeds. In production, reality decides.
     const failUnits = attempt === 0 ? (order.failUnits ?? []) : [];
-    const signoff = (await conditionLT<SignoffPayload>(`signoff-${ctx.workflowId}-a${attempt}`, {
+    const signoff = (await Durable.workflow.condition<SignoffPayload>(`signoff-${ctx.workflowId}-a${attempt}`, {
       role: farmerPond,
       type: ORDER_SIGNOFF_TYPE,
       subtype: done.printerId,
       priority: 2,
       description: `Order ${originId} printed on ${done.printerId} — inspect and sign off`,
-      workflowType: PRINT_WORKFLOWS.ORDER,
       metadata: {
         [SIGNOFF_FACETS.ORDER_ID]: originId,
         [SIGNOFF_FACETS.PRINTER_ID]: done.printerId,
@@ -66,7 +63,6 @@ export async function printOrder(envelope: LTEnvelope): Promise<any> {
         [SIGNOFF_FACETS.FAIL_UNITS]: failUnits,
         source: PRINT_SOURCE,
       },
-      envelope: { orderId: originId, printerId: done.printerId, units: done.units },
     })) as SignoffPayload;
 
     last = { printerId: done.printerId, completedAt: done.completedAt, inspectedBy: signoff.inspectedBy };
