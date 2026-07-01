@@ -11,3 +11,7 @@ CLAUDE.md
 # CDK
 deploy/cdk/cdk.out/
 deploy/cdk/dist/
+
+src/workflows/print-routing/OPERATIONS.md
+src/workflows/print-routing/ARCHITECTURE.md
+src/workflows/print-routing/README.md

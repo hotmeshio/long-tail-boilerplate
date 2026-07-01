@@ -32,11 +32,12 @@ loop, and how NATS signal budgeting prevents the harvest from hanging at scale.
 
 The print farm is a two-sided market on one primitive — the escalation queue.
 
-**Supply side — printer adverts.** When a printer is idle, it calls `conditionLT` and
-parks. This writes a pending escalation row in the printer pond (`printer-pool-standard`
-or `printer-pool-diabetic`) with metadata describing the machine: `printerId`, `filament`,
-`sizeClass`, `state=ready`. That row IS the advert. Sixty printers idle = 60 pending `state=ready`
-rows in the supply pond. Availability is a query, not a hash.
+**Supply side — printer adverts.** When a printer is idle, it calls
+`Durable.workflow.condition()` with an escalation config and parks. This writes a pending
+escalation row in the printer pond (`printer-pool-standard` or `printer-pool-diabetic`)
+with metadata describing the machine: `printerId`, `filament`, `sizeClass`, `state=ready`.
+That row IS the advert. Sixty printers idle = 60 pending `state=ready` rows in the supply
+pond. Availability is a query, not a hash.
 
 **Demand side — order insoles.** When an order arrives, it enqueues one escalation per
 insole in the order pond (`print-farm-standard` or `print-farm-diabetic`), all sharing one
@@ -68,11 +69,13 @@ let outstanding = order.units.map((_, i) => i);  // intent: all units
 let attempt = 0;
 while (outstanding.length && attempt < MAX_PRINT_ATTEMPTS) {
   const originId = attempt === 0 ? orderId : `${orderId}#a${attempt}`;
-  await enqueueOrderUnits({ order, originId, unitIndices: outstanding, ... });
+  await enqueueOrderUnits({ order, originId, unitIndices: outstanding, reprint: attempt > 0, ... });
   // park until the broker settles this group
   const done = await Durable.workflow.condition<OrderDoneSignal>(orderSignal);
   // park until the farmer inspects and signs off
-  const signoff = await conditionLT<SignoffPayload>(signoffKey, { role: farmerPond, ... });
+  const signoff = await Durable.workflow.condition<SignoffPayload>(signoffKey, {
+    role: farmerPond, type: ORDER_SIGNOFF_TYPE, ...
+  });
   outstanding = signoff.failedUnits;  // rejected units re-enter the funnel
   attempt += 1;
 }
@@ -99,14 +102,20 @@ means it survives crashes, replays cleanly, and is readable as a plain loop.
 while (totalRuns < EOL_RUNS) {
   if (runsUntilRefill <= 0) {
     // needs filament — post maintenance advert, wait for technician
-    await conditionLT(refillSignal, { role: printerPool, metadata: { ...facets, state: 'maintenance' } });
+    await Durable.workflow.condition<RefillPayload>(refillSignal, {
+      role: printerPool, type: PRINT_WORKFLOWS.PRINTER, subtype: PRINTER_STATE.MAINTENANCE,
+      metadata: { ...facets, state: 'maintenance' },
+    });
     runsUntilRefill = REFILL_INTERVAL;
     refills += 1;
     continue;
   }
 
   // advertise as ready — the broker resolves this with a job payload
-  const job = await conditionLT<PrinterJobPayload>(readySignal, { role: printerPool, metadata: { ...facets, state: 'ready' } });
+  const job = await Durable.workflow.condition<PrinterJobPayload>(readySignal, {
+    role: printerPool, type: PRINT_WORKFLOWS.PRINTER, subtype: PRINTER_STATE.READY,
+    metadata: { ...facets, state: 'ready' },
+  });
   if (job?.powerdown) break;       // shift power-down command
   if (job?.callbackKey) {
     await runPrintJob({ job, printerId });
@@ -125,9 +134,9 @@ machine. No separate state store is needed.
 its execution history is bounded. `continueAsNew` is for infinite loops; `while` is for
 bounded assembly-line idioms. Retirement is workflow completion.
 
-**Payload dispatch.** The `conditionLT` resolution payload carries the job. New machine
-states are new branches in the loop — `job.jammed`, `job.paused`, etc. The loop absorbs
-them without structural change.
+**Payload dispatch.** The `Durable.workflow.condition()` resolution payload carries the
+job. New machine states are new branches in the loop — `job.jammed`, `job.paused`, etc.
+The loop absorbs them without structural change.
 
 ---
 
@@ -154,10 +163,14 @@ export async function printBroker(envelope) {
     )));
   }
 
-  // 3. settleOrder per order (groups pairings by originId)
-  await Promise.all([...byOrder.values()].map(({ group, ... }) =>
-    settleOrder({ group, ... })
-  ));
+  // 3. settleOrder per order (groups pairings by originId, chunked at CONDITION_CHUNK)
+  for (let oi = 0; oi < orderEntries.length; oi += CONDITION_CHUNK) {
+    await Promise.all(
+      orderEntries.slice(oi, oi + CONDITION_CHUNK).map(({ group, ... }) =>
+        settleOrder({ group, ... })
+      )
+    );
+  }
 
   // 4. continueAsNew — carry unplaced forward
   await Durable.workflow.continueAsNew({ data: { ...d, carried: unplaced, ... } });
@@ -277,6 +290,14 @@ The broker carries them — still claimed — into the next `dispatchBatch` call
 `continueAsNew`. On the next tick, carried orders go first (they have implicit priority:
 they were already claimed and are aging).
 
+**Claim TTL and recovery.** Order-insole claims have a 5-minute TTL (`claimMinutes`). If
+the broker's harvest step takes longer than 5 minutes (e.g., an extreme stall), a carried
+group's claim expires and the insoles return to the pool — where they are re-claimed fresh
+on the next `claimOrdersForCapacity` call. This is the orphan-recovery floor: a crash or
+extended stall never permanently locks insoles. Size `claimMinutes` above the expected
+worst-case harvest time (for a 200-printer fleet with conditionChunkSize=20, that is
+`ceil(200/20) × max_print_job_seconds`).
+
 **Dual-pond loop.** Both `[false, true]` (standard and diabetic) ponds are scanned in the
 same loop iteration. The singleton broker handles both sides of the floor without awareness
 of which kind it's working — the role gates enforce capability isolation; the broker just
@@ -311,9 +332,11 @@ All conditions in a chunk are opened simultaneously (via `Promise.all`), then th
 settles before the next chunk opens. Printers retry their signal delivery for up to 30s,
 so a 200ms inter-chunk overhead is invisible to them.
 
-**Sizing.** Local Docker: `conditionChunkSize=20`. AWS (NATS handles higher burst rates):
-`conditionChunkSize=100`. The `print:pressure` script sets 20 locally; `print:remote:pressure`
-sets 100.
+**Sizing.** The hard cap is **20 on all environments** — local Docker and AWS alike. The
+durable workflow's Promise.all collation layer has a practical limit of 20 concurrent items;
+beyond that, the NATS signal bus risks a subscription storm. The bash entry point
+(`10-farm.sh`) hard-fails on any `CONDITION_CHUNK_SIZE` above 20. Both `print:pressure`
+and `print:remote:pressure` default to 20.
 
 ### continueAsNew — the checkpoint cadence
 
@@ -408,14 +431,21 @@ All knobs live on `BrokerData` (passed at broker invocation time and carried acr
 | Knob | Default | Effect |
 |------|---------|--------|
 | `maxAdverts` | 10 | Max `ready` adverts read per pond per iteration. Raise for large fleets. |
-| `conditionChunkSize` | 20 | Max concurrent NATS subscriptions in the harvest. 20 for local Docker, 100 for AWS. |
+| `conditionChunkSize` | 20 | Max concurrent NATS subscriptions in the harvest. **Hard cap: 20 on all environments.** The bash entry guard rejects values above this. |
 | `maxIterations` | 10 | Inner loop iterations per `dispatchBatch` call before checkpointing. |
 | `activeSleepMs` | 200 | Sleep between active iterations (work placed). |
 | `idleSleepMs` | 1000 | Sleep between idle iterations (no work found). |
 | `maxIdleRuns` | 3 | Consecutive idle outer ticks before self-terminating. |
 | `claimMinutes` | 5 | Claim TTL — orphaned claims recover in this many minutes. |
 
-For production: `maxIdleRuns=999999`, `conditionChunkSize=100`, `maxAdverts` = `ceil(FLEET_SIZE / 2)`.
+For production: `maxIdleRuns=999999`, `conditionChunkSize=20`, `maxAdverts` = `ceil(FLEET_SIZE / 2)`.
+
+`maxAdverts` is the broker's capacity horizon per scan — how many ready-printer adverts it
+reads to estimate available filament/sizeClass slots. The singleton broker runs the inner
+loop `maxIterations` times per activity call, so a fleet of N printers is covered
+approximately `maxIterations × maxAdverts / N` times per activity checkpoint. Setting
+`maxAdverts = ceil(FLEET_SIZE / 2)` gives ~5× full-fleet coverage at `maxIterations=10` —
+enough that no printer sits invisible for more than one activity cycle.
 
 ---
 
