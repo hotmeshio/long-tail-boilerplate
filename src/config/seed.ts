@@ -2,6 +2,8 @@ import { Pool } from 'pg';
 
 import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
+import { ALL_PRINT_ROLES } from '../workflows/print-routing/types';
+import { allOperatorSeeds, operatorIds } from '../workflows/print-routing/operators';
 
 const bcrypt: any = require('bcryptjs');
 
@@ -63,6 +65,62 @@ export async function seedIfEmpty() {
     console.log('[seed] Superadmin account created (login: superadmin)');
   } catch (err: any) {
     console.error('[seed] Seed failed (non-fatal):', err.message);
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
+ * Seed the print-farm roles and operator principals from the static config in
+ * `src/workflows/print-routing/operators.ts` (deterministic UUIDs). Runs at
+ * startup so the operators exist everywhere the app boots — local Docker AND an
+ * AWS deploy — making `npm run print:seed` unnecessary and remote `print:remote:*`
+ * runs work without any DB access or HTTP seed.
+ *
+ * Independent of the superadmin "if empty" guard so it also provisions the farm on
+ * an existing DB (an AWS deploy that already has a superadmin). Idempotent: guarded
+ * by an existence check on the standard broker operator, and every write is
+ * `ON CONFLICT`. Additive and isolated — it never touches the default
+ * users/roles/chains, so the integration baseline is unaffected.
+ */
+export async function seedPrintFarmIfEmpty() {
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!password) return;
+
+  const pool = new Pool(DB_CONFIG);
+  try {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM lt_users WHERE id = $1',
+      [operatorIds(false).brokerId],
+    );
+    if (rows.length > 0) return;
+
+    console.log('[seed] Seeding print-farm roles and operators');
+
+    for (const role of ALL_PRINT_ROLES) {
+      await pool.query('INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING', [role]);
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    for (const op of allOperatorSeeds()) {
+      await pool.query(
+        `INSERT INTO lt_users (id, external_id, display_name, email, password_hash, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')
+         ON CONFLICT (external_id) DO UPDATE SET id = $1, password_hash = $5`,
+        [op.id, op.externalId, op.display, `${op.externalId}@print.local`, hash],
+      );
+      for (const role of op.roles) {
+        await pool.query(
+          `INSERT INTO lt_user_roles (user_id, role, type)
+           VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`,
+          [op.id, role],
+        );
+      }
+    }
+
+    console.log(`[seed] Print farm seeded (${allOperatorSeeds().length} operators, ${ALL_PRINT_ROLES.length} roles)`);
+  } catch (err: any) {
+    console.error('[seed] Print farm seed failed (non-fatal):', err.message);
   } finally {
     await pool.end();
   }

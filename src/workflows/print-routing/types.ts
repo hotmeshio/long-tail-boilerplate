@@ -1,0 +1,476 @@
+/**
+ * Print Routing types & policy — an enterprise print farm where printers are
+ * first-class durable workflows.
+ *
+ * Two ponds on one primitive: orders (demand) advertise insole escalations, and
+ * printers (supply) advertise availability escalations. The platform knows none
+ * of it: `diabetic` is the hard capability wall (isolated role queues), and the
+ * rest are metadata facets a broker sorts and intersects. A printer's whole life
+ * — ready, printing, refilling, retired — is the trace of its escalations.
+ */
+
+import type { ClaimedGroup } from '@hotmeshio/long-tail';
+
+// ── Roles (hard capability walls) ────────────────────────────────────────────
+
+/** Demand pond — orders. Diabetic insoles are isolated from standard. */
+export const PRINT_FARM_DIABETIC = 'print-farm-diabetic';
+export const PRINT_FARM_STANDARD = 'print-farm-standard';
+
+/** Supply pond — printer adverts. One pool per fleet the printers serve. */
+export const PRINTER_POOL_DIABETIC = 'printer-pool-diabetic';
+export const PRINTER_POOL_STANDARD = 'printer-pool-standard';
+
+/** Signoff pond — order-done escalations the farmer inspects and clears. */
+export const PRINT_FARMER_DIABETIC = 'print-farmer-diabetic';
+export const PRINT_FARMER_STANDARD = 'print-farmer-standard';
+
+export const ALL_PRINT_ROLES = [
+  PRINT_FARM_DIABETIC,
+  PRINT_FARM_STANDARD,
+  PRINTER_POOL_DIABETIC,
+  PRINTER_POOL_STANDARD,
+  PRINT_FARMER_DIABETIC,
+  PRINT_FARMER_STANDARD,
+] as const;
+
+export type FleetKind = 'diabetic' | 'standard';
+
+export function fleetKind(diabetic: boolean): FleetKind {
+  return diabetic ? 'diabetic' : 'standard';
+}
+
+/** The order pond a fleet draws demand from. */
+export const ORDER_POND: Record<FleetKind, string> = {
+  diabetic: PRINT_FARM_DIABETIC,
+  standard: PRINT_FARM_STANDARD,
+};
+
+/** The printer pond a fleet's printers advertise into. */
+export const PRINTER_POND: Record<FleetKind, string> = {
+  diabetic: PRINTER_POOL_DIABETIC,
+  standard: PRINTER_POOL_STANDARD,
+};
+
+/** The signoff pond a fleet's completed orders surface to the farmer in. */
+export const FARMER_POND: Record<FleetKind, string> = {
+  diabetic: PRINT_FARMER_DIABETIC,
+  standard: PRINT_FARMER_STANDARD,
+};
+
+/** The hard switch for an order → its demand pond role. */
+export function roleForOrder(diabetic: boolean): string {
+  return ORDER_POND[fleetKind(diabetic)];
+}
+
+export const PRINT_ROUTING_QUEUE = 'print-routing';
+
+/** Registered workflow function names (also each row's `workflow_type`). */
+export const PRINT_WORKFLOWS = {
+  ORDER: 'printOrder',
+  PRINTER: 'printer',
+  BROKER: 'printBroker',
+  TECHNICIAN: 'farmTechnician',
+  INSPECTOR: 'farmInspector',
+  /** The invocable entry target — runs the whole farm end-to-end. */
+  SHIFT: 'printShift',
+} as const;
+
+/** Escalation type for an order-done signoff the farmer inspects. */
+export const ORDER_SIGNOFF_TYPE = 'order-signoff';
+
+/** Metadata keys on an order-done signoff escalation. */
+export const SIGNOFF_FACETS = {
+  ORDER_ID: 'orderId',
+  PRINTER_ID: 'printerId',
+  UNITS: 'units',
+  FAIL_UNITS: 'failUnits',
+} as const;
+
+// ── Facet keys ───────────────────────────────────────────────────────────────
+
+/** Order insole facets. `ORDER_SIZE` drives group completeness. */
+export const PRINT_FACETS = {
+  ORDER_SIZE: 'orderSize',
+  UNIT_INDEX: 'unitIndex',
+  SIDE: 'side',
+  FILAMENT: 'filament',
+  SIZE_CLASS: 'sizeClass',
+  DIABETIC: 'diabetic',
+  CUSTOMER_ID: 'customerId',
+  APPROVED_AT: 'approvedAt',
+  MUST_COMPLETE_BY: 'mustCompleteBy',
+  ORDER_SIGNAL: 'orderSignal',
+  KEY_ACCOUNT: 'keyAccount',
+  REPRINT: 'reprint',
+} as const;
+
+/** Printer advert facets. `STATE` says who resolves it: broker vs technician. */
+export const PRINTER_FACETS = {
+  PRINTER_ID: 'printerId',
+  STATE: 'state',
+  FILAMENT: 'filament',
+  SIZE_CLASS: 'sizeClass',
+  TOTAL_RUNS: 'totalRuns',
+  RUNS_UNTIL_REFILL: 'runsUntilRefill',
+} as const;
+
+export const PRINTER_STATE = {
+  READY: 'ready',
+  MAINTENANCE: 'maintenance',
+  /** A job in flight — the broker's callback escalation, resolved by the printer. */
+  PRINTING: 'printing',
+} as const;
+
+/**
+ * Outcome facets the printer merges into the `printing` escalation's GIN-indexed
+ * metadata in the same atomic resolve. The creation metadata said "what was intended"
+ * (printerId, state=printing); these record "what actually happened" on the same row —
+ * `@>`-queryable next to it. The boundary DURATION is not stored: the row's own
+ * `created_at` (handoff / print start) → `resolved_at` (done) is the duration, derivable
+ * by query. The row alone tells the whole story.
+ */
+export const OUTCOME_FACETS = {
+  OUTCOME: 'outcome',
+  UNITS_PRINTED: 'unitsPrinted',
+} as const;
+
+/** The outcome patch merged into a `printing` row on resolve. */
+export interface PrintOutcomeFacets {
+  outcome: PrintOutcome;
+  unitsPrinted: number;
+}
+
+export const PRINT_SOURCE = 'print-routing';
+
+/** A printer prints this many runs between filament refills. */
+export const REFILL_INTERVAL = 3;
+/** A printer retires (end-of-life) after this many total runs. */
+export const EOL_RUNS = 10;
+
+/** An order gives up reprinting a stubborn defect after this many attempts. */
+export const MAX_PRINT_ATTEMPTS = 5;
+
+/**
+ * How long a broker holds a claim before it expires back to the pool. Short, so an
+ * orphaned claim (a crash mid-handoff) recovers in minutes rather than the 30-min
+ * platform default. Overridable per broker via `BrokerData.claimMinutes`.
+ */
+export const DEFAULT_BROKER_CLAIM_MINUTES = 5;
+
+/**
+ * Cap on `ready` adverts a broker reads per tick — its capacity horizon. Sized to
+ * cover one max-order (6 insoles) with headroom; Promise.all in the harvest is
+ * bounded to this count. A fleet larger than this is served by running more brokers
+ * (ceil(FLEET_SIZE / DEFAULT_MAX_ADVERTS)). Overridable via `BrokerData.maxAdverts`.
+ */
+export const DEFAULT_MAX_ADVERTS = 10;
+
+// ── Order shapes (demand) ────────────────────────────────────────────────────
+
+export type SizeClass = 'xl' | 'standard';
+export type Side = 'L' | 'R';
+
+export interface PrintUnitSpec {
+  side: Side;
+}
+
+export interface PrintOrderData {
+  orderId?: string;
+  diabetic: boolean;
+  customerId: string;
+  filament: string;
+  sizeClass: SizeClass;
+  units: PrintUnitSpec[];
+  approvedAt: number;
+  mustCompleteBy: number;
+  /** Example control: unit indices the farmer finds defective at inspection. */
+  failUnits?: number[];
+  /** Order operator — a principal holding the order pond role. The order enqueues its
+   *  demand units through the role-gated public create API, so it runs as this operator.
+   *  Threaded at start/spawn; the order workflow asserts it before enqueuing. */
+  operatorId?: string;
+}
+
+export interface OrderFacets {
+  orderSize: number;
+  unitIndex: number;
+  side: Side;
+  filament: string;
+  sizeClass: SizeClass;
+  diabetic: boolean;
+  customerId: string;
+  approvedAt: number;
+  mustCompleteBy: number;
+  orderSignal: string;
+  /** Whether this order belongs to a key account — a priority-rule facet. */
+  keyAccount: boolean;
+}
+
+export interface PrintOrderResult {
+  orderId: string;
+  printed: boolean;
+  printerId: string;
+  role: string;
+  units: number;
+  completedAt: string;
+  inspectedBy: string;
+  passed: boolean;
+  /** Unit indices still failing when the order stopped — empty when it converged. */
+  failedUnits: number[];
+  /** How many print→inspect passes it took to converge (1 = clean, first try). */
+  attempts: number;
+}
+
+/** The wake signal the broker sends an order once printed (before farmer signoff). */
+export interface OrderDoneSignal {
+  orderId: string | null;
+  printerId: string;
+  role: string;
+  units: number;
+  completedAt: string;
+}
+
+/** The farmer's resolution of an order-done signoff escalation. */
+export interface SignoffPayload {
+  passed: boolean;
+  inspectedBy: string;
+  /** Unit indices found defective — empty when the whole order passed. */
+  failedUnits: number[];
+  notes?: string;
+}
+
+// ── Printer shapes (supply) ──────────────────────────────────────────────────
+
+export interface PrinterData {
+  printerId: string;
+  diabetic: boolean;
+  filament: string;
+  sizeClass: SizeClass;
+  totalRuns?: number;
+  runsUntilRefill?: number;
+  refills?: number;
+  /** Printer operator — a principal holding the printer pond role. The printer resolves
+   *  the broker's callback advert (role = printer pond) through the gated public API.
+   *  Threaded at start/spawn; the printer workflow asserts it before printing. */
+  operatorId?: string;
+}
+
+export interface PrinterResult {
+  printerId: string;
+  retired: boolean;
+  totalRuns: number;
+  refills: number;
+}
+
+export type PrintOutcome = 'success' | 'fail' | 'cancel';
+
+/** Resolution of a `maintenance` advert — the technician's action. */
+export interface RefillPayload {
+  action: 'added-filament';
+}
+
+/**
+ * The job the broker hands a printer by resolving the printer's `ready` advert.
+ * Resolving wakes the printer (Path 0); the printer signals `callbackKey` on the
+ * broker workflow when the run completes.
+ */
+export interface PrinterJobPayload {
+  orderId: string | null;
+  units: number;
+  callbackKey: string;
+  brokerWorkflowId: string;
+  /**
+   * Power-down command: a `ready` advert resolved with this (no callback key)
+   * retires the machine instead of running a job. The shift uses it to bound an
+   * idle printer once the floor is clear — the boundary commands the machine.
+   */
+  powerdown?: boolean;
+}
+
+/** The printer's completion report, signaled back to the broker's callback key. */
+export interface PrintCallbackPayload {
+  result: PrintOutcome;
+  printerId: string;
+  orderId: string | null;
+  units: number;
+  completedAt: string;
+}
+
+/** One capability bucket of claimed orders (output of `claimOrdersForCapacity`). */
+export interface ClaimedOrderBucket {
+  filament: string;
+  sizeClass: SizeClass;
+  groups: ClaimedGroup[];
+  /** Which pond this bucket belongs to (false = standard, true = diabetic). */
+  diabetic: boolean;
+}
+
+/** Orders the broker claimed this tick, grouped by capability bucket. */
+export interface ClaimPlan {
+  buckets: ClaimedOrderBucket[];
+  matched: number;
+}
+
+/** A locked printer paired to a claimed order, carrying the rendezvous key. */
+export interface BrokerPairing {
+  callbackKey: string;
+  printerId: string;
+  group: ClaimedGroup;
+  /** Which pond this pairing belongs to — used to derive the callback condition role. */
+  diabetic: boolean;
+}
+
+// ── Broker & technician (outsiders) ──────────────────────────────────────────
+
+/**
+ * Singleton broker state — carried across every `continueAsNew`. The broker
+ * serves BOTH ponds (standard + diabetic) in a single `dispatchBatch` activity
+ * loop; it is not tied to one fleet kind.
+ */
+export interface BrokerData {
+  /** Broker operator — a principal holding both printer AND order pond roles. */
+  brokerId: string;
+  /** Loop iterations per `dispatchBatch` activity call before checkpointing. */
+  maxIterations?: number;
+  /** Sleep between idle iterations (no work found), ms. */
+  idleSleepMs?: number;
+  /** Sleep between active iterations (work placed), ms. */
+  activeSleepMs?: number;
+  maxIdleRuns?: number;
+  cumulative?: BrokerTotals;
+  idleRuns?: number;
+  /** Orders claimed but not yet placed — carried across continueAsNew. */
+  carried?: ClaimedOrderBucket[];
+  /** Ordered priority-rule names (see policy/priority.ts). */
+  priorityRules?: string[];
+  /** Claim TTL in minutes (orphan-recovery floor). */
+  claimMinutes?: number;
+  /** Max `ready` adverts read per iteration (capacity horizon). */
+  maxAdverts?: number;
+  /**
+   * Max conditions opened concurrently in the harvest step. Caps the NATS
+   * signal burst — each open condition is a live subscription. Default 20 is
+   * safe for local Docker; raise for production (AWS NATS handles ~200+).
+   */
+  conditionChunkSize?: number;
+}
+
+export interface BrokerTotals {
+  ordersPrinted: number;
+  runs: number;
+}
+
+/**
+ * Shared pacing for a crew hot-loop batch (technician/inspector) — the same shape
+ * as the broker's `dispatchBatch`: run `maxIterations` scan→resolve passes inside
+ * ONE proxy activity with plain-JS sleeps between passes (zero durable cost per
+ * pass), so the workflow checkpoints once per batch instead of once per tick.
+ */
+export interface CrewBatchInput {
+  diabetic: boolean;
+  /** Scan→resolve passes per activity call before the workflow checkpoints. */
+  maxIterations: number;
+  /** Sleep after a pass that resolved work, ms. */
+  activeSleepMs: number;
+  /** Sleep after an idle pass (nothing pending), ms. */
+  idleSleepMs: number;
+  /** Max adverts read per scan pass. */
+  scanLimit: number;
+}
+
+/** What a crew batch reports back — total resolved and whether it did any work. */
+export interface CrewBatchResult {
+  resolved: number;
+  didWork: boolean;
+}
+
+export interface TechnicianData {
+  diabetic: boolean;
+  /** Technician operator — a principal holding the printer pond role. Resolves
+   *  maintenance adverts through the gated public API. */
+  technicianId: string;
+  maxIdleRuns?: number;
+  cumulative?: number;
+  idleRuns?: number;
+  /** Batch pacing (see CrewBatchInput). Defaults from LOOP_DEFAULTS when unset. */
+  maxIterations?: number;
+  activeSleepMs?: number;
+  idleSleepMs?: number;
+  scanLimit?: number;
+  /** @deprecated pacing now lives inside `technicianBatch`; ignored. Kept so
+   *  existing callers (shift, harness) still type-check without edits. */
+  tickSeconds?: number;
+  idleTickSeconds?: number;
+}
+
+export interface InspectorData {
+  diabetic: boolean;
+  /** Inspector operator — a principal holding the farmer pond role. Resolves order
+   *  signoff adverts through the gated public API. */
+  inspectorId: string;
+  maxIdleRuns?: number;
+  cumulative?: number;
+  idleRuns?: number;
+  /** Batch pacing (see CrewBatchInput). Defaults from LOOP_DEFAULTS when unset. */
+  maxIterations?: number;
+  activeSleepMs?: number;
+  idleSleepMs?: number;
+  scanLimit?: number;
+  /** @deprecated pacing now lives inside `inspectorBatch`; ignored. Kept so
+   *  existing callers (shift, harness) still type-check without edits. */
+  tickSeconds?: number;
+  idleTickSeconds?: number;
+}
+
+// ── Shift (the invocable entry target) ───────────────────────────────────────
+
+/**
+ * `printShift` input — the knobs the dashboard (or a test) can set. Everything
+ * defaults; an empty `{}` runs the standard full-lifecycle scenario.
+ */
+export interface ShiftData {
+  /** Which fleet the shift runs against. Defaults to the standard pond. */
+  diabetic?: boolean;
+  /** Operators the shift runs its crew as — each a principal holding the pond roles
+   *  its robot resolves through. The shift threads these to the broker/technician/
+   *  inspector children it spawns, the orders it runs, and the printers it launches;
+   *  powerDown runs as the technician (printer role). */
+  brokerId: string;
+  technicianId: string;
+  inspectorId: string;
+  ordererId: string;
+  printerOperatorId: string;
+  /** Idle pacing for the dispatcher loops the shift starts (broker/technician/inspector). */
+  idleTickSeconds?: number;
+  /** How many idle ticks before a dispatcher loop self-terminates. */
+  maxIdleRuns?: number;
+  /** Illustrative beat between flavor waves (a visible `Durable.sleep` in the trace). */
+  waveGapSeconds?: number;
+}
+
+/** One flavor of work — a wave of orders exercising a single dimension. */
+export interface ShiftWave {
+  name: string;
+  orders: PrintOrderData[];
+}
+
+/** The scenario the shift drives: a fleet (supply) and waves of orders (demand). */
+export interface ShiftPlan {
+  fleet: PrinterData[];
+  waves: ShiftWave[];
+}
+
+/** What a completed shift reports — the headline numbers, derived from results. */
+export interface ShiftResult {
+  shiftId: string;
+  diabetic: boolean;
+  ordersPlaced: number;
+  ordersPrinted: number;
+  insolesPrinted: number;
+  reprints: number;
+  /** Idle machines the shift powered down once the floor cleared (EOL retirements
+   *  happen on their own and show in the escalation trail, not this count). */
+  printersPoweredDown: number;
+  waves: { name: string; orders: number }[];
+}

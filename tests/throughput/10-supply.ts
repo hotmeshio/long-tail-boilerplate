@@ -1,0 +1,108 @@
+/**
+ * 10-supply — power on the SUPPLY surface of the print farm.
+ *
+ * Invokes the printer fleet + the autonomous crew (broker, technician, inspector),
+ * then stays alive reporting fleet health (runs completed, machines retired) until
+ * the orders drain or it's interrupted. The crew are durable looping workflows that
+ * resolve escalations in-process as their seeded operators — the orchestrator just
+ * starts them.
+ *
+ * Usage:
+ *   npm run print:supply
+ *   FLEET_SIZE=4 DIABETIC=1 npm run print:supply
+ */
+
+import {
+  login, api, sleep, ts,
+  RUN_ID, DIABETIC, FLEET_SIZE, EOL_RUNS,
+  CREW_IDLE_TICK_S, CREW_MAX_IDLE, MAX_ADVERTS, CONDITION_CHUNK_SIZE,
+  PRINT_ROUTING_QUEUE, PRINT_WORKFLOWS,
+  buildFleet, operators, fleetSnapshot, ensureSingleton,
+} from './10-shared';
+
+/** Flip a registered (but non-invocable) workflow invocable so HTTP invoke works. */
+async function makeInvocable(workflowType: string): Promise<void> {
+  await api('PUT', `/api/workflows/${workflowType}/config`, {
+    invocable: true,
+    task_queue: PRINT_ROUTING_QUEUE,
+    default_role: 'reviewer',
+  });
+}
+
+async function invoke(workflowType: string, workflowId: string, data: Record<string, any>, idempotent = false): Promise<void> {
+  try {
+    await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId });
+  } catch (err: any) {
+    if (!idempotent || !String(err?.message ?? '').includes('Duplicate')) throw err;
+  }
+}
+
+async function main() {
+  await login();
+
+  const op = operators();
+  const fleet = buildFleet();
+  const crew = { idleTickSeconds: CREW_IDLE_TICK_S, maxIdleRuns: CREW_MAX_IDLE };
+
+  console.log(`[supply] ${ts()} powering on ${FLEET_SIZE} printers + 1 broker (both ponds) + crew`);
+
+  // 1. Make the supply workflows invocable over HTTP (kept non-invocable by default
+  //    so only printShift clutters the dashboard).
+  for (const wf of [PRINT_WORKFLOWS.PRINTER, PRINT_WORKFLOWS.BROKER, PRINT_WORKFLOWS.TECHNICIAN, PRINT_WORKFLOWS.INSPECTOR]) {
+    await makeInvocable(wf);
+  }
+
+  // 2. Start the printers (each parks on a `ready` advert the broker resolves).
+  for (const spec of fleet) {
+    await invoke(PRINT_WORKFLOWS.PRINTER, spec.printerId, { ...spec, operatorId: op.printerOperatorId });
+  }
+
+  // 3. Start the autonomous crew — persistent singletons that outlive any single run.
+  //    ensureSingleton reuses a live instance (no competing crew) and starts a fresh
+  //    generation only when the previous one self-terminated on a long idle gap. So
+  //    printers come and go by advertising or not, and the crew is always present to
+  //    work whatever is currently on the board — exactly the production model.
+  const fleetLabel = DIABETIC ? 'diabetic' : 'standard';
+  const brokerWf = await ensureSingleton(PRINT_WORKFLOWS.BROKER, 'broker-print', {
+    brokerId: op.brokerId,
+    maxIdleRuns: CREW_MAX_IDLE,
+    maxAdverts: MAX_ADVERTS,
+    conditionChunkSize: CONDITION_CHUNK_SIZE,
+  });
+  const techWf = await ensureSingleton(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId });
+  const inspWf = await ensureSingleton(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId });
+  console.log(`[supply] ${ts()} crew live: broker=${brokerWf} technician=${techWf} inspector=${inspWf}`);
+
+  // Sentinel the farm orchestrator waits for before releasing demand.
+  console.log(`[supply] ${ts()} SUPPLY READY RUN_ID=${RUN_ID}`);
+
+  // 4. Stay alive, reporting the marketplace clearing in real time. We report what
+  //    the supply side is actually doing — idle machines, in-flight handoffs, prints
+  //    done, refills, retirements — not just retirements (which never fire until a
+  //    machine hits its 10-run end of life). Utilization = busy / fleet.
+  const t0 = performance.now();
+  const capacity = FLEET_SIZE * EOL_RUNS;
+  while (true) {
+    await sleep(5000);
+    const snap = await fleetSnapshot();
+    let retired = 0;
+    for (const spec of fleet) {
+      try {
+        const r = await api('GET', `/api/workflows/${spec.printerId}/result`);
+        if (r?.result?.type === 'return') retired++;
+      } catch { /* still running */ }
+    }
+    const busy = snap.inflight;
+    const util = FLEET_SIZE > 0 ? Math.round((busy / FLEET_SIZE) * 100) : 0;
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(0);
+    console.log(
+      `[supply] ${ts()} prints=${snap.prints}/${capacity} busy=${busy}/${FLEET_SIZE} (${util}% util) idle=${snap.idle} refills=${snap.refills} retired=${retired}/${FLEET_SIZE} (${elapsed}s)`,
+    );
+    if (retired >= FLEET_SIZE) {
+      console.log(`[supply] ${ts()} all machines retired — fleet exhausted (${snap.prints} prints)`);
+      break;
+    }
+  }
+}
+
+main().catch((err) => { console.error('[supply] failed:', err.message); process.exit(1); });
