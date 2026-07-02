@@ -18,6 +18,7 @@ import {
 } from '../workflows/print-routing';
 import { ALL_PRINT_ROLES, PRINT_ROUTING_QUEUE } from '../workflows/print-routing/types';
 import { operatorIds } from '../workflows/print-routing/operators';
+import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import * as richForm from '../workflows/rich-form';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
@@ -263,6 +264,29 @@ const farmInspectorConfig: LTWorkerConfig = {
   roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
 };
 
+// ── Task Queue config ───────────────────────────────────────────────────────
+// One durable instance per task (workflowId = `task-<taskId>`): a role-gated wait
+// with an SLA deadline, resolved by metadata. The provable core of a host app's
+// task-queue runtime — see src/workflows/task-queue/README.md.
+//
+// REGISTERED, deliberately unCERTIFIED: no `roles`/`consumes`, so the invoke
+// layer leaves the envelope unstamped and the interceptor stays a pure
+// pass-through. The entire call history is the trigger, one atomic waiter
+// (escalation row + SLA timer in the same commit), and the return — the wait
+// carries its own role gate, so the workflow needs none of the certification
+// weight (task rows, config lookups, extra durable legs).
+
+const taskWorkflowConfig: LTWorkerConfig = {
+  description: 'Task queue — one durable instance per task: role-gated wait with an SLA deadline, resolved by metadata (taskId).',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  resolverSchema: { approved: true, notes: '' },
+  envelopeSchema: {
+    data: { taskId: 'task-001', role: REVIEWER, slaSeconds: 3600, title: 'Review this task' },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -287,6 +311,7 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: printBroker, config: printBrokerConfig },
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmTechnician, config: farmTechnicianConfig },
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmInspector, config: farmInspectorConfig },
+  { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
 ];
 
 export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({
