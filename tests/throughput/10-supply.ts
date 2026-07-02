@@ -17,7 +17,7 @@ import {
   RUN_ID, DIABETIC, FLEET_SIZE, EOL_RUNS,
   CREW_IDLE_TICK_S, CREW_MAX_IDLE, MAX_ADVERTS, CONDITION_CHUNK_SIZE,
   PRINT_ROUTING_QUEUE, PRINT_WORKFLOWS,
-  buildFleet, operators, fleetSnapshot,
+  buildFleet, operators, fleetSnapshot, ensureSingleton,
 } from './10-shared';
 
 /** Flip a registered (but non-invocable) workflow invocable so HTTP invoke works. */
@@ -57,19 +57,21 @@ async function main() {
     await invoke(PRINT_WORKFLOWS.PRINTER, spec.printerId, { ...spec, operatorId: op.printerOperatorId });
   }
 
-  // 3. Start the autonomous crew — fixed IDs make them persistent singletons across
-  //    runs. A broker-print that is already running is a no-op (idempotent invoke);
-  //    printers come and go by advertising or not, and the crew works with whatever
-  //    is currently presenting escalations — exactly the production model.
+  // 3. Start the autonomous crew — persistent singletons that outlive any single run.
+  //    ensureSingleton reuses a live instance (no competing crew) and starts a fresh
+  //    generation only when the previous one self-terminated on a long idle gap. So
+  //    printers come and go by advertising or not, and the crew is always present to
+  //    work whatever is currently on the board — exactly the production model.
   const fleetLabel = DIABETIC ? 'diabetic' : 'standard';
-  await invoke(PRINT_WORKFLOWS.BROKER, 'broker-print', {
+  const brokerWf = await ensureSingleton(PRINT_WORKFLOWS.BROKER, 'broker-print', {
     brokerId: op.brokerId,
     maxIdleRuns: CREW_MAX_IDLE,
     maxAdverts: MAX_ADVERTS,
     conditionChunkSize: CONDITION_CHUNK_SIZE,
-  }, true);
-  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId }, true);
-  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId }, true);
+  });
+  const techWf = await ensureSingleton(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, technicianId: op.technicianId });
+  const inspWf = await ensureSingleton(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { diabetic: DIABETIC, ...crew, inspectorId: op.inspectorId });
+  console.log(`[supply] ${ts()} crew live: broker=${brokerWf} technician=${techWf} inspector=${inspWf}`);
 
   // Sentinel the farm orchestrator waits for before releasing demand.
   console.log(`[supply] ${ts()} SUPPLY READY RUN_ID=${RUN_ID}`);

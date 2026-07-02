@@ -12,8 +12,8 @@ export const {
   dispatchBatch,
   settleOrder,
   runPrintJob,
-  technicianRefill,
-  inspectorSignoff,
+  technicianBatch,
+  inspectorBatch,
   buildShiftPlan,
   powerDownIdlePrinters,
 } = Durable.workflow.proxyActivities<typeof activities>({
@@ -36,9 +36,11 @@ export const LOOP_DEFAULTS = {
   maxIterations: 10,
   activeSleepMs: 200,
   idleSleepMs: 1_000,
-  /** Idle dispatchBatch calls before the broker self-terminates. */
+  /** Idle batch calls before a loop (broker OR crew) self-terminates. Counted in
+   *  BATCHES now — one batch ≈ maxIterations × idleSleepMs of wall time — so the
+   *  broker and crew share the same idle tolerance (was skewed when the crew used
+   *  a per-tick model and self-terminated far sooner than the broker). */
   maxIdleRuns: 3,
-  /** Crew singletons (technician, inspector) — unchanged tick model. */
-  tickSeconds: 1,
-  idleTickSeconds: 5,
+  /** Adverts read per crew scan pass (technician/inspector), inside the batch. */
+  crewScanLimit: 100,
 };

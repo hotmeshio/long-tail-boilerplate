@@ -361,21 +361,47 @@ export interface BrokerTotals {
   runs: number;
 }
 
+/**
+ * Shared pacing for a crew hot-loop batch (technician/inspector) — the same shape
+ * as the broker's `dispatchBatch`: run `maxIterations` scan→resolve passes inside
+ * ONE proxy activity with plain-JS sleeps between passes (zero durable cost per
+ * pass), so the workflow checkpoints once per batch instead of once per tick.
+ */
+export interface CrewBatchInput {
+  diabetic: boolean;
+  /** Scan→resolve passes per activity call before the workflow checkpoints. */
+  maxIterations: number;
+  /** Sleep after a pass that resolved work, ms. */
+  activeSleepMs: number;
+  /** Sleep after an idle pass (nothing pending), ms. */
+  idleSleepMs: number;
+  /** Max adverts read per scan pass. */
+  scanLimit: number;
+}
+
+/** What a crew batch reports back — total resolved and whether it did any work. */
+export interface CrewBatchResult {
+  resolved: number;
+  didWork: boolean;
+}
+
 export interface TechnicianData {
   diabetic: boolean;
   /** Technician operator — a principal holding the printer pond role. Resolves
    *  maintenance adverts through the gated public API. */
   technicianId: string;
-  tickSeconds?: number;
-  idleTickSeconds?: number;
   maxIdleRuns?: number;
   cumulative?: number;
   idleRuns?: number;
-}
-
-export interface RefillSummary {
-  refilled: number;
-  printerIds: string[];
+  /** Batch pacing (see CrewBatchInput). Defaults from LOOP_DEFAULTS when unset. */
+  maxIterations?: number;
+  activeSleepMs?: number;
+  idleSleepMs?: number;
+  scanLimit?: number;
+  /** @deprecated pacing now lives inside `technicianBatch`; ignored. Kept so
+   *  existing callers (shift, harness) still type-check without edits. */
+  tickSeconds?: number;
+  idleTickSeconds?: number;
 }
 
 export interface InspectorData {
@@ -383,16 +409,18 @@ export interface InspectorData {
   /** Inspector operator — a principal holding the farmer pond role. Resolves order
    *  signoff adverts through the gated public API. */
   inspectorId: string;
-  tickSeconds?: number;
-  idleTickSeconds?: number;
   maxIdleRuns?: number;
   cumulative?: number;
   idleRuns?: number;
-}
-
-export interface SignoffSummary {
-  signedOff: number;
-  orderIds: string[];
+  /** Batch pacing (see CrewBatchInput). Defaults from LOOP_DEFAULTS when unset. */
+  maxIterations?: number;
+  activeSleepMs?: number;
+  idleSleepMs?: number;
+  scanLimit?: number;
+  /** @deprecated pacing now lives inside `inspectorBatch`; ignored. Kept so
+   *  existing callers (shift, harness) still type-check without edits. */
+  tickSeconds?: number;
+  idleTickSeconds?: number;
 }
 
 // ── Shift (the invocable entry target) ───────────────────────────────────────

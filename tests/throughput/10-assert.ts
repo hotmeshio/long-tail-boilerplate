@@ -23,7 +23,7 @@
  * priority end to end and is far faster.)
  */
 
-import { login, api, sleep, ts, operators } from './10-shared';
+import { login, api, sleep, ts, operators, ensureSingleton } from './10-shared';
 import {
   PRINT_WORKFLOWS,
   PRINT_ROUTING_QUEUE,
@@ -93,9 +93,9 @@ async function drainPending() {
 async function startCrew() {
   const loop = { diabetic: DIABETIC, idleTickSeconds: 2, maxIdleRuns: 1200 };
   const fleetLabel = DIABETIC ? 'diabetic' : 'standard';
-  await invoke(PRINT_WORKFLOWS.BROKER, 'broker-print', { ...loop, brokerId: OP.brokerId }, true);
-  await invoke(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { ...loop, technicianId: OP.technicianId }, true);
-  await invoke(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { ...loop, inspectorId: OP.inspectorId }, true);
+  await ensureSingleton(PRINT_WORKFLOWS.BROKER, 'broker-print', { ...loop, brokerId: OP.brokerId });
+  await ensureSingleton(PRINT_WORKFLOWS.TECHNICIAN, `technician-print-${fleetLabel}`, { ...loop, technicianId: OP.technicianId });
+  await ensureSingleton(PRINT_WORKFLOWS.INSPECTOR, `inspector-print-${fleetLabel}`, { ...loop, inspectorId: OP.inspectorId });
 }
 
 /** Start a section's printers and enqueue its orders — does NOT wait. The shared crew serves them. */

@@ -94,6 +94,61 @@ export function operators(diabetic = DIABETIC): PrintOperators {
   return operatorIds(diabetic);
 }
 
+// ── Crew singletons (infrastructure that outlives any single run) ────────────
+
+type SingletonState = 'running' | 'completed' | 'missing';
+
+/** Read a workflow's liveness. Missing (no such id) surfaces as a non-JSON SPA
+ *  response, so a thrown api() call means "no such workflow". A `return` result
+ *  means it finished (self-terminated); anything else means it is still running. */
+async function singletonState(workflowId: string): Promise<SingletonState> {
+  try {
+    const r = await api('GET', `/api/workflows/${workflowId}/result`);
+    return r?.result?.type === 'return' ? 'completed' : 'running';
+  } catch {
+    return 'missing';
+  }
+}
+
+/**
+ * Ensure exactly one LIVE instance of a crew singleton (broker/technician/inspector)
+ * and return its workflow id. Crew are infrastructure, not per-run artifacts:
+ *
+ *   - running   → reuse it (idempotent no-op). Prevents competing crew — the bug
+ *                 that fragments claims when two brokers race the same adverts.
+ *   - completed → that generation self-terminated on a long idle gap between runs;
+ *                 a completed id cannot be re-invoked (the platform rejects it as a
+ *                 duplicate), so advance to the next generation and start fresh. The
+ *                 dead generation never competes because it has already returned.
+ *   - missing   → start this generation.
+ *
+ * Generation ids are URL-safe (`-gN`, not `#gN` which a URL treats as a fragment).
+ * Printers are ephemeral and must NOT use this — they carry unique run-scoped ids.
+ */
+export async function ensureSingleton(
+  workflowType: string,
+  baseId: string,
+  data: Record<string, any>,
+  maxGenerations = 100,
+): Promise<string> {
+  for (let gen = 0; gen < maxGenerations; gen++) {
+    const id = gen === 0 ? baseId : `${baseId}-g${gen}`;
+    const state = await singletonState(id);
+    if (state === 'running') return id;
+    if (state === 'completed') continue;
+    // missing → start it; if it raced into existence, resolve its real state.
+    try {
+      await api('POST', `/api/workflows/${workflowType}/invoke`, { data, workflowId: id });
+      return id;
+    } catch (err: any) {
+      if (!String(err?.message ?? '').includes('Duplicate')) throw err;
+      if ((await singletonState(id)) === 'running') return id;
+      // completed between our probe and invoke — advance to the next generation.
+    }
+  }
+  throw new Error(`ensureSingleton: no free generation for ${baseId} within ${maxGenerations}`);
+}
+
 // ── Marketplace telemetry (queried from the escalation queue) ────────────────
 
 /** A live read of the supply side for one run, derived from the printer pool. */
