@@ -4,4 +4,4 @@ export { MCP_SERVER_FACTORIES } from './mcp';
 export { AGENTS } from './agents';
 export { TOPICS } from './topics';
 export { GRAPH_WORKFLOWS } from './graph-workflows';
-export { seedIfEmpty, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty } from './seed';
+export { seedIfEmpty, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty } from './seed';
