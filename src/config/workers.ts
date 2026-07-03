@@ -21,6 +21,8 @@ import { operatorIds } from '../workflows/print-routing/operators';
 import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import * as richForm from '../workflows/rich-form';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
+import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
+import { pullOperatorIds } from '../workflows/pull-farm/operators';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
@@ -292,6 +294,39 @@ const bambuPrinterConfig: LTWorkerConfig = {
   },
 };
 
+// ── Pull Farm config ─────────────────────────────────────────────────────────
+// The claim-as-lease contention proof: pullDemand fans out unit escalations;
+// puller crew-loops (each a DISTINCT seeded principal) race the pond. Proves
+// exactly-once resolution under contention, lost-race statuses, and claim-TTL
+// recovery from a puller that goes dark. REGISTERED, deliberately unCERTIFIED
+// — the pond role gate lives on the unit escalations, not the worker config.
+
+const pullDemandConfig: LTWorkerConfig = {
+  description: 'Pull demand — fans out N pullUnit children, each parking one escalation in the pull-pond. Returns who resolved what (the distribution proof).',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  envelopeSchema: {
+    data: { batch: 'batch-001', units: 24 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
+const pullUnitConfig: LTWorkerConfig = {
+  description: 'Pull unit — one unit of work parked at the membrane; whichever puller wins the lease resolves it.',
+  invocable: false,
+  resolverSchema: { approved: true, pullerId: 'puller-0', run: 0 },
+};
+
+const pullerConfig: LTWorkerConfig = {
+  description: `Puller — crew-loop running as its own principal (${PULLER_COUNT} seeded): scan → claim (a real lease) → work → resolve; counts lost races with their statuses; 'silent' claims and goes dark (claim-TTL recovery).`,
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  envelopeSchema: {
+    data: { pullerId: 'puller-0', operatorId: pullOperatorIds()[0], batch: 'batch-001', workSeconds: 1 },
+    metadata: { source: 'dashboard' },
+  },
+};
+
 // ── Task Queue config ───────────────────────────────────────────────────────
 // One durable instance per task (workflowId = `task-<taskId>`): a role-gated wait
 // with an SLA deadline, resolved by metadata. The provable core of a host app's
@@ -340,6 +375,9 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmTechnician, config: farmTechnicianConfig },
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmInspector, config: farmInspectorConfig },
   { taskQueue: BAMBU_FARM_QUEUE, workflow: bambuPrinter, config: bambuPrinterConfig },
+  { taskQueue: PULL_FARM_QUEUE, workflow: pullDemand, config: pullDemandConfig },
+  { taskQueue: PULL_FARM_QUEUE, workflow: pullUnit, config: pullUnitConfig },
+  { taskQueue: PULL_FARM_QUEUE, workflow: puller, config: pullerConfig },
   { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
 ];
 
