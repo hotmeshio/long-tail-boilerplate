@@ -4,6 +4,8 @@ A starter project for [Long Tail](https://github.com/hotmeshio/long-tail) — du
 
 Clone, start Docker, and open the dashboard. Four example workflows show the patterns you'll use in production: simple activities, confidence-based escalation, browser automation, and human-in-the-loop assembly lines.
 
+**Start with [PERSUASION.md](PERSUASION.md)** — the business case in plain language: why the queue of unfinished work is the business. Then **[CONVERGENCE.md](CONVERGENCE.md)** — the engineering-grade guide to the escalation surface as the digital/physical boundary, and the laws every workflow in this repository derives from. Then **[ACME.md](ACME.md)** — the doctrine for taking over a live production system with these patterns, so gently the end users never notice.
+
 ## Quick Start
 
 ```bash

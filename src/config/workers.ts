@@ -20,6 +20,7 @@ import { ALL_PRINT_ROLES, PRINT_ROUTING_QUEUE } from '../workflows/print-routing
 import { operatorIds } from '../workflows/print-routing/operators';
 import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import * as richForm from '../workflows/rich-form';
+import { bambuPrinter, ALL_BAMBU_ROLES, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
@@ -264,6 +265,30 @@ const farmInspectorConfig: LTWorkerConfig = {
   roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
 };
 
+// ── Bambu Farm config ───────────────────────────────────────────────────────
+// A virtual print farm speaking the REAL Bambu integration language — the
+// testbed for acme-mono's three-environment parity work. Each machine is a
+// durable workflow: its ready advert is resolved with Acme's IoT dispatch
+// payload, and it emits PrinterBambuDto-shaped events (webhook POST when
+// BAMBU_WEBHOOK_URL is set; log-only otherwise). Failure is a data directive
+// on the dispatch payload. Dispatcher operator seeded at startup.
+
+const bambuPrinterConfig: LTWorkerConfig = {
+  description: 'Bambu printer — virtual machine mirroring the Farm Manager gcode_state lifecycle. Advertises when idle; dispatch resolves the advert with Acme’s IoT payload; emits real Bambu webhook events (job_start/job_failed+hms/job_finished/printer_ready/job_rejected).',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: REVIEWER,
+  roles: [...CERTIFIED_ROLES, ...ALL_BAMBU_ROLES],
+  envelopeSchema: {
+    data: { deviceId: 'VIRT-0001', machineName: 'virtual-a1', maxRuns: 50 },
+    metadata: { source: 'dashboard' },
+  },
+  resolverSchema: {
+    command: { deviceId: 'VIRT-0001', fileName: 'plate_1.gcode.3mf', folderName: 'virtual-a1', presignedUrl: 'https://…' },
+    simulate: { mode: 'ok' },
+  },
+};
+
 // ── Task Queue config ───────────────────────────────────────────────────────
 // One durable instance per task (workflowId = `task-<taskId>`): a role-gated wait
 // with an SLA deadline, resolved by metadata. The provable core of a host app's
@@ -311,6 +336,7 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: printBroker, config: printBrokerConfig },
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmTechnician, config: farmTechnicianConfig },
   { taskQueue: PRINT_ROUTING_QUEUE, workflow: farmInspector, config: farmInspectorConfig },
+  { taskQueue: BAMBU_FARM_QUEUE, workflow: bambuPrinter, config: bambuPrinterConfig },
   { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
 ];
 
