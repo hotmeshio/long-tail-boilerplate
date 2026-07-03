@@ -75,6 +75,8 @@
     "task:remote:demo": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/11-task.ts",
     "bambu:demo": "ts-node tests/throughput/12-bambu.ts",
     "bambu:remote:demo": "REMOTE_URL=https://longtail.hotmesh.io ts-node tests/throughput/12-bambu.ts",
+    "bambu:pressure": "ts-node tests/throughput/13-bambu-pressure.ts",
+    "bambu:remote:pressure": "REMOTE_URL=https://longtail.hotmesh.io FLEET_SIZE=40 ROUNDS=3 ts-node tests/throughput/13-bambu-pressure.ts",
     "test:nats": "vitest run --config tests/integration/vitest.config.ts tests/integration/nats-events.test.ts",
     "test:self-test": "vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",
     "test:self-test:remote": "REMOTE_URL=https://longtail.hotmesh.io vitest run --config tests/integration/vitest.config.ts tests/integration/self-test.test.ts",

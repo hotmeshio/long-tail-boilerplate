@@ -20,7 +20,7 @@ import { ALL_PRINT_ROLES, PRINT_ROUTING_QUEUE } from '../workflows/print-routing
 import { operatorIds } from '../workflows/print-routing/operators';
 import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import * as richForm from '../workflows/rich-form';
-import { bambuPrinter, ALL_BAMBU_ROLES, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
+import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
@@ -272,13 +272,16 @@ const farmInspectorConfig: LTWorkerConfig = {
 // payload, and it emits PrinterBambuDto-shaped events (webhook POST when
 // BAMBU_WEBHOOK_URL is set; log-only otherwise). Failure is a data directive
 // on the dispatch payload. Dispatcher operator seeded at startup.
+//
+// REGISTERED, deliberately unCERTIFIED (like helloWorld / taskWorkflow): no
+// `roles`/`defaultRole`, so the interceptor stays a pure pass-through — no
+// extra durable legs per flow. The ready advert carries its own role gate
+// (`bambu-pool`) on the conditionLT call; certification would add nothing.
 
 const bambuPrinterConfig: LTWorkerConfig = {
   description: 'Bambu printer — virtual machine mirroring the Farm Manager gcode_state lifecycle. Advertises when idle; dispatch resolves the advert with Acme’s IoT payload; emits real Bambu webhook events (job_start/job_failed+hms/job_finished/printer_ready/job_rejected).',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: [...CERTIFIED_ROLES, ...ALL_BAMBU_ROLES],
   envelopeSchema: {
     data: { deviceId: 'VIRT-0001', machineName: 'virtual-a1', maxRuns: 50 },
     metadata: { source: 'dashboard' },

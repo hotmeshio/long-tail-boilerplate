@@ -65,6 +65,24 @@ The demo proves, on one small fleet:
 4. **Gone dark** — `job_start` then silence: no finish, no ready, no further adverts —
    the watchdog case (`wentDark: true` on the workflow result).
 
+## Pressure — the farm at scale, failures on
+
+`13-bambu-pressure.ts` drives FLEET_SIZE machines × ROUNDS dispatch rounds with a
+**deterministic** failure plan (20% `job_failed` + hms, 5% `job_rejected` + 1053 — no
+randomness, so assertions are exact). Every machine's returned history is verified
+against the plan, outcome by outcome: nothing lost, nothing double-run.
+
+| Run | Fleet | Runs verified | Outcomes (success / failed / rejected) | Time | Result |
+| --- | --- | --- | --- | --- | --- |
+| Local (docker) | 10 | 30 | 21 / 6 / 3 | 35s | PASS (2026-07-03) |
+| AWS (v0.7.1) | 40 | 120 | 90 / 24 / 6 | 76s, 1.58 dispatch/s | PASS (2026-07-03) |
+
+```bash
+npm run bambu:pressure                 # local: 10 × 3
+npm run bambu:remote:pressure          # AWS: 40 × 3
+FLEET_SIZE=100 ROUNDS=5 npm run bambu:pressure   # your own shape
+```
+
 ## Files
 
 | Path | Role |
@@ -74,6 +92,7 @@ The demo proves, on one small fleet:
 | `activities/events.ts` | `emitBambuEvent` — webhook POST or log-only |
 | `operators.ts` | Dispatcher principal (stable UUID, seeded at startup) |
 | `tests/throughput/12-bambu.ts` | The four-fates proof harness |
+| `tests/throughput/13-bambu-pressure.ts` | Scale pressure with deterministic failure injection |
 
 Next (per the parity plan): the brokering refinement (one printer per insole, atomic
 per-order claims) runs against this fleet, then the design ports to acme-mono as
