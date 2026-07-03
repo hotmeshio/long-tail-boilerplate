@@ -4,6 +4,8 @@ import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
 import { ALL_PRINT_ROLES } from '../workflows/print-routing/types';
 import { allOperatorSeeds, operatorIds } from '../workflows/print-routing/operators';
+import { ALL_BAMBU_ROLES } from '../workflows/bambu-farm/types';
+import { bambuOperatorSeeds, bambuOperatorIds } from '../workflows/bambu-farm/operators';
 
 const bcrypt: any = require('bcryptjs');
 
@@ -121,6 +123,54 @@ export async function seedPrintFarmIfEmpty() {
     console.log(`[seed] Print farm seeded (${allOperatorSeeds().length} operators, ${ALL_PRINT_ROLES.length} roles)`);
   } catch (err: any) {
     console.error('[seed] Print farm seed failed (non-fatal):', err.message);
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
+ * Seed the bambu-farm role and dispatcher operator (deterministic UUID from
+ * `src/workflows/bambu-farm/operators.ts`). Same shape and guarantees as
+ * `seedPrintFarmIfEmpty`: startup-time, idempotent, additive, non-fatal.
+ */
+export async function seedBambuFarmIfEmpty() {
+  const password = process.env.SEED_ADMIN_PASSWORD;
+  if (!password) return;
+
+  const pool = new Pool(DB_CONFIG);
+  try {
+    const { rows } = await pool.query(
+      'SELECT 1 FROM lt_users WHERE id = $1',
+      [bambuOperatorIds().dispatcherId],
+    );
+    if (rows.length > 0) return;
+
+    console.log('[seed] Seeding bambu-farm role and dispatcher operator');
+
+    for (const role of ALL_BAMBU_ROLES) {
+      await pool.query('INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING', [role]);
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    for (const op of bambuOperatorSeeds()) {
+      await pool.query(
+        `INSERT INTO lt_users (id, external_id, display_name, email, password_hash, status)
+         VALUES ($1, $2, $3, $4, $5, 'active')
+         ON CONFLICT (external_id) DO UPDATE SET id = $1, password_hash = $5`,
+        [op.id, op.externalId, op.display, `${op.externalId}@print.local`, hash],
+      );
+      for (const role of op.roles) {
+        await pool.query(
+          `INSERT INTO lt_user_roles (user_id, role, type)
+           VALUES ($1, $2, 'member') ON CONFLICT DO NOTHING`,
+          [op.id, role],
+        );
+      }
+    }
+
+    console.log(`[seed] Bambu farm seeded (${bambuOperatorSeeds().length} operator, ${ALL_BAMBU_ROLES.length} role)`);
+  } catch (err: any) {
+    console.error('[seed] Bambu farm seed failed (non-fatal):', err.message);
   } finally {
     await pool.end();
   }
