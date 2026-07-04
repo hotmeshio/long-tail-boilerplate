@@ -4,7 +4,11 @@ The testbed experiment behind acme-mono's virtual print farm (and every pull-cre
 it). The farm's machines pull work from a pond; this proves — with measured numbers —
 what the membrane guarantees when N pullers race:
 
-## The questions, answered (local run, 24 units × 6 pullers)
+Proven identically on local docker and AWS (v0.7.3, Aurora/NATS): local — 60 lost
+claims, all 409, perfect 4×6 distribution; AWS — 47 lost claims, all 409,
+`lostResolves=0`, 24/24 in ~53s of work phase (2026-07-04).
+
+## The questions, answered (24 units × 6 pullers)
 
 | Question | Answer | Evidence |
 | --- | --- | --- |
