@@ -15,3 +15,6 @@ deploy/cdk/dist/
 src/workflows/print-routing/OPERATIONS.md
 src/workflows/print-routing/ARCHITECTURE.md
 src/workflows/print-routing/README.md
+
+# Local-only development doctrine (never checked in)
+docs/local/
