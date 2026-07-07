@@ -101,8 +101,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@hotmeshio/hotmesh": "^0.25.5",
-    "@hotmeshio/long-tail": "^0.7.4",
+    "@hotmeshio/hotmesh": "^0.25.6",
+    "@hotmeshio/long-tail": "^0.8.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "bcryptjs": "^2.4.3",
     "pg": "^8.13.0",

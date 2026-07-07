@@ -18,3 +18,4 @@ src/workflows/print-routing/README.md
 
 # Local-only development doctrine (never checked in)
 docs/local/
+.DS_Store
