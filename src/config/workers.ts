@@ -19,6 +19,7 @@ import {
 import { ALL_PRINT_ROLES, PRINT_ROUTING_QUEUE } from '../workflows/print-routing/types';
 import { operatorIds } from '../workflows/print-routing/operators';
 import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
+import { proofDirector, proofDirector2, chainedActor, proofActor, proofWaiter, proofBroker, proofPill, PROOF_QUEUE } from '../workflows/lifecycle-proof';
 import * as richForm from '../workflows/rich-form';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
@@ -379,6 +380,15 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PULL_FARM_QUEUE, workflow: pullUnit, config: pullUnitConfig },
   { taskQueue: PULL_FARM_QUEUE, workflow: puller, config: pullerConfig },
   { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
+  // Lifecycle proof — the isolated expression of the actor/waiter/director
+  // patterns (see src/workflows/lifecycle-proof/workflows.ts RULES 1-5).
+  { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },
+  { taskQueue: PROOF_QUEUE, workflow: proofActor, config: { description: 'Lifecycle proof — batch-loop actor', invocable: false } },
+  { taskQueue: PROOF_QUEUE, workflow: proofWaiter, config: { description: 'Lifecycle proof — event-driven waiter', invocable: false } },
+  { taskQueue: PROOF_QUEUE, workflow: proofBroker, config: { description: 'Lifecycle proof — matcher', invocable: false } },
+  { taskQueue: PROOF_QUEUE, workflow: proofPill, config: { description: 'Lifecycle proof — self-expiring pill', invocable: false } },
+  { taskQueue: PROOF_QUEUE, workflow: proofDirector2, config: { description: 'Lifecycle proof — CHAIN director (convergence by parked waits, zero held children)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },
+  { taskQueue: PROOF_QUEUE, workflow: chainedActor, config: { description: 'Lifecycle proof — generation-chained actor (one batch per link, startChild successor)', invocable: false } },
 ];
 
 export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => ({

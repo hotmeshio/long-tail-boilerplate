@@ -110,6 +110,23 @@ async function seed() {
   console.log(`\n  Seed complete. Login at http://localhost:${process.env.PORT || '3030'}/`);
   console.log(`  Credentials: superadmin / l0ngt@1l\n`);
 
+  // Lifecycle-proof principal + roles (integration test: lifecycle-proof.test.ts)
+  const proofHash = await bcrypt.hash('l0ngt@1l', 10);
+  await pool.query(
+    `INSERT INTO lt_users (id, external_id, display_name, email, password_hash, status)
+     VALUES ('0e000000-0000-4000-8000-000000000001', 'lifecycle-proof', 'Lifecycle Proof', 'proof@lifecycle.local', $1, 'active')
+     ON CONFLICT (external_id) DO UPDATE SET id = '0e000000-0000-4000-8000-000000000001'`,
+    [proofHash],
+  );
+  for (const role of ['proof-actor', 'proof-waiter']) {
+    await pool.query(`INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING`, [role]);
+    await pool.query(
+      `INSERT INTO lt_user_roles (user_id, role, type) VALUES ('0e000000-0000-4000-8000-000000000001', $1, 'member') ON CONFLICT DO NOTHING`,
+      [role],
+    );
+  }
+  console.log('[seed] lifecycle-proof principal + roles ready');
+
   await pool.end();
 }
 
