@@ -1,7 +1,9 @@
 import { Pool } from 'pg';
+import { api } from '@hotmeshio/long-tail';
 
 import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
+import { INTAKE_ROLE, INTAKE_FORM_SCHEMA } from '../workflows/rich-form/forms';
 import { ALL_PRINT_ROLES } from '../workflows/print-routing/types';
 import { allOperatorSeeds, operatorIds } from '../workflows/print-routing/operators';
 import { ALL_BAMBU_ROLES } from '../workflows/bambu-farm/types';
@@ -125,6 +127,36 @@ export async function seedPrintFarmIfEmpty() {
     console.log(`[seed] Print farm seeded (${allOperatorSeeds().length} operators, ${ALL_PRINT_ROLES.length} roles)`);
   } catch (err: any) {
     console.error('[seed] Print farm seed failed (non-fatal):', err.message);
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
+ * Seed the rich-form role and its versioned escalation form. The `intake-reviewer`
+ * role owns the `form_schema` (its fields carry x-lt-bind); `api.roles.updateRole`
+ * snapshots form version 1. Runs after `start()` (the long-tail pool is ready).
+ * Idempotent (guarded on `current_schema_version`), additive, non-fatal.
+ */
+export async function seedRichFormIfEmpty() {
+  const pool = new Pool(DB_CONFIG);
+  try {
+    await pool.query('INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING', [INTAKE_ROLE]);
+    const { rows } = await pool.query('SELECT current_schema_version FROM lt_roles WHERE role = $1', [INTAKE_ROLE]);
+    if (rows[0]?.current_schema_version == null) {
+      console.log('[seed] Seeding rich-form role + versioned form');
+      await api.roles.updateRole({ role: INTAKE_ROLE, title: 'Intake Reviewer', form_schema: INTAKE_FORM_SCHEMA });
+    }
+    // Grant the seeded reviewer the role so the resolve path is testable as a
+    // normal member (superadmin can resolve any regardless). No-op if absent.
+    await pool.query(
+      `INSERT INTO lt_user_roles (user_id, role, type)
+       SELECT id, $1, 'member' FROM lt_users WHERE external_id = 'reviewer'
+       ON CONFLICT DO NOTHING`,
+      [INTAKE_ROLE],
+    );
+  } catch (err: any) {
+    console.error('[seed] Rich-form seed failed (non-fatal):', err.message);
   } finally {
     await pool.end();
   }
