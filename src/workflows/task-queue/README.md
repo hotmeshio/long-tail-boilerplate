@@ -65,7 +65,6 @@ const taskWorkflowConfig: LTWorkerConfig = {
   description: 'Task queue — one durable instance per task: role-gated wait with an SLA deadline, resolved by metadata (taskId).',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  resolverSchema: { approved: true, notes: '' },
   envelopeSchema: {
     data: { taskId: 'task-001', role: 'reviewer', slaSeconds: 3600, title: 'Review this task' },
   },

@@ -21,6 +21,7 @@ import { operatorIds } from '../workflows/print-routing/operators';
 import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import { proofDirector, proofDirector2, chainedActor, proofActor, proofWaiter, proofBroker, proofPill, PROOF_QUEUE } from '../workflows/lifecycle-proof';
 import * as richForm from '../workflows/rich-form';
+import { INTAKE_ROLE } from '../workflows/rich-form/forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
@@ -48,10 +49,6 @@ const contentReviewConfig: LTWorkerConfig = {
   envelopeSchema: {
     data: { contentId: 'article-001', content: 'Content to review...', contentType: 'article' },
     metadata: { certified: true, source: 'dashboard' },
-  },
-  resolverSchema: {
-    approved: true,
-    analysis: { confidence: 0.95, flags: [], summary: 'Manually reviewed and approved.' },
   },
 };
 
@@ -117,7 +114,6 @@ const reverterConfig: LTWorkerConfig = {
     },
     metadata: { certified: true, source: 'dashboard' },
   },
-  resolverSchema: { approved: true, revertSteps: 0 },
 };
 
 const workstationConfig: LTWorkerConfig = {
@@ -125,16 +121,15 @@ const workstationConfig: LTWorkerConfig = {
   invocable: false,
   defaultRole: 'grinder',
   roles: [...CERTIFIED_ROLES, 'grinder', 'gluer'],
-  resolverSchema: { approved: true, station: 'grinder' },
 };
 
 const richFormConfig: LTWorkerConfig = {
-  description: 'Rich form showcase — exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, read-only, ordering',
+  description: 'Rich form showcase — role-owned versioned escalation form (x-lt-bind) with injectable defaults; exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, ordering',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
+  defaultRole: INTAKE_ROLE,
   envelopeSchema: {
-    data: { role: REVIEWER },
+    data: { role: INTAKE_ROLE },
     metadata: { source: 'dashboard' },
   },
 };
@@ -166,7 +161,6 @@ const orthoStationConfig: LTWorkerConfig = {
   invocable: false,
   defaultRole: 'renderer',
   roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
-  resolverSchema: { approved: true, station: 'renderer' },
 };
 
 const printstationConfig: LTWorkerConfig = {
@@ -181,7 +175,6 @@ const printerConfig: LTWorkerConfig = {
   invocable: false,
   defaultRole: 'printer',
   roles: [...CERTIFIED_ROLES, 'printer'],
-  resolverSchema: { approved: true, station: 'printer' },
 };
 
 // ── Efficient (atomic-escalation) variants ──────────────────────────────────
@@ -193,7 +186,6 @@ const orthoStationEfficientConfig: LTWorkerConfig = {
   invocable: false,
   defaultRole: 'renderer',
   roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
-  resolverSchema: { approved: true, station: 'renderer' },
 };
 
 const printstationEfficientConfig: LTWorkerConfig = {
@@ -208,7 +200,6 @@ const printerEfficientConfig: LTWorkerConfig = {
   invocable: false,
   defaultRole: 'printer',
   roles: [...CERTIFIED_ROLES, 'printer'],
-  resolverSchema: { approved: true, station: 'printer' },
 };
 
 // ── Print Routing configs ───────────────────────────────────────────────────
@@ -289,10 +280,6 @@ const bambuPrinterConfig: LTWorkerConfig = {
     data: { deviceId: 'VIRT-0001', machineName: 'virtual-a1', maxRuns: 50 },
     metadata: { source: 'dashboard' },
   },
-  resolverSchema: {
-    command: { deviceId: 'VIRT-0001', fileName: 'plate_1.gcode.3mf', folderName: 'virtual-a1', presignedUrl: 'https://…' },
-    simulate: { mode: 'ok' },
-  },
 };
 
 // ── Pull Farm config ─────────────────────────────────────────────────────────
@@ -315,7 +302,6 @@ const pullDemandConfig: LTWorkerConfig = {
 const pullUnitConfig: LTWorkerConfig = {
   description: 'Pull unit — one unit of work parked at the membrane; whichever puller wins the lease resolves it.',
   invocable: false,
-  resolverSchema: { approved: true, pullerId: 'puller-0', run: 0 },
 };
 
 const pullerConfig: LTWorkerConfig = {
@@ -344,7 +330,6 @@ const taskWorkflowConfig: LTWorkerConfig = {
   description: 'Task queue — one durable instance per task: role-gated wait with an SLA deadline, resolved by metadata (taskId).',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  resolverSchema: { approved: true, notes: '' },
   envelopeSchema: {
     data: { taskId: 'task-001', role: REVIEWER, slaSeconds: 3600, title: 'Review this task' },
     metadata: { source: 'dashboard' },
