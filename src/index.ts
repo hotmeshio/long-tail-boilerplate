@@ -47,6 +47,17 @@ async function main() {
 
     auth: {
       secret: process.env.JWT_SECRET || 'change-me',
+      // OAuth sign-in for MCP clients at /mcp. Loopback redirects (Claude Code)
+      // are always allowed; https redirects must be listed exactly.
+      oauthServer: process.env.LT_OAUTH_ISSUER
+        ? {
+            issuer: process.env.LT_OAUTH_ISSUER,
+            allowedRedirectUris: (process.env.LT_OAUTH_ALLOWED_REDIRECT_URIS || '')
+              .split(',')
+              .map((uri) => uri.trim())
+              .filter(Boolean),
+          }
+        : undefined,
     },
 
     workers: isApi ? READONLY_OBSERVERS : WORKERS,

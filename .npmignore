@@ -1,0 +1,6 @@
+# npm ignores .gitignore when this file exists, so secrets are listed here too
+.mcp.json
+.env
+.env.*
+!.env.example
+.claude

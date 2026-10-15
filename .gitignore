@@ -19,3 +19,6 @@ src/workflows/print-routing/README.md
 # Local-only development doctrine (never checked in)
 docs/local/
 .DS_Store
+
+# Local MCP client config (may hold bearer tokens)
+.mcp.json
