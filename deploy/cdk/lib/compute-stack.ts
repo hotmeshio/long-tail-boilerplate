@@ -160,6 +160,8 @@ export class ComputeStack extends cdk.Stack {
       internetFacing: true,
       securityGroup: albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
+      // Above NATS's 2-minute ping, so quiet /nats-ws connections stay open.
+      idleTimeout: cdk.Duration.seconds(300),
     });
 
     this.alb.addListener('HttpRedirect', {
@@ -238,6 +240,8 @@ export class ComputeStack extends cdk.Stack {
         PORT: '3030',
         NATS_URL: config.natsUrl,
         NATS_WS_TARGET: `ws://nats.${config.serviceDiscoveryNamespace}:9222`,
+        // OAuth sign-in for MCP clients at https://{domain}/mcp
+        LT_OAUTH_ISSUER: `https://${config.domainName}`,
       },
       secrets: {
         ...sharedSecrets,
