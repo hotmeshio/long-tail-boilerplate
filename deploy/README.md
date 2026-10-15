@@ -136,7 +136,7 @@ Docker Compose runs four containers:
 | `app` | Built from `Dockerfile` (dev stage) | 3030 | API + workers (standalone mode) |
 | `postgres` | `postgres:16` | 5416 | Database |
 | `nats` | `nats:2-alpine` | 4222 (client), 9222 (WebSocket) | Event bus for real-time dashboard updates |
-| `minio` | `minio/minio` | 9002 (API), 9003 (console) | S3-compatible file storage |
+| `minio` | `cgr.dev/chainguard/minio` | 9002 (API), 9003 (console) | S3-compatible file storage |
 
 The `app` container mounts `src/`, `scripts/`, and `tests/` as volumes. Code changes hot-reload via `ts-node-dev`.
 
