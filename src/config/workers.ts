@@ -1,3 +1,4 @@
+import { WORKFLOW_ICONS } from '@hotmeshio/long-tail';
 import type { LTWorkerConfig, LTStartConfig } from '@hotmeshio/long-tail';
 
 import * as helloWorld from '../workflows/hello-world';
@@ -22,6 +23,15 @@ import { taskWorkflow, TASK_QUEUE } from '../workflows/task-queue';
 import { proofDirector, proofDirector2, chainedActor, proofActor, proofWaiter, proofBroker, proofPill, PROOF_QUEUE } from '../workflows/lifecycle-proof';
 import * as richForm from '../workflows/rich-form';
 import { INTAKE_ROLE } from '../workflows/rich-form/forms';
+import { INTAKE_INPUT_SCHEMA } from '../workflows/rich-form/invoke-form';
+import { lotInspection } from '../workflows/lot-inspection';
+import { LOT_INSPECTION_INPUT_SCHEMA } from '../workflows/lot-inspection/forms';
+import { PART_FAMILIES_LOOKUP } from '../workflows/lot-inspection/lookups';
+import { LOT_RECEIVER_ROLE } from '../workflows/lot-inspection/types';
+import { HELLO_INPUT_SCHEMA } from '../workflows/hello-world/forms';
+import { MODERATOR_ROLE, CONTENT_REVIEW_INPUT_SCHEMA } from '../workflows/content-review/forms';
+import { SCREENSHOT_INPUT_SCHEMA } from '../workflows/screenshot-research/forms';
+import { TASK_INPUT_SCHEMA } from '../workflows/task-queue/forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
@@ -29,37 +39,44 @@ import { pullOperatorIds } from '../workflows/pull-farm/operators';
 import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
 
 // ── Workflow configs ──────────────────────────────────────────────────────
+// Configs with an `inputSchema` render a rich invoke form, and the invoke API
+// validates `data` against it (422 on violation). `reset: true` makes the
+// profile code-owned: applied on every boot, so a stale DB row (AWS kept
+// richForm's old envelope until this) is replaced on deploy.
+
+const DASHBOARD_METADATA = { source: 'dashboard' };
 
 const helloWorldConfig: LTWorkerConfig = {
-  description: 'Hello world — minimal durable workflow with sleep and IAM context',
+  description: 'Hello world: minimal durable workflow with a sleep and IAM context.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  envelopeSchema: {
-    data: { name: 'World' },
-    metadata: { source: 'dashboard' },
-  },
+  icon: WORKFLOW_ICONS.SPARKLES,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: HELLO_INPUT_SCHEMA,
+  reset: true,
 };
 
 const contentReviewConfig: LTWorkerConfig = {
-  description: 'Content review — AI-powered moderation with human escalation for low-confidence results',
+  description: 'Content review: scores content and escalates low-confidence items to the content-moderator form.',
   invocable: true,
+  certified: true,
   invocationRoles: INVOCATION_ROLES,
-  defaultRole: REVIEWER,
-  roles: CERTIFIED_ROLES,
-  envelopeSchema: {
-    data: { contentId: 'article-001', content: 'Content to review...', contentType: 'article' },
-    metadata: { certified: true, source: 'dashboard' },
-  },
+  defaultRole: MODERATOR_ROLE,
+  roles: [...CERTIFIED_ROLES, MODERATOR_ROLE],
+  icon: WORKFLOW_ICONS.SHIELD,
+  envelopeSchema: { data: {}, metadata: { certified: true, ...DASHBOARD_METADATA } },
+  inputSchema: CONTENT_REVIEW_INPUT_SCHEMA,
+  reset: true,
 };
 
 const screenshotConfig: LTWorkerConfig = {
-  description: 'Screenshot research — capture and analyze web pages using Playwright and Vision',
+  description: 'Screenshot research: captures a page with Playwright, analyzes it with vision, files the analysis as knowledge.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  envelopeSchema: {
-    data: { url: 'https://example.com', description: 'Capture and analyze this page' },
-    metadata: { source: 'dashboard' },
-  },
+  icon: WORKFLOW_ICONS.CAMERA,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: SCREENSHOT_INPUT_SCHEMA,
+  reset: true,
 };
 
 const assemblyLineConfig: LTWorkerConfig = {
@@ -124,14 +141,26 @@ const workstationConfig: LTWorkerConfig = {
 };
 
 const richFormConfig: LTWorkerConfig = {
-  description: 'Rich form showcase — role-owned versioned escalation form (x-lt-bind) with injectable defaults; exercises every HITL form feature: dates, email, file upload, two-column layout, required fields, ordering',
+  description: 'Customer intake: the invoke form prefills the intake-reviewer form, whose decision reveals only the fields that outcome needs.',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
   defaultRole: INTAKE_ROLE,
-  envelopeSchema: {
-    data: { role: INTAKE_ROLE },
-    metadata: { source: 'dashboard' },
-  },
+  icon: WORKFLOW_ICONS.CLIPBOARD,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: INTAKE_INPUT_SCHEMA,
+  reset: true,
+};
+
+const lotInspectionConfig: LTWorkerConfig = {
+  description: 'Lot inspection: receive at the dock, then inspect against knowledge-backed checklists and defect lists.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  defaultRole: LOT_RECEIVER_ROLE,
+  icon: WORKFLOW_ICONS.CLIPBOARD_CHECK,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: LOT_INSPECTION_INPUT_SCHEMA,
+  inputLookups: [PART_FAMILIES_LOOKUP],
+  reset: true,
 };
 
 // ── Ortho Pipeline configs ──────────────────────────────────────────────────
@@ -327,13 +356,13 @@ const pullerConfig: LTWorkerConfig = {
 // weight (task rows, config lookups, extra durable legs).
 
 const taskWorkflowConfig: LTWorkerConfig = {
-  description: 'Task queue — one durable instance per task: role-gated wait with an SLA deadline, resolved by metadata (taskId).',
+  description: 'Task queue: one durable instance per task, a role-gated wait with an SLA deadline, resolved by metadata (taskId).',
   invocable: true,
   invocationRoles: INVOCATION_ROLES,
-  envelopeSchema: {
-    data: { taskId: 'task-001', role: REVIEWER, slaSeconds: 3600, title: 'Review this task' },
-    metadata: { source: 'dashboard' },
-  },
+  icon: WORKFLOW_ICONS.CHECKLIST,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: TASK_INPUT_SCHEMA,
+  reset: true,
 };
 
 // ── Worker list ───────────────────────────────────────────────────────────
@@ -343,6 +372,7 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: 'default', workflow: contentReview.reviewContent, config: contentReviewConfig },
   { taskQueue: 'default', workflow: screenshotResearch.screenshotResearch, config: screenshotConfig },
   { taskQueue: 'default', workflow: richForm.richForm, config: richFormConfig },
+  { taskQueue: 'default', workflow: lotInspection, config: lotInspectionConfig },
   { taskQueue: 'assembly-line', workflow: assemblyLine, config: assemblyLineConfig },
   { taskQueue: 'assembly-line', workflow: workstation, config: workstationConfig },
   { taskQueue: 'assembly-line', workflow: stepIterator, config: stepIteratorConfig },
