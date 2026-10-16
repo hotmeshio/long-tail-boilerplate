@@ -1,29 +1,32 @@
 /**
- * Rich Form Activities — post-resolution processing.
+ * Rich Form activities: post-resolution processing.
  *
- * The input is payload-shaped, not form-shaped: the resolve step already mapped
- * the flat submission through the form's `x-lt-bind` into the nested tree this
- * workflow owns as `IntakeResolverV1`. So this reads `customer.name` /
- * `contract.tier`, never `customer_name` / `tier` — the form can be re-laid-out
- * without changing this consumer.
+ * The input is payload-shaped (the x-lt-bind tree), not form-shaped, and is
+ * parsed through the declared zod schema at the activity boundary so a
+ * drifted payload fails loud with a per-field violation list.
  */
 
-import type { IntakeResolverV1 } from './forms';
+import { parseFormPayload } from '../../lib/form-values';
 
-export async function processIntake(input: IntakeResolverV1): Promise<{
-  received: boolean;
+import { IntakeResolverSchema } from './forms';
+
+export interface IntakeOutcome {
   customerName: string;
+  contactEmail: string;
   tier: string;
-  approved: boolean;
+  decision: string;
+  followUp: string[];
   processedAt: string;
-}> {
-  const customer = input.customer ?? ({} as IntakeResolverV1['customer']);
-  const contract = input.contract ?? ({} as IntakeResolverV1['contract']);
+}
+
+export async function processIntake(input: unknown): Promise<IntakeOutcome> {
+  const intake = parseFormPayload(IntakeResolverSchema, input);
   return {
-    received: true,
-    customerName: customer.name ?? '',
-    tier: contract.tier ?? '',
-    approved: contract.approved ?? false,
+    customerName: intake.customer.name,
+    contactEmail: intake.customer.email,
+    tier: intake.contract.tier,
+    decision: intake.review.decision,
+    followUp: intake.review.decision === 'needs-info' ? intake.review.missing ?? [] : [],
     processedAt: new Date().toISOString(),
   };
 }

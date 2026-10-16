@@ -121,6 +121,16 @@ export class ApiClient {
     return { status: res.status, data };
   }
 
+  /** Like the verbs above, but returns non-2xx responses instead of throwing (for 4xx assertions). */
+  async send<T = any>(method: string, path: string, body?: any): Promise<ApiResponse<T>> {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method,
+      headers: this.headers(),
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, data: await res.json() as T };
+  }
+
   // ── YAML workflow lifecycle ───────────────────────────────────────────────
 
   async deployWorkflow(id: string): Promise<any> {

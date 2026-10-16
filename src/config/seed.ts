@@ -1,9 +1,10 @@
+import { isDeepStrictEqual } from 'node:util';
 import { Pool } from 'pg';
-import { api } from '@hotmeshio/long-tail';
+import { KnowledgeApi } from '@hotmeshio/long-tail';
 
 import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
-import { INTAKE_ROLE, INTAKE_FORM_SCHEMA } from '../workflows/rich-form/forms';
+import { LOOKUP_DOMAIN, LOOKUP_ENTRIES } from '../workflows/lot-inspection/lookups';
 import { ALL_PRINT_ROLES } from '../workflows/print-routing/types';
 import { allOperatorSeeds, operatorIds } from '../workflows/print-routing/operators';
 import { ALL_BAMBU_ROLES } from '../workflows/bambu-farm/types';
@@ -133,32 +134,22 @@ export async function seedPrintFarmIfEmpty() {
 }
 
 /**
- * Seed the rich-form role and its versioned escalation form. The `intake-reviewer`
- * role owns the `form_schema` (its fields carry x-lt-bind); `api.roles.updateRole`
- * snapshots form version 1. Runs after `start()` (the long-tail pool is ready).
- * Idempotent (guarded on `current_schema_version`), additive, non-fatal.
+ * Write the HITL knowledge lookups (see src/workflows/lot-inspection/lookups.ts)
+ * when the stored data differs from code. A changed entry mints the next
+ * edition: pinned refs keep theirs, current refs follow. Unchanged entries are
+ * skipped so a boot publishes no knowledge events. Non-fatal.
  */
-export async function seedRichFormIfEmpty() {
-  const pool = new Pool(DB_CONFIG);
-  try {
-    await pool.query('INSERT INTO lt_roles (role) VALUES ($1) ON CONFLICT DO NOTHING', [INTAKE_ROLE]);
-    const { rows } = await pool.query('SELECT current_schema_version FROM lt_roles WHERE role = $1', [INTAKE_ROLE]);
-    if (rows[0]?.current_schema_version == null) {
-      console.log('[seed] Seeding rich-form role + versioned form');
-      await api.roles.updateRole({ role: INTAKE_ROLE, title: 'Intake Reviewer', form_schema: INTAKE_FORM_SCHEMA });
+export async function seedHitlLookups() {
+  for (const { key, data } of LOOKUP_ENTRIES) {
+    try {
+      const existing = await KnowledgeApi.getEntry({ domain: LOOKUP_DOMAIN, key });
+      if (existing.status === 200 && isDeepStrictEqual(existing.data?.data, data)) continue;
+      const result = await KnowledgeApi.storeEntry({ domain: LOOKUP_DOMAIN, key, data, tags: ['lookup', 'hitl'], replace: true });
+      if (result.status >= 400) throw new Error(result.error ?? `status ${result.status}`);
+      console.log(`[seed] HITL lookup ${LOOKUP_DOMAIN}/${key} written`);
+    } catch (err: any) {
+      console.error(`[seed] HITL lookup ${LOOKUP_DOMAIN}/${key} failed (non-fatal):`, err.message);
     }
-    // Grant the seeded reviewer the role so the resolve path is testable as a
-    // normal member (superadmin can resolve any regardless). No-op if absent.
-    await pool.query(
-      `INSERT INTO lt_user_roles (user_id, role, type)
-       SELECT id, $1, 'member' FROM lt_users WHERE external_id = 'reviewer'
-       ON CONFLICT DO NOTHING`,
-      [INTAKE_ROLE],
-    );
-  } catch (err: any) {
-    console.error('[seed] Rich-form seed failed (non-fatal):', err.message);
-  } finally {
-    await pool.end();
   }
 }
 

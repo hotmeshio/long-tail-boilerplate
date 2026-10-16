@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, seedIfEmpty, seedRichFormIfEmpty, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty } from './config';
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -64,6 +64,9 @@ async function main() {
 
     graphWorkflows: GRAPH_WORKFLOWS,
 
+    // Code-owned HITL roles: versioned forms and list pages (reset per entry).
+    roles: HITL_ROLES,
+
     agents: AGENTS,
 
     topics: TOPICS,
@@ -95,7 +98,7 @@ async function main() {
   // 2. Seed default users + print-farm operators (skipped for worker-only containers)
   if (!isWorker) {
     await seedIfEmpty();
-    await seedRichFormIfEmpty();
+    await seedHitlLookups();
     await seedPrintFarmIfEmpty();
     await seedBambuFarmIfEmpty();
     await seedPullFarmIfEmpty();
