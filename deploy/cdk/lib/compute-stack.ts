@@ -160,8 +160,11 @@ export class ComputeStack extends cdk.Stack {
       internetFacing: true,
       securityGroup: albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      // Above NATS's 2-minute ping, so quiet /nats-ws connections stay open.
-      idleTimeout: cdk.Duration.seconds(300),
+      // 60s (the ALB default) mirrors hike-mono's backend ALB to reproduce its
+      // behavior: below NATS's 2-minute ping, so quiet /nats-ws connections drop.
+      // Set explicitly; removing the prop would not reset the deployed value.
+      // 300s keeps them open.
+      idleTimeout: cdk.Duration.seconds(60),
     });
 
     this.alb.addListener('HttpRedirect', {
