@@ -14,7 +14,7 @@ import { HotMesh } from '@hotmeshio/hotmesh';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-import { postgres_options } from '../../modules/config';
+import { DB_CONFIG as postgres_options } from '../../src/config/database';
 
 const COUNT = parseInt(process.argv[2] || '1', 10);
 

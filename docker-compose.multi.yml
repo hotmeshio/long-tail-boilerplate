@@ -19,8 +19,8 @@ services:
         required: false
     environment:
       APP_ROLE: api
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${DOCKER_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${DOCKER_POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
       LT_S3_PUBLIC_ENDPOINT: http://localhost:9002
       NATS_URL: nats://nats:4222
@@ -48,8 +48,8 @@ services:
         required: false
     environment:
       APP_ROLE: worker
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${DOCKER_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${DOCKER_POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
       NATS_URL: nats://nats:4222
       NATS_TOKEN: dev_api_secret
@@ -74,8 +74,8 @@ services:
         required: false
     environment:
       APP_ROLE: worker
-      POSTGRES_HOST: ${POSTGRES_HOST:-postgres}
-      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_HOST: ${DOCKER_POSTGRES_HOST:-postgres}
+      POSTGRES_PORT: ${DOCKER_POSTGRES_PORT:-5432}
       LT_S3_ENDPOINT: http://minio:9000
       NATS_URL: nats://nats:4222
       NATS_TOKEN: dev_api_secret
