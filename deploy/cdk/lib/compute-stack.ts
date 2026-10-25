@@ -11,6 +11,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 import type { DeployConfig } from './config';
+import { LoginWaf } from './login-waf';
 
 export interface ComputeStackProps extends cdk.StackProps {
   vpc: ec2.Vpc;
@@ -165,6 +166,14 @@ export class ComputeStack extends cdk.Stack {
       // Set explicitly; removing the prop would not reset the deployed value.
       // 300s keeps them open.
       idleTimeout: cdk.Duration.seconds(60),
+    });
+
+    // AWS WAF: IP reputation list, plus a per-IP throttle on password login.
+    new LoginWaf(this, 'LoginWaf', {
+      loadBalancerArn: this.alb.loadBalancerArn,
+      name: config.projectSlug,
+      loginRateLimit: config.loginRateLimit,
+      loginRateWindowSeconds: config.loginRateWindowSeconds,
     });
 
     this.alb.addListener('HttpRedirect', {

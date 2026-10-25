@@ -3,10 +3,15 @@
 set -euo pipefail
 
 CLUSTER="longtail"
-SUBNETS='["subnet-0ff50eabdaead9c20","subnet-07710fd1155d681f4"]'
-SG="sg-08c00d1d745617c68"
-EXEC_ROLE="arn:aws:iam::162216049230:role/LongTail-Compute-ApiTaskDefExecutionRoleE6ABB053-O0qsKPiZJTz2"
 LOG_GROUP="/ecs/longtail/api"
+
+# Network and execution role come from the running api service, so no
+# account, subnet, or security group ids are written here.
+SERVICE=$(aws ecs describe-services --cluster "$CLUSTER" --services api --query 'services[0]' --output json)
+SUBNETS=$(echo "$SERVICE" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['networkConfiguration']['awsvpcConfiguration']['subnets']))")
+SG=$(echo "$SERVICE" | python3 -c "import sys,json; print(json.load(sys.stdin)['networkConfiguration']['awsvpcConfiguration']['securityGroups'][0])")
+API_TASK_DEF=$(echo "$SERVICE" | python3 -c "import sys,json; print(json.load(sys.stdin)['taskDefinition'])")
+EXEC_ROLE=$(aws ecs describe-task-definition --task-definition "$API_TASK_DEF" --query 'taskDefinition.executionRoleArn' --output text)
 
 DB_SECRET=$(aws secretsmanager get-secret-value --secret-id LongTail/AuroraDatabase --query SecretString --output text)
 DB_HOST=$(echo "$DB_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['host'])")

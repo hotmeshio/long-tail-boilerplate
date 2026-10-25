@@ -139,7 +139,9 @@ SVC_STATUS=$(aws ecs describe-services --cluster longtail --services api worker 
   --output text 2>&1)
 echo "$SVC_STATUS" | awk '{printf "  %-12s desired: %s  running: %s\n", $1, $2, $3}'
 
-HEALTH=$(curl -s -o /dev/null -w "%{http_code}" https://longtail.hotmesh.io/health)
+SERVICE_URL=$(aws cloudformation describe-stacks --stack-name "${STACK_PREFIX:-LongTail}-Compute" \
+  --query "Stacks[0].Outputs[?OutputKey=='ServiceUrl'].OutputValue" --output text 2>/dev/null)
+HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${SERVICE_URL}/health")
 
 # ── Summary ──
 AURORA_ACU_AVG=$(echo "$AURORA_ACU" | awk '{s+=$2; n++} END {if(n>0) printf "%.1f", s/n; else print "—"}')

@@ -14,13 +14,13 @@
  * the longtailapi namespace already has 3+ active tools.
  *
  * Local:  docker compose up -d --build
- * Remote: REMOTE_URL=https://longtail.hotmesh.io npm run test:self-test:remote
+ * Remote: npm run test:self-test:remote (reads LT_REMOTE_URL from .env)
  *
  * Requires: ANTHROPIC_API_KEY or OPENAI_API_KEY for the planner/builder LLM
  *           (only on first run — skipped when tools already exist)
  */
 
-try { require('dotenv/config'); } catch {}
+import '../helpers/remote-target';
 
 import { describe, it, expect, beforeAll } from 'vitest';
 

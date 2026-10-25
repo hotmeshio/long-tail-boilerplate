@@ -15,7 +15,7 @@
  * Defaults: target=100, batchSize=10, enqueueInterval=5000
  */
 
-try { require('dotenv/config'); } catch {}
+import '../helpers/remote-target';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

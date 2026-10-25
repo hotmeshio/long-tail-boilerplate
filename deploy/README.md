@@ -88,7 +88,7 @@ Both services read and write files to S3-compatible storage. The app uses the sa
 | `LT_STORAGE_BACKEND` | `s3` | `s3` |
 | `LT_S3_BUCKET` | `long-tail-files` | `longtail-files-{account}-{region}` |
 | `LT_S3_ENDPOINT` | `http://minio:9000` | *(omitted — uses default S3 endpoint)* |
-| `LT_S3_REGION` | `us-east-1` | `us-west-1` |
+| `LT_S3_REGION` | `us-east-1` | your AWS region |
 | `LT_S3_ACCESS_KEY` | `minioadmin` | *(omitted — IAM task role)* |
 | `LT_S3_SECRET_KEY` | `minioadmin` | *(omitted — IAM task role)* |
 | `LT_S3_FORCE_PATH_STYLE` | `true` | *(omitted — defaults to false)* |
@@ -243,7 +243,7 @@ The CDK code in `deploy/cdk/` creates four CloudFormation stacks:
 |-------|-----------|-------------|
 | **LongTail-Network** | VPC, 6 subnets (2 public, 2 private, 2 isolated), 1 NAT gateway, 4 security groups | ~5 min |
 | **LongTail-Data** | RDS PostgreSQL 16, S3 bucket, 8 Secrets Manager entries (including NATS token) | ~15 min |
-| **LongTail-Dns** | ACM certificate for `longtail.hotmesh.io` (DNS-validated via existing `hotmesh.io` hosted zone in Route 53) | ~3 min |
+| **LongTail-Dns** | ACM certificate for `<subdomain>.<hosted zone>` (DNS-validated via your existing Route 53 hosted zone) | ~3 min |
 | **LongTail-Compute** | ECS Fargate cluster, API service, worker service, NATS service, ALB (ports 443 + 9222), Route 53 A record | ~10 min |
 
 A fifth stack, **LongTail-GithubOidc**, creates an IAM role for GitHub Actions. It's deployed separately, once.
@@ -318,7 +318,15 @@ Secrets are injected into containers via ECS task definition `secrets:` blocks. 
 - **AWS CLI v2** configured with admin credentials (`aws sts get-caller-identity` should work)
 - **Node 22+**
 - **Docker** running (CDK builds the container image locally)
-- **Route 53** hosted zone for your domain already exists (the CDK looks up `hotmesh.io`)
+- **Route 53** hosted zone for your domain already exists
+- **Your domain** set for every CDK command (nothing in the repo names a deployment; synth fails without it):
+
+```bash
+export LT_HOSTED_ZONE_DOMAIN=example.com   # the hosted zone you own
+export LT_SUBDOMAIN=app                     # the app serves at https://app.example.com
+```
+
+  Context flags work too: `-c hostedZoneDomain=example.com -c subdomain=app`.
 - **CDK bootstrapped** for your account and region:
 
 ```bash
@@ -392,7 +400,7 @@ aws secretsmanager get-secret-value --secret-id LongTail/OpenaiApiKey \
 npx cdk deploy LongTail-Dns --require-approval never
 ```
 
-**Verify:** ACM → Certificates: `longtail.hotmesh.io` with status "Issued".
+**Verify:** ACM → Certificates: `app.example.com` with status "Issued".
 
 #### 6. Deploy Compute
 
@@ -405,13 +413,13 @@ This step builds the Docker image for `linux/amd64` (cross-compiles if you're on
 **Verify:**
 - ECS → Clusters → `longtail`: three services (`api`, `worker`, `nats`), each with 1 running task
 - EC2 → Load Balancers: internet-facing ALB with HTTPS on 443
-- `https://longtail.hotmesh.io/health` returns `{"status":"ok"}`
+- `https://app.example.com/health` returns `{"status":"ok"}`
 
 ### Verify Everything Works
 
 ```bash
 # Health check
-curl -s https://longtail.hotmesh.io/health
+curl -s https://app.example.com/health
 
 # Service status
 aws ecs describe-services --cluster longtail --services api worker \
@@ -422,7 +430,7 @@ aws secretsmanager get-secret-value --secret-id LongTail/SeedAdminPassword \
   --query SecretString --output text
 ```
 
-Log in at `https://longtail.hotmesh.io/login` with username `superadmin` and the password from the command above. The superadmin account is created automatically on first boot.
+Log in at `https://app.example.com/login` with username `superadmin` and the password from the command above. The superadmin account is created automatically on first boot.
 
 ### Connecting a SQL Client to RDS
 
@@ -469,7 +477,7 @@ Then in Beekeeper Studio:
 | Database | `longtail` |
 | SSL | On (allow self-signed) |
 
-Note: Direct connections from your laptop require network-level access to the isolated subnet (VPN, bastion, or SSM tunnel). For most admin tasks, the dashboard at `https://longtail.hotmesh.io` provides full visibility into workflows, users, and execution traces.
+Note: Direct connections from your laptop require network-level access to the isolated subnet (VPN, bastion, or SSM tunnel). For most admin tasks, the dashboard at `https://app.example.com` provides full visibility into workflows, users, and execution traces.
 
 ---
 
@@ -528,7 +536,7 @@ aws logs filter-log-events --log-group-name /ecs/longtail/worker \
 
 ```bash
 # Quick status
-curl -s https://longtail.hotmesh.io/health
+curl -s https://app.example.com/health
 
 # Service details
 aws ecs describe-services --cluster longtail --services api worker \
@@ -568,8 +576,18 @@ Copy the output role ARN. In GitHub → Settings → Secrets and variables → A
 | Variable | Value |
 |----------|-------|
 | `AWS_ACCOUNT_ID` | Your AWS account ID |
-| `AWS_REGION` | `us-west-1` |
+| `AWS_REGION` | Your AWS region, e.g. `us-east-1` |
 | `AWS_ROLE_ARN` | Role ARN from the OIDC stack output |
+
+Then under **Secrets**, add the values the deploy and smoke jobs read. Secrets keep the domain out of the repo and mask it in public run logs:
+
+| Secret | Value |
+|--------|-------|
+| `LT_HOSTED_ZONE_DOMAIN` | Your Route 53 hosted zone, e.g. `example.com` |
+| `LT_SUBDOMAIN` | The app's subdomain, e.g. `app` |
+| `REMOTE_PASSWORD` | The superadmin password, for the post-deploy smoke tests |
+
+For local `*:remote:*` scripts, put `LT_REMOTE_URL=https://app.example.com` and `REMOTE_PASSWORD` in your gitignored `.env`.
 
 ### Release Flow
 

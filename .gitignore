@@ -10,6 +10,8 @@ CLAUDE.md
 
 # CDK
 deploy/cdk/cdk.out/
+# CDK lookup cache: names the account, region, and hosted zone; rebuilt on deploy
+deploy/cdk/cdk.context.json
 deploy/cdk/dist/
 
 src/workflows/print-routing/OPERATIONS.md
