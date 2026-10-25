@@ -1,15 +1,16 @@
 # Long Tail Developer Guide
 
-How to build durable workflows, MCP tools, and agents with this boilerplate. Each section stands alone — jump to what you need.
+How to build durable workflows, forms, MCP tools, and agents with this boilerplate. Each section stands alone. New here? Start with [first-workflow.md](first-workflow.md), which builds one end to end.
 
 ## Table of Contents
 
 - [Setup](#setup)
 - [Project Layout](#project-layout)
-- [How index.ts Works](#how-indexts-works)
+- [The Start Config](#the-start-config)
 - [Creating an Activity](#creating-an-activity)
 - [Creating a Workflow](#creating-a-workflow)
 - [Registering a Worker](#registering-a-worker)
+- [Forms](#forms)
 - [Escalation Patterns](#escalation-patterns)
 - [Creating an MCP Tool Server](#creating-an-mcp-tool-server)
 - [Creating an Agent](#creating-an-agent)
@@ -33,7 +34,7 @@ open http://localhost:3030
 
 Login: `superadmin` / `l0ngt@1l`
 
-Docker Compose starts PostgreSQL, MinIO (S3-compatible storage), NATS (event bus), and the app with hot module reloading.
+Docker Compose starts PostgreSQL, MinIO (S3-compatible storage), NATS (event bus), and the app. The app container mounts `src/`, `scripts/`, and `tests/` and restarts when you save.
 
 ---
 
@@ -41,72 +42,71 @@ Docker Compose starts PostgreSQL, MinIO (S3-compatible storage), NATS (event bus
 
 ```
 src/
-  index.ts                          Entry point — starts Long Tail
+  index.ts                  start(): one call, wired from config/
   config/
-    roles.ts                        Role constants (reviewer, engineer, admin, superadmin)
-    database.ts                     PostgreSQL connection config
-    workers.ts                      Workflow configs and worker list
-    agents.ts                       Agent definitions (schedules, subscriptions)
-    mcp.ts                          MCP server factory registry
-    seed.ts                         Database seeding logic
-    index.ts                        Barrel export
-  activities/
-    image.ts                        Image processing (12 sharp operations)
-    gmail.ts                        Gmail API (search, read, draft)
-  mcp-servers/
-    image-tools.ts                  MCP server wrapping image activities
-    gmail.ts                        MCP server wrapping Gmail activities
-  workflows/
-    hello-world/                    Minimal: timer + activity
-    content-review/                 Confidence-based human escalation
-    screenshot-research/            Pipeline: screenshot + vision LLM + knowledge store
-    assembly-line/                  Human-in-the-loop orchestration
-      index.ts                        Parent orchestrator (sequential stations)
-      worker.ts                       Child workflow (single workstation)
-      iterator.ts                     Data-driven loop variant
-      reverter.ts                     Loop with revert-on-rejection
-      types.ts                        Station interfaces
-      activities.ts                   Escalation + signal routing
+    database.ts             Postgres connection from env
+    workers.ts              Workflow profiles and the WORKERS list
+    hitl-roles.ts           Roles with their forms and list pages (code-owned)
+    graph-workflows.ts      YAML (graph) workflows
+    agents.ts               Scheduled and event-driven reactions
+    topics.ts               Event catalog
+    mcp.ts                  MCP tool server registry
+    roles.ts                Role name constants
+    seed.ts                 First-boot users, farm operators, knowledge lookups
+    connection.ts           HotMesh connection descriptor for scripts
+    index.ts                Barrel export
+  workflows/<name>/         One folder per workflow:
+    index.ts                  the workflow
+    activities.ts             its side effects
+    forms.ts                  its invoke form and role forms
+    types.ts                  its contracts
+  activities/               Activities shared by several workflows (image, gmail)
+  mcp-servers/              MCP tool servers wrapping activities
+  lib/form-values.ts        Zod helpers for dashboard-submitted payloads
 tests/
-  integration/                      End-to-end tests (requires docker compose)
-  throughput/                       Load and benchmark tests
-scripts/
-  seed.ts                           Create admin account
-  token.ts                          Generate JWT for API testing
-docs/
-  guide.md                          This file
+  unit/                     Mirrors src/; no Docker
+  integration/              End to end through the HTTP API (docker compose)
+  throughput/               Load and pressure scripts, local or remote
+  helpers/                  Shared test helpers (form validation, remote target)
+scripts/                    seed, token, and AWS ops helpers (aws-health, aws-stats)
+deploy/                     AWS CDK app and deployment guide
+docs/                       This guide and the first-workflow walkthrough
 ```
 
 ---
 
-## How index.ts Works
+## The Start Config
 
-The entry point is intentionally short. It imports configuration from `src/config/` and passes it to Long Tail's `start()` function:
+`src/index.ts` calls `start()` once. Each key comes from one module in `src/config/`, so to find where something is declared, find its key:
 
 ```typescript
-import { start } from '@hotmeshio/long-tail';
-import { DB_CONFIG, WORKERS, AGENTS, MCP_SERVER_FACTORIES } from './config';
-
 const lt = await start({
-  database: DB_CONFIG,       // where to store workflow state
-  server: { port: 3030 },   // dashboard + REST API
-  workers: WORKERS,          // which workflows to run
-  agents: AGENTS,            // autonomous agents
-  mcp: { serverFactories: MCP_SERVER_FACTORIES },
+  database: DB_CONFIG,                                  // config/database.ts
+  server: isWorker ? { enabled: false } : { port: 3030 },
+  auth: { secret: process.env.JWT_SECRET, oauthServer: { ... } },  // OAuth for MCP clients
+  workers: isApi ? READONLY_OBSERVERS : WORKERS,         // config/workers.ts
+  graphWorkflows: GRAPH_WORKFLOWS,                       // config/graph-workflows.ts
+  roles: HITL_ROLES,                                     // config/hitl-roles.ts
+  agents: AGENTS,                                        // config/agents.ts
+  topics: TOPICS,                                        // config/topics.ts
+  mcp: { serverFactories: MCP_SERVER_FACTORIES },        // config/mcp.ts
+  escalation: { strategy: 'mcp' },
+  events: { nats: { url, wsProxy, token } },             // live dashboard updates
 });
 ```
 
-All the detail — workflow configs, role definitions, agent subscriptions — lives in `src/config/`. The entry point reads like a recipe: connect to database, start server, register workers, register agents, wire up MCP tools.
+`APP_ROLE` splits the same image into two services on AWS: `api` serves the dashboard, REST, and `/mcp`, and runs read-only observers of the workers; `worker` runs the workflows. Unset (local), one process does both.
+
+**Who owns a declaration.** By default each declaration is written once, on first boot, and the database owns it afterward (admins edit it in the dashboard). Add `reset: true` to an entry to make code own it: every boot compares it and applies changes, and a changed role form becomes that role's next version. This repo marks the workflows and roles it actively maintains as `reset: true`, so local and AWS converge on deploy.
 
 ---
 
 ## Creating an Activity
 
-An activity is an async function. It runs as a checkpointed step inside a workflow — if the process crashes, the activity won't re-run if it already completed.
+An activity is an async function that runs as a checkpointed step. If the process crashes after it completes, the recorded result is reused instead of running it again. Anything non-deterministic (network, time, randomness) belongs in an activity.
 
 ```typescript
 // src/workflows/my-workflow/activities.ts
-
 export async function fetchPrice(input: { symbol: string }) {
   const res = await fetch(`https://api.example.com/price/${input.symbol}`);
   const data = await res.json();
@@ -114,29 +114,22 @@ export async function fetchPrice(input: { symbol: string }) {
 }
 ```
 
-Rules:
-- One operation per function
-- Typed inputs and outputs
-- No global state — everything comes through the input parameter
-- Activities that are shared across workflows go in `src/activities/`
-- Activities specific to one workflow go in that workflow's directory
+- One operation per function, typed input and output, no global state.
+- Shared across workflows: `src/activities/`. Specific to one: the workflow's folder.
 
 ---
 
 ## Creating a Workflow
 
-A workflow is an async function that receives an `LTEnvelope` and returns a result. Every step is checkpointed to PostgreSQL.
+A workflow receives an `LTEnvelope` and returns a result. Its code must be deterministic: it replays from the checkpoints, so all side effects go through activities.
 
 ```typescript
 // src/workflows/my-workflow/index.ts
-
 import { Durable } from '@hotmeshio/hotmesh';
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 import * as activities from './activities';
 
-const { fetchPrice } = Durable.workflow.proxyActivities<typeof activities>({
-  activities,
-});
+const { fetchPrice } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function priceWorkflow(envelope: LTEnvelope) {
   const result = await fetchPrice({ symbol: envelope.data.symbol });
@@ -144,103 +137,116 @@ export async function priceWorkflow(envelope: LTEnvelope) {
 }
 ```
 
-Key points:
-- `proxyActivities` wraps functions so each call is checkpointed and durable
-- The envelope carries input data (`envelope.data`) and identity context
-- Return `{ type: 'return', data }` for normal completion
-- Return `{ type: 'escalation', ... }` to pause and create a human task (see [Escalation Patterns](#escalation-patterns))
+- The exported function name is the workflow type you invoke.
+- `envelope.data` is the input; identity rides along for activities.
+- `Durable.workflow.sleep('5 minutes')` pauses durably; `conditional(...)` waits for a person (see [Escalation Patterns](#escalation-patterns)).
 
 ---
 
 ## Registering a Worker
 
-Add your workflow to `src/config/workers.ts`:
+Add a profile and a `WORKERS` entry in `src/config/workers.ts`:
 
 ```typescript
 import * as myWorkflow from '../workflows/my-workflow';
+import { MY_INPUT_SCHEMA } from '../workflows/my-workflow/forms';
 
 const myWorkflowConfig: LTWorkerConfig = {
-  description: 'Price lookup — fetches current stock prices',
-  invocable: true,                        // can be triggered from dashboard/API
-  invocationRoles: INVOCATION_ROLES,      // who can trigger it
-  envelopeSchema: {                       // example input shown in dashboard
-    data: { symbol: 'AAPL' },
-    metadata: { source: 'dashboard' },
-  },
+  description: 'Price lookup: fetches the current price for a symbol.',
+  invocable: true,                     // dashboard, API, and MCP may start it
+  invocationRoles: INVOCATION_ROLES,   // who may start it
+  icon: WORKFLOW_ICONS.GAUGE,          // shown on the Invoke Tool page
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: MY_INPUT_SCHEMA,        // the invoke form, enforced by the API (422)
+  reset: true,                         // code-owned profile
 };
-```
 
-Then add it to the `WORKERS` array:
-
-```typescript
 export const WORKERS: LTStartConfig['workers'] = [
   // ...existing workers...
   { taskQueue: 'default', workflow: myWorkflow.priceWorkflow, config: myWorkflowConfig },
 ];
 ```
 
-Rebuild: `docker compose up -d --build`
+Save and the app restarts. The workflow appears on the Invoke Tool page and at `POST /api/workflows/priceWorkflow/invoke`.
 
-The workflow now appears in the dashboard and is callable via the REST API.
+---
+
+## Forms
+
+Forms are JSON Schema plus Long Tail's `x-lt-*` keywords, and they are data: the dashboard renders them and the server validates against them with the same code. There are two kinds:
+
+| Form | Lives on | Declared in | Validated by |
+|---|---|---|---|
+| **Invoke form** | A workflow profile (`inputSchema`) | `config/workers.ts` | The invoke API, MCP `invoke_workflow` |
+| **Escalation form** | A role (`form_schema`), versioned | `config/hitl-roles.ts` | Every resolve surface when the role sets `enforce_schema` |
+
+A role can also own a `list_schema` that turns its queue into a custom table (columns, row actions, a look-ahead into other roles).
+
+Write forms in the workflow's `forms.ts`. Habits that make them work well:
+
+- One decision field (`x-lt-options`) gates the rest, and `x-lt-showIf: "resolver.decision=..."` reveals only what that answer needs.
+- Facts the person reads but doesn't edit are `readOnly`; `x-lt-section-options` with `display: "dictionary"` lays them out compactly.
+- `x-lt-bind` maps flat form fields to the nested payload the workflow consumes; declare that payload once in zod and parse it in an activity (`parseFormPayload` in `src/lib/form-values.ts`).
+- The dashboard submits hidden and untouched fields as blanks, so optional fields in the zod contract use `blankAsAbsent`.
+- Test forms with `violationsOf` from `tests/helpers/form-validation.ts`: it is the same validator the dashboard and server run.
+
+Working examples: `src/workflows/rich-form/` and `src/workflows/lot-inspection/` (summary in its README). The full keyword reference ships with Long Tail in `node_modules/@hotmeshio/long-tail/docs/hitl-guide.md`.
 
 ---
 
 ## Escalation Patterns
 
-### Simple (return-based)
+### `conditional` (the default)
 
-Return `type: 'escalation'` to pause the workflow and create a human task. The dashboard shows it in the assigned role's queue. When resolved, the workflow resumes with the resolver's response.
+One call writes the escalation and suspends the workflow until it is resolved:
 
 ```typescript
-if (analysis.confidence < 0.7) {
-  return {
-    type: 'escalation' as const,
-    role: 'reviewer',
-    message: `Low confidence (${analysis.confidence}). Needs human review.`,
-    data: { contentId, analysis },
-  };
+import { conditional } from '@hotmeshio/long-tail';
+
+const review = await conditional<FarewellReview>(`goodbye-${ctx.workflowId}`, {
+  role: 'farewell-reviewer',                 // whose queue it lands in; the role owns the form
+  description: `Goodbye to ${name}`,         // the queue's headline
+  metadata: { name },                        // searchable facets
+  envelope: { formDefaults: { message } },   // prefills the form
+  timeout: '48h',                            // optional SLA
+});
+if (review === null) { /* cancelled */ }
+if (review === false) { /* the timeout fired */ }
+```
+
+Options worth knowing: `schemaVersion` pins one edition of the role's form; `lookups` attach versioned knowledge lists the form reads; `batch` and `accumulate` turn one row into a container that fills over time. Some older examples call `conditionLT`, a deprecated alias of `conditional`.
+
+### Return-based (certified workflows)
+
+A workflow whose profile has `certified: true` and `roles` can return `type: 'escalation'`. The platform creates the row, and when someone resolves it, runs the workflow again with `envelope.resolver` set:
+
+```typescript
+if (envelope.resolver) return { type: 'return' as const, data: envelope.resolver };
+if (analysis.confidence < threshold) {
+  return { type: 'escalation' as const, role: 'content-moderator', message: 'Moderate this', data: analysis };
 }
 ```
 
-See `src/workflows/content-review/` for a working example.
+See `src/workflows/content-review/`.
 
-### Advanced (signal-based)
+### Parent and child stations
 
-For multi-step human-in-the-loop flows, use `startChild` + `condition` + `signal`:
-
-```typescript
-// Parent: spawn child and wait for its signal
-await Durable.workflow.startChild({
-  workflowName: 'workstation',
-  args: [{ stationName, signalId, role }],
-});
-const result = await Durable.workflow.condition(signalId);
-
-// Child: create escalation, wait for human, signal parent
-await createStationEscalation({ signalId, role, instructions });
-const resolution = await Durable.workflow.condition(localSignalId);
-await signalParent({ parentWorkflowId, signalId, data: resolution });
-```
-
-The assembly line directory has three variants of this pattern:
+`src/workflows/assembly-line/` runs stations as child workflows, each waiting on its own escalation:
 
 | Variant | File | Behavior |
-|---------|------|----------|
+|---|---|---|
 | **Assembly Line** | `index.ts` | Sequential stations, named roles |
-| **Step Iterator** | `iterator.ts` | Same pattern, data-driven from `steps[]` array |
-| **Reverter** | `reverter.ts` | Humans can reject and send work backwards N steps |
+| **Step Iterator** | `iterator.ts` | Same pattern, driven by a `steps[]` array |
+| **Reverter** | `reverter.ts` | A station can reject and send work back |
 
 ---
 
 ## Creating an MCP Tool Server
 
-Any activity can be exposed as an MCP tool, making it discoverable by the Pipeline Designer.
-
-### 1. Create the server
+Any activity can be exposed as an MCP tool, available to agents, the Pipeline Designer, and MCP clients at `/mcp`.
 
 ```typescript
 // src/mcp-servers/my-tools.ts
-
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { registerMcpTool } from '@hotmeshio/long-tail';
@@ -248,7 +254,6 @@ import { fetchPrice } from '../workflows/my-workflow/activities';
 
 export function createMyToolsServer(): McpServer {
   const server = new McpServer({ name: 'my-tools', version: '1.0.0' });
-
   registerMcpTool(server,
     'fetch_price',
     'Fetch the current price for a stock symbol.',
@@ -257,23 +262,21 @@ export function createMyToolsServer(): McpServer {
       content: [{ type: 'text', text: JSON.stringify(await fetchPrice(args)) }],
     }),
   );
-
   return server;
 }
 ```
 
-Use `registerMcpTool` instead of `server.tool()` — the MCP SDK's `.tool()` method has deeply nested Zod generic types that cause the TypeScript compiler to run out of memory.
+Use `registerMcpTool` rather than `server.tool()`: the SDK's `.tool()` generics can exhaust the TypeScript compiler.
 
-### 2. Register the server
-
-Add it to `src/config/mcp.ts`:
+Register it in `src/config/mcp.ts`. The `config` is shown in the dashboard; a `toolManifest` lists the tools before the server first connects:
 
 ```typescript
-import { createMyToolsServer } from '../mcp-servers/my-tools';
-
 export const MCP_SERVER_FACTORIES = {
   // ...existing servers...
-  'my-tools': { factory: createMyToolsServer, config: MY_TOOLS_CONFIG },
+  'my-tools': {
+    factory: createMyToolsServer,
+    config: { description: 'Price tools', tags: ['finance'], category: 'Data' },
+  },
 };
 ```
 
@@ -281,7 +284,7 @@ export const MCP_SERVER_FACTORIES = {
 
 ## Creating an Agent
 
-Agents are autonomous actors that react to events and run on schedules. Define them in `src/config/agents.ts`:
+Agents run workflows on a schedule or in reaction to events. Declare them in `src/config/agents.ts`:
 
 ```typescript
 export const AGENTS: LTAgentConfig[] = [
@@ -292,168 +295,142 @@ export const AGENTS: LTAgentConfig[] = [
     rules: 'Constraints on its behavior',
     status: 'active',
     knowledge_domain: 'my-domain',
-
-    // Run a workflow on a cron schedule
     schedules: [
-      {
-        cron: '*/15 * * * *',               // every 15 minutes
-        workflow_type: 'priceWorkflow',      // which workflow to run
-        execute_as: 'superadmin',            // identity context
-      },
+      { cron: '*/15 * * * *', workflow_type: 'priceWorkflow', execute_as: 'superadmin' },
     ],
-
-    // React to events by running workflows
     subscriptions: [
       {
-        topic: 'price.updated',             // NATS subject pattern
-        reaction_type: 'durable',           // checkpoint the reaction
+        topic: 'price.updated',
+        reaction_type: 'durable',
         workflow_type: 'priceWorkflow',
         execute_as: 'superadmin',
-        input_mapping: {                    // map event fields to workflow input
-          data: { symbol: '{event.data.symbol}' },
-        },
+        input_mapping: { data: { symbol: '{event.data.symbol}' } },
       },
     ],
   },
 ];
 ```
 
-The boilerplate includes two example agents:
-
-- **health-monitor** — runs `helloWorkflow` every 15 minutes and reacts to `workflow.failed` and `activity.failed` events
-- **event-coordinator** — routes `app.>` wildcard events and `knowledge.stored` events to workflows
+`execute_as` must be allowed to invoke the workflow; the check runs each time the agent fires. The boilerplate includes two agents: **health-monitor** (runs `helloWorkflow` every 15 minutes and on failure events) and **event-coordinator** (routes `app.>` and `knowledge.stored` events).
 
 ---
 
 ## IAM and Identity
 
-Every workflow carries identity context. Activities can inspect who invoked the workflow:
+Every run carries the identity that started it. Activities can read it:
 
 ```typescript
 import { getActivityIdentity } from '@hotmeshio/long-tail';
 
-export async function myActivity(input: any) {
-  const identity = getActivityIdentity();
-  console.log(identity.principal.id);     // who is executing
-  console.log(identity.principal.roles);  // their roles
+export async function myActivity(input: unknown) {
+  const { principal } = getActivityIdentity();
+  console.log(principal.id, principal.roles);
 }
 ```
 
-Roles are defined in `src/config/roles.ts`. Worker configs specify which roles can invoke a workflow (`invocationRoles`) and which roles participate in escalations (`roles`, `defaultRole`).
+Role names live in `src/config/roles.ts`. A profile's `invocationRoles` controls who may start a workflow; a role's members (and superadmins) claim and resolve its escalations.
 
 ---
 
 ## Testing
 
-### Unit Tests
+### Unit tests
 
-Fast, mocked, no Docker required:
+Fast, mocked, no Docker. They mirror `src/` under `tests/unit/`:
 
 ```bash
 npm test                                  # all unit tests
 npm run test:watch                        # watch mode
-npx vitest run path/to/test.ts            # single file
+npx vitest run tests/unit/workflows/rich-form
 ```
 
-### Integration Tests
+### Integration tests
 
-End-to-end through the HTTP API. Requires Docker Compose running:
+End to end through the HTTP API, against the running stack:
 
 ```bash
-docker compose exec app npm run test:integration
+docker compose exec app npm run test:integration    # expect: 34 passed, 7 skipped
+docker compose exec app npm run test:nats           # cross-container event delivery
 ```
 
-The integration suite walks through full escalation lifecycles: registers configs, invokes workflows, polls for pending escalations by role, claims and resolves each one, and verifies workflows complete with expected results.
+After `docker compose down -v`, run `docker compose exec app npm run seed` first.
 
-### NATS Event Tests
-
-Verifies cross-container event delivery:
+### Throughput and pressure tests
 
 ```bash
-docker compose exec app npm run test:nats
+docker compose exec app npm run test:factory:1      # YAML engine smoke test
+docker compose exec app npm run test:assembly:1     # durable engine smoke test
+docker compose exec app npm run test:factory:100    # sustained load
 ```
 
-### Throughput Tests
-
-Sustained load tests simulating concurrent traffic:
+Every `*:remote:*` script runs the same test against a deployed app. Put `LT_REMOTE_URL` and `REMOTE_PASSWORD` in your `.env`, then run from your machine:
 
 ```bash
-# YAML engine (compiled graph)
-docker compose exec app npm run test:factory:1        # smoke test
-docker compose exec app npm run test:factory:100      # sustained load
-
-# Durable engine (TypeScript parent-child)
-docker compose exec app npm run test:assembly:1       # smoke test
-docker compose exec app npm run test:assembly:100     # sustained load
+npm run test:remote:assembly:10
 ```
 
-### Remote Throughput Tests
-
-Same tests targeting production AWS. Run from your Mac (not Docker). Set `REMOTE_PASSWORD` in `.env`:
-
-```bash
-npm run test:remote:factory:100
-npm run test:remote:assembly:100
-```
+See [tests/throughput/README.md](../tests/throughput/README.md) for the full list.
 
 ---
 
 ## AWS Deployment
 
-The `deploy/` directory contains full AWS infrastructure as CDK stacks:
-
-- VPC, subnets, security groups
-- RDS PostgreSQL + S3
-- ECS Fargate (separate API and worker services)
-- ALB with HTTPS + Route 53 DNS
-- GitHub Actions CI/CD via OIDC
+`deploy/cdk/` deploys the app to AWS: VPC, Aurora PostgreSQL Serverless v2, S3, ECS Fargate (api, worker, NATS), and an HTTPS load balancer with AWS WAF. Your domain comes from the environment; nothing in the repo names a deployment.
 
 ```bash
-npm run aws:deploy                        # build and deploy via CDK
-npm run aws:health                        # health check
-npm run aws:services                      # service status
-npm run aws:logs:api                      # tail API logs
-npm run aws:logs:worker                   # tail worker logs
+export LT_HOSTED_ZONE_DOMAIN=example.com LT_SUBDOMAIN=app
+npm run aws:deploy        # rebuild and deploy the Compute stack from your machine
+npm run aws:health        # health check (reads the URL from the stack)
+npm run aws:services      # ECS service status
+npm run aws:logs:api      # tail API logs
+npm run aws:stats         # load, database, and service summary
 ```
 
-See [deploy/README.md](../deploy/README.md) for the step-by-step deployment guide.
+With CI set up, release instead: `npm run release:patch` (or `release:minor`) bumps the version and pushes a tag, and GitHub Actions deploys and runs smoke tests. See [deploy/README.md](../deploy/README.md) for the first deploy and the secrets CI needs.
 
 ---
 
 ## Working with Claude Code
 
-This project is designed for iterative development with Claude Code.
+### Connect it to the app
 
-### The Loop
+The app is an MCP server with OAuth sign-in:
 
-1. **Describe** — Tell Claude what workflow you need. Be specific about inputs, outputs, and business rules.
-2. **Author** — Claude writes the activity functions, the workflow, and the tests.
-3. **Type-check** — Claude runs `npm run typecheck`.
-4. **Test** — Claude runs `npm test`.
-5. **Fix** — If anything fails, Claude fixes it and re-runs.
+```bash
+claude mcp add --transport http long-tail-local http://localhost:3030/mcp
+claude mcp add --transport http long-tail-aws https://app.example.com/mcp
+```
 
-### Tips
+Run `/mcp` and sign in. Claude acts as you, under your roles: it can invoke workflows, read and resolve escalations (forms are enforced), and inspect runs. Disconnect it any time from **Connected apps** in the dashboard's user menu.
 
-- **Be explicit about types.** "The input has a `url` string and optional `timeout` number" beats "it takes a URL."
-- **Name your edge cases.** "What happens when the URL returns a 404?" prompts Claude to handle and test it.
-- **Ask for tests first.** Test expectations double as a specification.
-- **Run the watch loop.** Use `npm run test:watch` in a terminal — Claude sees the output and self-corrects.
+### The loop
+
+1. **Describe** the workflow: inputs, outputs, business rules, and who decides what.
+2. **Author**: Claude writes the activities, the workflow, the forms, and the tests.
+3. **Check**: `npm run typecheck` and `npm test`.
+4. **Try it** through MCP: invoke it, work its escalations, read the result.
+
+Be explicit about types and name the edge cases; test expectations double as a specification.
 
 ---
 
 ## Troubleshooting
 
+### A port is already taken
+
+Another project holds 4222, 5416, or similar. Set the host port in `.env` (`NATS_PORT=4224`, `PG_PORT=5426`, `PORT=3040`, ...) and run `docker compose up -d` again.
+
+### The app can't reach the database
+
+Inside Docker the app uses `postgres:5432`; `POSTGRES_HOST`/`POSTGRES_PORT` in `.env` are for processes on your machine. For an external database, set `DOCKER_POSTGRES_HOST` and `DOCKER_POSTGRES_PORT` (see `.env.example`).
+
+### The dashboard says live updates are off
+
+The browser reconnects automatically, and a tab in the background waits until it is visible again. If a visible tab stays disconnected, refresh it; check that the `nats` container is healthy (`docker compose ps`).
+
 ### `tsc` runs out of memory
 
-Use `registerMcpTool` from `@hotmeshio/long-tail` instead of `McpServer.tool()`. The MCP SDK's `.tool()` has deeply nested Zod generics that exhaust the compiler.
-
-### Tests fail with "Cannot find module"
-
-Run `npm install` — a dependency may be missing after switching branches.
-
-### Server won't start
-
-Check Docker: `docker compose ps`. PostgreSQL needs to be healthy before the app can connect.
+Use `registerMcpTool` instead of `McpServer.tool()`.
 
 ### Full reset
 

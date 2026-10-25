@@ -1,19 +1,50 @@
 # Throughput Tests
 
-Progressive test suite proving HotMesh YAML workflow performance — from baseline echo to full factory floor with real escalations.
+Load, pressure, and simulation scripts. 01 to 06 build up from a bare echo to a full factory floor with real escalations; 07 to 14 simulate shop floors, print farms, and task queues against the HTTP API.
 
-Each test builds on the previous. Run them in order to understand the system.
+## Running them
 
-## Prerequisites
+Local, against `docker compose up` (from your machine or inside the app container):
 
 ```bash
-docker compose up -d --build   # all services running
+npm run test:assembly:1
+docker compose exec app npx ts-node tests/throughput/01-echo.ts 1000 10
 ```
 
-All tests run inside the Docker container:
+Remote, against a deployed app: every `*:remote:*` script sets `REMOTE=1`, which reads the target from your gitignored `.env`:
 
 ```bash
-docker compose exec long-tail npx ts-node tests/throughput/<test>.ts [args]
+# .env
+LT_REMOTE_URL=https://app.example.com
+REMOTE_PASSWORD=...        # the deployed superadmin password
+
+npm run test:remote:assembly:10
+```
+
+`REMOTE=1` without `LT_REMOTE_URL` stops with an error instead of running locally. An explicit `REMOTE_URL=...` (what CI passes) takes precedence.
+
+## Index
+
+| Script | npm scripts | What it exercises |
+|---|---|---|
+| `01-echo` to `03-chain` | `test:throughput:{echo,signal,chain}` | YAML engine baseline, hook/signal, chained stations (needs the database on `localhost:5416`) |
+| `04-factory` | `test:factory:1`, `test:remote:factory:1` | 22-activity YAML factory with real escalations |
+| `05-factory-sustained` | `test:factory:{10,100}` and `:remote:` | Sustained YAML factory load |
+| `06-assembly-line` | `test:assembly:{1,10,100,250}` and `:remote:` | Durable parent/child assembly line |
+| `07-*` | `shop:{enqueue,claim,resolve}` and `:remote:` | Shop floor: steady enqueue, claimers, resolvers |
+| `08-*` | `ortho:{run,efficient:run,drain,day1..4}` and `:remote:` | Ortho insole pipeline, a manufacturing day compressed |
+| `09-escalation-smoke` | (CI post-deploy) | Legacy and efficient escalation paths set `signal_key` |
+| `10-*` | `print:{run,smoke,pressure,assert,reset,drain}` and `:remote:` | Print farm: printers, broker, technician, inspector |
+| `11-task` | `task:demo`, `task:remote:demo` | Task queue: idempotent start, resolve by metadata, SLA expiry |
+| `12-bambu`, `13-bambu-pressure` | `bambu:{demo,pressure}` and `:remote:` | Virtual Bambu fleet emitting real webhook events |
+| `14-pull` | `pull:{demo,ttl}` and `:remote:` | Claim-as-lease contention across distinct principals |
+
+A 10-minute ortho run (30 orders, 180 insoles) that finishes with nothing stalled:
+
+```bash
+DAILY_VOLUME=300 BASELINE_HOURS=1 COMPRESSION_HOURS=0.0099 BATCHES=10 PRINTER_SETS=3 \
+  HOLD_S=5 POLL_MS=1000 npm run ortho:efficient:run
+HOLD_S=0 POLL_MS=1000 npm run ortho:drain     # after an interrupted run
 ```
 
 ## Test Progression
@@ -25,7 +56,7 @@ docker compose exec long-tail npx ts-node tests/throughput/<test>.ts [args]
 **YAML:** `yaml/01-echo.yaml` (app: yamltest)
 
 ```bash
-docker compose exec long-tail npx ts-node tests/throughput/01-echo.ts 1000 10
+docker compose exec app npx ts-node tests/throughput/01-echo.ts 1000 10
 ```
 
 **Measured:** ~300/sec sustained, 3.3ms avg on local Docker.
@@ -37,7 +68,7 @@ docker compose exec long-tail npx ts-node tests/throughput/01-echo.ts 1000 10
 **YAML:** `yaml/02-signal.yaml` (app: yamltest)
 
 ```bash
-docker compose exec long-tail npx ts-node tests/throughput/02-signal.ts 5
+docker compose exec app npx ts-node tests/throughput/02-signal.ts 5
 ```
 
 ### 03 — Chain (Sequential Stations)
@@ -47,7 +78,7 @@ docker compose exec long-tail npx ts-node tests/throughput/02-signal.ts 5
 **YAML:** `yaml/03-chain.yaml` (app: yamltest)
 
 ```bash
-docker compose exec long-tail npx ts-node tests/throughput/03-chain.ts 10
+docker compose exec app npx ts-node tests/throughput/03-chain.ts 10
 ```
 
 ### 04 — Factory Floor (Real Escalations)
@@ -61,10 +92,10 @@ the workflow. The resolve worker runs transactionally after the hook resumes.
 
 ```bash
 # Single workflow — watch each station
-docker compose exec long-tail npx ts-node tests/throughput/04-factory.ts 1
+docker compose exec app npx ts-node tests/throughput/04-factory.ts 1
 
 # Multiple workflows
-docker compose exec long-tail npx ts-node tests/throughput/04-factory.ts 10
+docker compose exec app npx ts-node tests/throughput/04-factory.ts 10
 ```
 
 **Flow per station:**
@@ -104,8 +135,7 @@ resolve worker (descendant of hook)
 
 ## Docker Tuning Applied
 
-See `docs/cloud.md` for the full tuning guide. Key settings:
+Key settings in `docker-compose.yml`:
 
 - **Postgres:** shared_buffers=256MB, wal_buffers=16MB, synchronous_commit=off (dev)
 - **Node:** --max-old-space-size=3072 --max-semi-space-size=64
-- **Resources:** long-tail 4-8 CPU / 2-4GB RAM, postgres 2-4 CPU / 1-2GB RAM

@@ -23,6 +23,7 @@ Long Tail is a durable workflow execution platform powered by PostgreSQL. The sa
   - [Network Layout](#network-layout)
   - [Security Groups](#security-groups)
   - [Secrets Manager](#secrets-manager)
+  - [Login Protection (AWS WAF)](#login-protection-aws-waf)
   - [Prerequisites](#aws-prerequisites)
   - [Step-by-Step First Deploy](#step-by-step-first-deploy)
   - [Verify Everything Works](#verify-everything-works)
@@ -35,7 +36,7 @@ Long Tail is a durable workflow execution platform powered by PostgreSQL. The sa
   - [Restarting Services](#restarting-services)
 - [GitHub Actions CI/CD](#github-actions-cicd)
 - [Infrastructure Details](#infrastructure-details)
-  - [RDS Configuration](#rds-configuration)
+  - [Database Configuration](#database-configuration)
   - [S3 Bucket Configuration](#s3-bucket-configuration)
   - [Fargate Task Sizing](#fargate-task-sizing)
   - [Future Flips](#future-flips)
@@ -53,7 +54,7 @@ The same Docker image runs in two modes, controlled by the `APP_ROLE` environmen
 |---------|-----------|------|---------|
 | **API** | `api` | Express dashboard, REST API, readonly workflow observers | Behind ALB on port 3030 |
 | **Worker** | `worker` | Workflow execution, durable activities, leader election via LISTEN/NOTIFY | No inbound traffic |
-| **NATS** | *(n/a)* | Event bus for cross-container event delivery (replaces Socket.IO for multi-container) | Internal port 4222, WebSocket 9222 via ALB |
+| **NATS** | *(n/a)* | Event bus for cross-container event delivery (replaces Socket.IO for multi-container) | Internal: 4222 (services), 9222 (WebSocket, reached through the API) |
 
 Local development runs both roles in a single container with `APP_ROLE` unset (standalone mode). On AWS, they are separate Fargate services with independent scaling and lifecycle.
 
@@ -61,7 +62,7 @@ Local development runs both roles in a single container with `APP_ROLE` unset (s
 
 Socket.IO works in single-container mode because all events are emitted and consumed in the same process. In a multi-container deployment (separate API and worker services), Socket.IO cannot deliver events across containers — the worker emits events that the API container (serving the dashboard) never sees.
 
-NATS solves this: workers publish events to NATS, and the dashboard connects directly to NATS via WebSocket. One event bus, one subscription, no intermediary. The browser authenticates to NATS using a token obtained from an authenticated API endpoint (`GET /api/nats-credentials`), so unauthenticated users cannot subscribe to events.
+NATS solves this: workers publish events to NATS, and the dashboard subscribes over a WebSocket. The browser never talks to NATS directly. It asks the API for a short-lived, single-use ticket (`GET /api/nats-credentials`, signed-in users only) and connects to `wss://<your domain>/nats-ws`, where the API proxies to NATS internally. The NATS token never leaves the servers, and the proxy passes only subscribe traffic from browsers.
 
 The worker uses a 120-second stop timeout. When ECS sends SIGTERM during a rolling deploy, in-flight durable activities complete and leader advisory locks release gracefully before the container exits.
 
@@ -101,10 +102,10 @@ The same code runs in both environments. Only env vars change:
 
 | Concern | Local | AWS |
 |---------|-------|-----|
-| Postgres | Container on port 5416 | RDS in isolated subnets |
+| Postgres | Container on port 5416 | Aurora PostgreSQL Serverless v2 in isolated subnets |
 | File storage | MinIO container on port 9002 | S3 bucket |
-| Event bus | NATS container on port 4222/9222 | NATS Fargate service via Cloud Map + ALB |
-| SSL | Not required | `PGSSLMODE=no-verify`, TLS at ALB for NATS WS |
+| Event bus | NATS container on port 4222/9222 | NATS Fargate service via Cloud Map; browsers through `/nats-ws` on 443 |
+| SSL | Not required | `PGSSLMODE=no-verify` to the database, TLS at the ALB |
 | Secrets | `.env` file / docker-compose env | Secrets Manager → ECS task definition |
 | App role | Standalone (unset) | `APP_ROLE=api` or `APP_ROLE=worker` |
 
@@ -129,7 +130,7 @@ The app starts on `http://localhost:3030`. Postgres runs on port 5416. MinIO run
 
 ### Services
 
-Docker Compose runs four containers:
+Docker Compose runs four containers. Each host port can be changed in `.env` (`PORT`, `PG_PORT`, `NATS_PORT`, `NATS_WS_PORT`, `MINIO_PORT`, `MINIO_CONSOLE_PORT`) when another project already holds it:
 
 | Container | Image | Ports | Purpose |
 |-----------|-------|-------|---------|
@@ -140,44 +141,21 @@ Docker Compose runs four containers:
 
 The `app` container mounts `src/`, `scripts/`, and `tests/` as volumes. Code changes hot-reload via `ts-node-dev`.
 
-### Environment Variables
-
-The `.env` file drives all configuration. Key variables:
+To run the AWS shape locally (an `api` service, two `worker` services, and NATS between them), add the multi-container override:
 
 ```bash
-# Database
-POSTGRES_HOST=localhost          # Use 'postgres' when running inside the container
-POSTGRES_PORT=5416               # Mapped from container's 5432
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=password
-POSTGRES_DB=myapp
-
-# Server
-PORT=3030
-JWT_SECRET=change-me-in-production
-
-# File storage (MinIO)
-LT_STORAGE_BACKEND=s3
-LT_S3_BUCKET=long-tail-files
-LT_S3_ENDPOINT=http://localhost:9002
-LT_S3_REGION=us-east-1
-LT_S3_ACCESS_KEY=minioadmin
-LT_S3_SECRET_KEY=minioadmin
-LT_S3_FORCE_PATH_STYLE=true
-
-# NATS event bus
-NATS_URL=nats://nats:4222         # Internal NATS connection
-NATS_TOKEN=dev_api_secret         # Auth token (Secrets Manager in production)
-NATS_WS_URL=ws://localhost:9222   # Browser WebSocket URL
-
-# LLM (required for workflow builder)
-ANTHROPIC_API_KEY=sk-ant-...
-
-# OAuth (optional)
-# OAUTH_ENCRYPTION_KEY=...
-# OAUTH_GOOGLE_CLIENT_ID=...
-# OAUTH_GOOGLE_CLIENT_SECRET=...
+docker compose -f docker-compose.yml -f docker-compose.multi.yml up -d --build
 ```
+
+### Environment Variables
+
+`.env` (copied from `.env.example`) drives configuration; `.env.example` lists every variable with comments. Things to know:
+
+- Inside Docker, compose overrides what differs on its network: the app reaches the database at `postgres:5432`, NATS at `nats:4222`, and MinIO at `minio:9000`. The `POSTGRES_*`, `NATS_*`, and `LT_S3_ENDPOINT` values in `.env` are for processes on your machine (`npm run dev`, scripts).
+- For an external database, set `DOCKER_POSTGRES_HOST=host.docker.internal` and `DOCKER_POSTGRES_PORT` for the container, and `POSTGRES_*` for host processes.
+- `SEED_ADMIN_PASSWORD` creates the `superadmin` on first boot (`l0ngt@1l` locally).
+- `LT_OAUTH_ISSUER` turns on OAuth sign-in for MCP clients at `/mcp`; it must be the URL the app is reached at.
+- `ANTHROPIC_API_KEY` (and `OPENAI_API_KEY`) are optional; they enable the workflow builder, tool orchestration, and screenshot vision.
 
 ### Connecting a SQL Client
 
@@ -226,7 +204,7 @@ npm run test:integration       # Integration tests (requires docker compose up)
 ```bash
 docker compose down -v         # Stop containers and delete volumes
 docker compose up -d --build   # Rebuild and start fresh
-npm run seed                   # Re-seed users and roles (run inside container)
+docker compose exec app npm run seed   # Re-seed users
 ```
 
 The `-v` flag deletes the Postgres and MinIO data volumes. Everything starts from scratch.
@@ -242,13 +220,15 @@ The CDK code in `deploy/cdk/` creates four CloudFormation stacks:
 | Stack | Resources | Deploy time |
 |-------|-----------|-------------|
 | **LongTail-Network** | VPC, 6 subnets (2 public, 2 private, 2 isolated), 1 NAT gateway, 4 security groups | ~5 min |
-| **LongTail-Data** | RDS PostgreSQL 16, S3 bucket, 8 Secrets Manager entries (including NATS token) | ~15 min |
+| **LongTail-Data** | Aurora PostgreSQL 16 Serverless v2, S3 bucket, nine Secrets Manager entries (including the NATS token) | ~15 min |
 | **LongTail-Dns** | ACM certificate for `<subdomain>.<hosted zone>` (DNS-validated via your existing Route 53 hosted zone) | ~3 min |
-| **LongTail-Compute** | ECS Fargate cluster, API service, worker service, NATS service, ALB (ports 443 + 9222), Route 53 A record | ~10 min |
+| **LongTail-Compute** | ECS Fargate cluster, API service, worker service, NATS service, ALB (80 to 443 redirect, 443, legacy 9222), AWS WAF web ACL, Route 53 A record | ~10 min |
 
 A fifth stack, **LongTail-GithubOidc**, creates an IAM role for GitHub Actions. It's deployed separately, once.
 
-All resources are tagged with `Project: long-tail` and `Environment: production`.
+All resources are tagged with `Project: longtail` (the project slug) and `Environment: production`.
+
+Stack names, the cluster, log groups, and secret names derive from `projectName` (default `LongTail`). Override it and the other settings with CDK context (`-c projectName=Acme`); see `deploy/cdk/lib/config.ts`.
 
 ### Network Layout
 
@@ -256,31 +236,26 @@ All resources are tagged with `Project: long-tail` and `Environment: production`
                     Internet
                        │
                    ┌───┴───┐
-                   │  ALB  │  (public subnets, ports 80/443/9222)
+                   │  ALB  │  public subnets: 80 → 443, 443 (HTTPS), legacy 9222
+                   │ + WAF │  AWS WAF: IP reputation list, login throttle
                    └───┬───┘
-                       │
-         ┌─────────────┼────────────┐
-         │ :3030       │ :9222      │
-    ┌────┴────┐   ┌────┴────┐  ┌────┴─────┐
-    │   API   │   │  NATS   │  │  Worker  │   (private subnets, NAT egress)
-    │ Fargate │   │ Fargate │  │ Fargate  │
-    └────┬────┘   └────┬────┘  └────┬─────┘
-         │  :4222      │  :4222     │
-         └─────────────┤────────────┘
-                       │
-              ┌────────┴────────┐
-              │   port 5432     │
-         ┌────┴────┐
-         │   RDS   │              (isolated subnets, no internet)
-         │ Postgres│
-         └─────────┘
+                       │ :3030  (dashboard, REST, /mcp, and /nats-ws for browsers)
+                  ┌────┴────┐  :9222 ┌─────────┐  :4222  ┌──────────┐
+                  │   API   ├───────►│  NATS   │◄────────┤  Worker  │   private subnets,
+                  │ Fargate ├───────►│ Fargate │         │ Fargate  │   NAT egress
+                  └────┬────┘  :4222 └─────────┘         └────┬─────┘
+                       │  :5432                               │  :5432
+                       └──────────────┬───────────────────────┘
+                              ┌───────┴────────┐
+                              │ Aurora Postgres│   isolated subnets, no internet
+                              │ Serverless v2  │
+                              └────────────────┘
 ```
 
-- **NATS** — Internal event bus in private subnets. API and worker connect on port 4222. Browser dashboard connects via ALB on port 9222 (TLS terminated at ALB, plaintext internally).
-
-- **Public subnets** — ALB only. Receives internet traffic on 80 (redirects to 443), 443 (HTTPS with ACM cert), and 9222 (NATS WebSocket, TLS terminated at ALB).
-- **Private subnets** — Fargate tasks. Outbound internet via NAT gateway (for ECR image pulls, S3, external APIs). No inbound except from ALB.
-- **Isolated subnets** — RDS only. No internet access at all. Only reachable from the private subnets.
+- **Public subnets:** the ALB only. Port 80 redirects to 443; 443 serves HTTPS with the ACM certificate. Port 9222 is a legacy listener that forwards straight to NATS; the dashboard no longer uses it, and it is kept until a follow-up removes it.
+- **Private subnets:** Fargate tasks. Outbound internet through the NAT gateway (ECR pulls, S3, external APIs). Inbound only from the ALB, and to NATS only from the API (proxy) and the legacy listener.
+- **Isolated subnets:** the database. No internet access; reachable only from the API and worker.
+- **NATS:** API and worker publish and subscribe on 4222. Browsers reach it only through the API's `/nats-ws` proxy on 443.
 
 One NAT gateway (cost-optimized for a single-environment setup).
 
@@ -288,21 +263,22 @@ One NAT gateway (cost-optimized for a single-environment setup).
 
 | Security Group | Inbound Rules | Attached To |
 |---------------|---------------|-------------|
-| ALB | TCP 80, 443, 9222 from `0.0.0.0/0` | Application Load Balancer |
+| ALB | TCP 80, 443, 9222 (legacy) from `0.0.0.0/0` | Application Load Balancer |
 | API tasks | TCP 3030 from ALB SG | API Fargate tasks |
 | Worker tasks | *(none)* | Worker Fargate tasks |
-| NATS | TCP 4222 from API SG + Worker SG, TCP 9222 from ALB SG, TCP 8222 from ALB SG (health) | NATS Fargate task |
-| RDS | TCP 5432 from API SG, TCP 5432 from Worker SG | RDS instance |
+| NATS | TCP 4222 from API SG + Worker SG, TCP 9222 from API SG (proxy) and ALB SG (legacy), TCP 8222 from ALB SG (health) | NATS Fargate task |
+| Database | TCP 5432 from API SG, TCP 5432 from Worker SG | Aurora cluster |
 
 Workers have no inbound rules — they initiate all connections outbound (to Postgres, S3, external APIs).
 
 ### Secrets Manager
 
-CDK creates eight secrets. Some are auto-generated, some need manual setup:
+CDK creates nine secrets. Some are auto-generated, some need manual setup:
 
 | Secret Name | Created By | Action Required |
 |-------------|-----------|-----------------|
-| `LongTail/Database` | CDK (auto-generated RDS credentials) | None — used automatically |
+| `LongTail/AuroraDatabase` | CDK (auto-generated Aurora credentials) | None. The app's database credentials |
+| `LongTail/Database` | CDK (legacy RDS instance credentials) | None. Retained with the legacy instance |
 | `LongTail/JwtSigningKey` | CDK (auto-generated, 64 chars) | None — used automatically |
 | `LongTail/SeedAdminPassword` | CDK (auto-generated, 32 chars) | None — used for first-boot superadmin |
 | `LongTail/NatsToken` | CDK (auto-generated, 48 chars) | None — shared by NATS server, API, and worker |
@@ -312,6 +288,19 @@ CDK creates eight secrets. Some are auto-generated, some need manual setup:
 | `LongTail/ApiKeys` | CDK (empty `{}`) | Optional |
 
 Secrets are injected into containers via ECS task definition `secrets:` blocks. ECS resolves them at container start time, not continuously. After changing a secret value, restart the services.
+
+### Login Protection (AWS WAF)
+
+The Compute stack attaches an AWS WAF web ACL to the ALB (`deploy/cdk/lib/login-waf.ts`) with two rules:
+
+| Rule | What it does |
+|------|--------------|
+| `aws-ip-reputation` | AWS's managed list of addresses tracked as malicious, blocked on every path |
+| `login-rate-limit` | `POST /api/auth/login`: at most 30 requests per client IP per 5 minutes. Over the limit, the IP gets `429` until its count falls back under the limit. Other paths are not affected |
+
+The limit and window are CDK context: `-c loginRateLimit=50 -c loginRateWindowSeconds=600` (the window is 60, 120, 300, or 600 seconds). WAF takes up to about 30 seconds to start blocking an IP that crosses the limit. Cost: about $5 per month for the web ACL, $1 per rule, and $0.60 per million requests. Metrics appear in CloudWatch under the WAF namespace, prefixed with the project slug.
+
+The ALB idle timeout is 60 seconds (the AWS default). Quiet dashboard connections drop after a minute and reconnect within seconds; background tabs reconnect when they become visible. Raise `idleTimeout` in `compute-stack.ts` above 120 seconds (NATS's ping interval) to keep them open.
 
 ### AWS Prerequisites
 
@@ -347,7 +336,7 @@ npm run build
 npx cdk synth --all
 ```
 
-Generates CloudFormation templates in `cdk.out/`. Review if you want. The only AWS call is a Route 53 hosted zone lookup.
+Generates CloudFormation templates in `cdk.out/`. Review if you want. The only AWS calls are lookups (your Route 53 hosted zone and the region's availability zones), cached in `cdk.context.json`. Both `cdk.out/` and `cdk.context.json` are gitignored: they name your account and hosted zone.
 
 #### 2. Deploy Network
 
@@ -364,9 +353,9 @@ npx cdk deploy LongTail-Data --require-approval never
 ```
 
 **Verify:**
-- RDS → Databases: PostgreSQL 16 instance, status "Available"
+- RDS → Databases: the Aurora PostgreSQL cluster with a Serverless v2 writer, status "Available"
 - S3 → Buckets: `longtail-files-ACCOUNT-REGION`
-- Secrets Manager: all seven secrets listed above
+- Secrets Manager: the nine secrets listed above
 
 #### 4. Set your LLM API keys
 
@@ -413,6 +402,7 @@ This step builds the Docker image for `linux/amd64` (cross-compiles if you're on
 **Verify:**
 - ECS → Clusters → `longtail`: three services (`api`, `worker`, `nats`), each with 1 running task
 - EC2 → Load Balancers: internet-facing ALB with HTTPS on 443
+- WAF & Shield → Web ACLs (your region): `longtail-web-acl`, associated with the ALB
 - `https://app.example.com/health` returns `{"status":"ok"}`
 
 ### Verify Everything Works
@@ -434,7 +424,7 @@ Log in at `https://app.example.com/login` with username `superadmin` and the pas
 
 ### Connecting a SQL Client to RDS
 
-RDS is in isolated subnets with no public access. To connect from your laptop (e.g., Beekeeper Studio), use SSM Session Manager port forwarding through a Fargate task.
+The database is in isolated subnets with no public access. To connect from your laptop (e.g., Beekeeper Studio), use SSM Session Manager port forwarding through a Fargate task.
 
 **Quick method — use the ECS Exec feature:**
 
@@ -453,11 +443,11 @@ TASK_ID=$(aws ecs list-tasks --cluster longtail --service-name api \
   --query 'taskArns[0]' --output text | awk -F/ '{print $NF}')
 
 # Get the RDS endpoint
-RDS_HOST=$(aws secretsmanager get-secret-value --secret-id LongTail/Database \
+RDS_HOST=$(aws secretsmanager get-secret-value --secret-id LongTail/AuroraDatabase \
   --query SecretString --output text | python3 -c "import sys,json; print(json.load(sys.stdin)['host'])")
 
 # Get the RDS password
-RDS_PASS=$(aws secretsmanager get-secret-value --secret-id LongTail/Database \
+RDS_PASS=$(aws secretsmanager get-secret-value --secret-id LongTail/AuroraDatabase \
   --query SecretString --output text | python3 -c "import sys,json; print(json.load(sys.stdin)['password'])")
 
 echo "RDS Host: $RDS_HOST"
@@ -485,12 +475,17 @@ Note: Direct connections from your laptop require network-level access to the is
 
 ### Deploying Code Changes
 
-For routine code changes (no infrastructure changes):
+With [CI set up](#github-actions-cicd), release from `main` and GitHub Actions deploys:
 
 ```bash
-cd deploy/cdk
-npm run build
-npx cdk deploy LongTail-Compute --require-approval never
+npm run release:patch          # or release:minor; bumps the version and pushes the tag
+```
+
+To deploy from your machine instead (no infrastructure changes):
+
+```bash
+export LT_HOSTED_ZONE_DOMAIN=example.com LT_SUBDOMAIN=app
+npm run aws:deploy             # builds deploy/cdk and deploys LongTail-Compute
 ```
 
 CDK rebuilds the Docker image, pushes to ECR, and does a rolling update on both services. Takes ~3–5 minutes. Zero downtime.
@@ -535,8 +530,11 @@ aws logs filter-log-events --log-group-name /ecs/longtail/worker \
 ### Checking Service Health
 
 ```bash
-# Quick status
-curl -s https://app.example.com/health
+# Quick status (reads the URL from the Compute stack's ServiceUrl output)
+npm run aws:health
+
+# Load, database, and service summary for the last 5 minutes
+npm run aws:stats
 
 # Service details
 aws ecs describe-services --cluster longtail --services api worker \
@@ -575,7 +573,6 @@ Copy the output role ARN. In GitHub → Settings → Secrets and variables → A
 
 | Variable | Value |
 |----------|-------|
-| `AWS_ACCOUNT_ID` | Your AWS account ID |
 | `AWS_REGION` | Your AWS region, e.g. `us-east-1` |
 | `AWS_ROLE_ARN` | Role ARN from the OIDC stack output |
 
@@ -585,29 +582,28 @@ Then under **Secrets**, add the values the deploy and smoke jobs read. Secrets k
 |--------|-------|
 | `LT_HOSTED_ZONE_DOMAIN` | Your Route 53 hosted zone, e.g. `example.com` |
 | `LT_SUBDOMAIN` | The app's subdomain, e.g. `app` |
-| `REMOTE_PASSWORD` | The superadmin password, for the post-deploy smoke tests |
+| `REMOTE_PASSWORD` | The superadmin password (the `LongTail/SeedAdminPassword` secret), for the post-deploy smoke tests |
 
 For local `*:remote:*` scripts, put `LT_REMOTE_URL=https://app.example.com` and `REMOTE_PASSWORD` in your gitignored `.env`.
 
 ### Release Flow
 
 ```bash
-git tag v1.0.0 && git push --tags
+npm run release:patch    # or release:minor / release:major: bumps package.json, tags, pushes
 ```
 
-GitHub Actions builds the image, pushes to ECR, runs `cdk deploy --all`. Rolling deploy, zero downtime.
+The `v*.*.*` tag starts `deploy.yml`: tests, `cdk deploy --all` (which builds the image and pushes it to ECR), then smoke tests against the deployed app. Rolling deploy, zero downtime. The deploy log masks the domain, since it comes from secrets.
 
 ---
 
 ## Infrastructure Details
 
-### RDS Configuration
+### Database Configuration
 
-- **Engine:** PostgreSQL 16
-- **Instance:** `db.t4g.medium` (2 vCPU, 4 GB RAM)
-- **Storage:** gp3, 100 GB initial, autoscaling to 500 GB
-- **Multi-AZ:** disabled (one-line flip to enable)
+- **Engine:** Aurora PostgreSQL 16.4
+- **Capacity:** Serverless v2, 0.5 to 8 ACUs, one writer
 - **Backups:** 7-day automated retention
+- **Encryption:** at rest; Performance Insights and CloudWatch log export on
 - **Deletion protection:** enabled
 - **Removal policy:** RETAIN (survives `cdk destroy`)
 
@@ -620,6 +616,8 @@ Custom parameter group (critical for LISTEN/NOTIFY):
 | `tcp_keepalives_idle` | 60 | Detects dead connections |
 | `tcp_keepalives_interval` | 10 | Keepalive probe frequency |
 | `tcp_keepalives_count` | 6 | Probes before declaring dead |
+
+The Data stack also keeps an earlier single-instance RDS database (`LongTail/Database`), retained so a cross-stack export stays valid. The app does not use it; it can be removed in a follow-up change.
 
 ### S3 Bucket Configuration
 
@@ -636,27 +634,27 @@ Lifecycle rules:
 
 ### Fargate Task Sizing
 
-Both services run at 0.5 vCPU / 1 GB RAM. Auto-scaling is configured 1–4 tasks per service, targeting 70% CPU utilization.
+API and worker tasks run at 0.5 vCPU / 1 GB RAM and scale on 70% CPU utilization.
 
 | Service | CPU | Memory | Desired | Max | Stop Timeout |
 |---------|-----|--------|---------|-----|-------------|
 | API | 0.5 vCPU | 1 GB | 1 | 4 | default |
-| Worker | 0.5 vCPU | 1 GB | 1 | 4 | 120 seconds |
+| Worker | 0.5 vCPU | 1 GB | 2 | 4 | 120 seconds |
 | NATS | 0.25 vCPU | 512 MB | 1 | 1 | default |
 
 ### Future Flips
 
-- **Multi-AZ RDS:** Change `multiAz: false` to `true` in `data-stack.ts`
-- **Larger RDS:** Change `InstanceSize.MEDIUM` in `data-stack.ts`
+- **High availability:** add a reader (`readers: [rds.ClusterInstance.serverlessV2('Reader')]`) to the Aurora cluster in `data-stack.ts`
+- **More database capacity:** raise `serverlessV2MaxCapacity` in `data-stack.ts`
 - **Staging environment:** Instantiate the same stacks in `bin/app.ts` with prefix `LongTailStaging-`
 
 ### Tearing Down
 
-RDS and S3 have `RemovalPolicy.RETAIN` and deletion protection. `cdk destroy` leaves them behind intentionally.
+The database and S3 bucket have `RemovalPolicy.RETAIN`, and the Aurora cluster has deletion protection. `cdk destroy` leaves them behind intentionally.
 
 To fully tear down:
 
 1. `npx cdk destroy --all`
-2. AWS Console → RDS: disable deletion protection, delete the instance
+2. AWS Console → RDS: disable deletion protection, delete the Aurora cluster (and the legacy instance)
 3. AWS Console → S3: empty the bucket, delete it
 4. AWS Console → Secrets Manager: delete retained secrets

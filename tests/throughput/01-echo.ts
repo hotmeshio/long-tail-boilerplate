@@ -14,7 +14,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import http from 'http';
 
-import { postgres_options } from '../../modules/config';
+import { DB_CONFIG as postgres_options } from '../../src/config/database';
 
 const COUNT = parseInt(process.argv[2] || '500', 10);
 const CONCURRENCY = parseInt(process.argv[3] || '10', 10);
