@@ -2,7 +2,7 @@
  * Shared utilities for the 07-* shop floor scripts.
  */
 
-try { require('dotenv/config'); } catch {}
+import '../helpers/remote-target';
 
 export const BASE_URL = process.env.REMOTE_URL || `http://localhost:${process.env.PORT || 3030}`;
 

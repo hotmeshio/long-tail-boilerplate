@@ -3,13 +3,12 @@ import * as cdk from 'aws-cdk-lib';
 /**
  * Centralized deployment configuration.
  *
- * All deployment-specific values live here. Fork the boilerplate,
- * change these values, and deploy to any AWS account/region.
+ * Nothing here names a real deployment. The domain is required and comes
+ * from CDK context or the environment; CI passes it from repository secrets:
+ *   LT_HOSTED_ZONE_DOMAIN=example.com LT_SUBDOMAIN=app npx cdk deploy --all
+ *   npx cdk deploy --all -c hostedZoneDomain=example.com -c subdomain=app
  *
- * Override any value via CDK context:
- *   npx cdk deploy --all -c projectName=myapp -c domainName=myapp.example.com
- *
- * Or set them in cdk.json under "context": { "projectName": "myapp", ... }
+ * Other values have defaults and accept the same context overrides.
  */
 export function loadConfig(app: cdk.App) {
   // ── Identity ───────────────────────────────────────────────────────────
@@ -21,11 +20,11 @@ export function loadConfig(app: cdk.App) {
   /** Lowercase slug derived from project name — used where AWS requires lowercase */
   const projectSlug = app.node.tryGetContext('projectSlug') || projectName.toLowerCase().replace(/[^a-z0-9]/g, '-');
 
-  /** Root domain — the Route 53 hosted zone you own */
-  const hostedZoneDomain = app.node.tryGetContext('hostedZoneDomain') || 'hotmesh.io';
+  /** Root domain: the Route 53 hosted zone you own */
+  const hostedZoneDomain = required(app, 'hostedZoneDomain', 'LT_HOSTED_ZONE_DOMAIN');
 
   /** Subdomain record name (without the root domain) */
-  const subdomain = app.node.tryGetContext('subdomain') || 'longtail';
+  const subdomain = required(app, 'subdomain', 'LT_SUBDOMAIN');
 
   /** Full domain name — derived from subdomain + hosted zone */
   const domainName = `${subdomain}.${hostedZoneDomain}`;
@@ -42,6 +41,14 @@ export function loadConfig(app: cdk.App) {
   // NATS auth token is stored in Secrets Manager (auto-generated).
   // No hardcoded token — all containers read from the shared secret.
 
+  // ── Login protection (AWS WAF on the ALB) ───────────────────────────────
+
+  /** POST /api/auth/login attempts allowed per client IP per window */
+  const loginRateLimit = Number(app.node.tryGetContext('loginRateLimit') ?? 30);
+
+  /** Window the login limit is counted over: 60, 120, 300, or 600 seconds */
+  const loginRateWindowSeconds = Number(app.node.tryGetContext('loginRateWindowSeconds') ?? 300);
+
   /** CloudMap private DNS namespace for service discovery */
   const serviceDiscoveryNamespace = `${projectSlug}.local`;
 
@@ -55,6 +62,8 @@ export function loadConfig(app: cdk.App) {
     dbName,
     dbUsername,
     serviceDiscoveryNamespace,
+    loginRateLimit,
+    loginRateWindowSeconds,
 
     // ── Derived values ─────────────────────────────────────────────────
     // Computed from the above — no need to override individually.
@@ -68,7 +77,7 @@ export function loadConfig(app: cdk.App) {
     /** Secrets Manager path: e.g., "LongTail/Database" */
     secretName: (name: string) => `${projectName}/${name}`,
 
-    /** S3 bucket name: e.g., "longtail-files-123456789-us-west-1" */
+    /** S3 bucket name: e.g., "longtail-files-123456789-us-east-1" */
     bucketName: (account: string, region: string) =>
       `${projectSlug}-files-${account}-${region}`,
 
@@ -81,3 +90,12 @@ export function loadConfig(app: cdk.App) {
 }
 
 export type DeployConfig = ReturnType<typeof loadConfig>;
+
+/** A value from CDK context or the environment; throws when neither is set. */
+function required(app: cdk.App, contextKey: string, envKey: string): string {
+  const value = app.node.tryGetContext(contextKey) || process.env[envKey];
+  if (!value) {
+    throw new Error(`Missing ${contextKey}: pass -c ${contextKey}=... or set ${envKey}`);
+  }
+  return value;
+}

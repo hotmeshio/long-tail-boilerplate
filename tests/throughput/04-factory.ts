@@ -18,7 +18,7 @@
  *   npx ts-node tests/throughput/04-factory.ts [count]
  */
 
-try { require('dotenv/config'); } catch {}
+import '../helpers/remote-target';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 

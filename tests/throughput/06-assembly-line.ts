@@ -16,7 +16,7 @@
  * Defaults: target=10, enqueueInterval=1000, RESOLVE_COOLDOWN_MS=10000
  */
 
-try { require('dotenv/config'); } catch {}
+import '../helpers/remote-target';
 
 const BASE_URL = process.env.REMOTE_URL || `http://localhost:${process.env.PORT || 3030}`;
 const TARGET = parseInt(process.argv[2] || '10', 10);
