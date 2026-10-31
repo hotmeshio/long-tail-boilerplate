@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty } from './config';
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchPersonas } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -102,6 +102,7 @@ async function main() {
     await seedPrintFarmIfEmpty();
     await seedBambuFarmIfEmpty();
     await seedPullFarmIfEmpty();
+    await seedWorkbenchPersonas();
   }
 
   // 4. Graceful shutdown

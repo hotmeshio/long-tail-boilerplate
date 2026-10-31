@@ -32,6 +32,14 @@ import { HELLO_INPUT_SCHEMA } from '../workflows/hello-world/forms';
 import { MODERATOR_ROLE, CONTENT_REVIEW_INPUT_SCHEMA } from '../workflows/content-review/forms';
 import { SCREENSHOT_INPUT_SCHEMA } from '../workflows/screenshot-research/forms';
 import { TASK_INPUT_SCHEMA } from '../workflows/task-queue/forms';
+import { ownerEscalation, claudeProject, projectPlan, CLAUDE_WORKBENCH_QUEUE } from '../workflows/claude-workbench';
+import {
+  OWNER_ESCALATION_INPUT_SCHEMA,
+  CLAUDE_PROJECT_INPUT_SCHEMA,
+  PROJECT_PLAN_INPUT_SCHEMA,
+} from '../workflows/claude-workbench/invoke-forms';
+import { agentWork, branchLease, workstream, AGENT_CREW_QUEUE } from '../workflows/agent-crew';
+import { AGENT_WORK_INPUT_SCHEMA, BRANCH_LEASE_INPUT_SCHEMA, WORKSTREAM_INPUT_SCHEMA } from '../workflows/agent-crew/invoke-forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
@@ -365,6 +373,75 @@ const taskWorkflowConfig: LTWorkerConfig = {
   reset: true,
 };
 
+// ── Claude workbench configs ────────────────────────────────────────────────
+// Ordinary workflows: each parks one escalation with `conditional`, carrying
+// project, PR, session and kind facets. A short headline is the description;
+// the markdown brief renders in the form.
+
+const ownerEscalationConfig: LTWorkerConfig = {
+  description: 'Owner escalation: parks one decide, verify, review or claude-next escalation with a markdown brief and project facets.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD_CHECK,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: OWNER_ESCALATION_INPUT_SCHEMA,
+  reset: true,
+};
+
+const claudeProjectConfig: LTWorkerConfig = {
+  description: 'Claude project: one open accumulator per project; each session joins as an item until the owner closes it.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: CLAUDE_PROJECT_INPUT_SCHEMA,
+  reset: true,
+};
+
+const projectPlanConfig: LTWorkerConfig = {
+  description: 'Project plan: one escalation whose steps are batch items; it resolves when every step is filled.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CHECKLIST,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: PROJECT_PLAN_INPUT_SCHEMA,
+  reset: true,
+};
+
+// ── Agent crew configs ──────────────────────────────────────────────────────
+// Work that spans agents and sessions: claims are leases, resolutions are
+// structured handoffs, and a workstream collects its pieces on one row.
+
+const agentWorkConfig: LTWorkerConfig = {
+  description: 'Agent work: one piece carried across agents and sessions; work, review by another agent, repeat until approved.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD_CHECK,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: AGENT_WORK_INPUT_SCHEMA,
+  reset: true,
+};
+
+const branchLeaseConfig: LTWorkerConfig = {
+  description: 'Branch lease: one row per repo and branch; holding the claim is holding the branch.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.SHIELD,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: BRANCH_LEASE_INPUT_SCHEMA,
+  reset: true,
+};
+
+const workstreamConfig: LTWorkerConfig = {
+  description: 'Workstream: a planner breaks a goal into pieces, agents work them, the pieces collect on one row, the owner signs off.',
+  invocable: true,
+  invocationRoles: INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CHECKLIST,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: WORKSTREAM_INPUT_SCHEMA,
+  reset: true,
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -395,6 +472,12 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PULL_FARM_QUEUE, workflow: pullUnit, config: pullUnitConfig },
   { taskQueue: PULL_FARM_QUEUE, workflow: puller, config: pullerConfig },
   { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: ownerEscalation, config: ownerEscalationConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: claudeProject, config: claudeProjectConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: projectPlan, config: projectPlanConfig },
+  { taskQueue: AGENT_CREW_QUEUE, workflow: agentWork, config: agentWorkConfig },
+  { taskQueue: AGENT_CREW_QUEUE, workflow: branchLease, config: branchLeaseConfig },
+  { taskQueue: AGENT_CREW_QUEUE, workflow: workstream, config: workstreamConfig },
   // Lifecycle proof — the isolated expression of the actor/waiter/director
   // patterns (see src/workflows/lifecycle-proof/workflows.ts RULES 1-5).
   { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },

@@ -5,4 +5,4 @@ export { AGENTS } from './agents';
 export { TOPICS } from './topics';
 export { GRAPH_WORKFLOWS } from './graph-workflows';
 export { HITL_ROLES } from './hitl-roles';
-export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty } from './seed';
+export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchPersonas } from './seed';

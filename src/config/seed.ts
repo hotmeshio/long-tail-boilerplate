@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Pool } from 'pg';
-import { KnowledgeApi } from '@hotmeshio/long-tail';
+import { KnowledgeApi, api } from '@hotmeshio/long-tail';
 
 import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
@@ -11,6 +11,8 @@ import { ALL_BAMBU_ROLES } from '../workflows/bambu-farm/types';
 import { bambuOperatorSeeds, bambuOperatorIds } from '../workflows/bambu-farm/operators';
 import { PULL_POND } from '../workflows/pull-farm/types';
 import { pullOperatorSeeds, pullOperatorIds } from '../workflows/pull-farm/operators';
+import { WORKBENCH_PERSONAS } from '../workflows/claude-workbench';
+import { CREW_PERSONAS, AGENT_PRINCIPALS } from '../workflows/agent-crew';
 
 const bcrypt: any = require('bcryptjs');
 
@@ -150,6 +152,39 @@ export async function seedHitlLookups() {
     } catch (err: any) {
       console.error(`[seed] HITL lookup ${LOOKUP_DOMAIN}/${key} failed (non-fatal):`, err.message);
     }
+  }
+}
+
+/**
+ * Seed the Claude workbench and agent crew personas, then the agent bot
+ * principals, each assigned its one persona. Both passes are declarative and
+ * idempotent: a persona spec reconciles every holder, and a bot that exists
+ * is left as it is. Non-fatal.
+ */
+export async function seedWorkbenchPersonas() {
+  try {
+    const result = await api.personas.seedPersonas({ personas: [...WORKBENCH_PERSONAS, ...CREW_PERSONAS] });
+    if (result.status >= 400) throw new Error(result.error ?? `status ${result.status}`);
+    await seedAgentPrincipals();
+  } catch (err: any) {
+    console.error('[seed] workbench personas failed (non-fatal):', err.message);
+  }
+}
+
+async function seedAgentPrincipals() {
+  const pool = new Pool(DB_CONFIG);
+  try {
+    for (const principal of AGENT_PRINCIPALS) {
+      await pool.query(
+        `INSERT INTO lt_users (id, external_id, display_name, account_type, status)
+         VALUES ($1, $2, $3, 'bot', 'active') ON CONFLICT (external_id) DO NOTHING`,
+        [principal.id, principal.externalId, principal.display],
+      );
+      const assigned = await api.personas.assignPersona({ id: principal.id, key: principal.persona });
+      if (assigned.status >= 400) throw new Error(`${principal.externalId}: ${assigned.error ?? assigned.status}`);
+    }
+  } finally {
+    await pool.end();
   }
 }
 
