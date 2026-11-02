@@ -8,7 +8,7 @@ import { KnowledgeApi } from '@hotmeshio/long-tail';
 import { Pool } from 'pg';
 
 import { DB_CONFIG } from '../../../config/database';
-import { HOLDERS, ORG_DOMAIN } from '../types';
+import { ORG_DOMAIN } from '../types';
 import { INBOX_CORRECTIONS_KEPT, type Correction, type Rule, type Vocabulary } from './types';
 import { INBOX_EDITION, STARTER_VOCABULARY, editionValues, readRule } from './vocabulary';
 
@@ -42,17 +42,26 @@ export async function readInboxVocabulary(): Promise<Vocabulary> {
 }
 
 /**
- * The account that owns an inbox, by the email its holder was configured with.
+ * The account that owns an inbox.
  * Rows open pre-assigned to it: a durable routing hint with no claim window,
  * so they stay available and appear under the holder's own items without a
- * claim. Undefined when the holder has no email or no account yet.
+ * claim. The account is whoever holds the holder's persona, which covers
+ * holders named in code and holders bound from a domain rule alike.
+ * Undefined when nobody holds it yet.
  */
 export async function holderAccount(input: { holder: string }): Promise<{ userId?: string }> {
-  const holder = HOLDERS.find((entry) => entry.role === input.holder);
-  if (!holder?.email) return {};
+  if (!input.holder.startsWith('inbox-')) return {};
+  const persona = input.holder.slice('inbox-'.length);
   const pool = new Pool(DB_CONFIG);
   try {
-    const { rows } = await pool.query<{ id: string }>(`SELECT id FROM lt_users WHERE lower(email) = $1 AND account_type <> 'bot' LIMIT 1`, [holder.email]);
+    const { rows } = await pool.query<{ id: string }>(
+      `SELECT u.id FROM lt_users u
+       JOIN lt_user_personas up ON up.user_id = u.id
+       JOIN lt_personas p ON p.id = up.persona_id
+       WHERE p.key = $1 AND u.account_type <> 'bot' AND u.status = 'active'
+       ORDER BY up.created_at LIMIT 1`,
+      [persona],
+    );
     return rows.length ? { userId: rows[0].id } : {};
   } finally {
     await pool.end();
