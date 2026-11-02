@@ -32,6 +32,15 @@ describe('DOMAIN_DICTIONARY', () => {
     expect(runbook?.steps[runbook.steps.length - 1]).toContain('Report to the holder');
   });
 
+  it('lets the agent start its own sweep instead of asking an admin', () => {
+    const day = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start your day');
+    expect(day?.steps.some((step) => step.includes('start one for your holder'))).toBe(true);
+    expect(day?.steps.some((step) => step.includes('ask the superadmin'))).toBe(false);
+    const sweep = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start a sweep for a holder');
+    expect(sweep?.steps[0]).toContain('their own inbox');
+    expect(sweep?.steps[0]).toContain('refused');
+  });
+
   it('points the inbox runbook at the triage guide first', () => {
     const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'work the inbox');
     expect(runbook?.steps[0]).toContain('inbox-triage-guide');

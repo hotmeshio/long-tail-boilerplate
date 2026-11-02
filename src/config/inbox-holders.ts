@@ -3,14 +3,16 @@
  * (whose roles exist from boot) and domains (a rule). An account whose email
  * matches gets its two roles, its persona and the assignment the first time
  * the binder sees it: at boot, then on a short interval in the api process.
- * Every step is idempotent, so a pass over bound accounts changes nothing.
+ * Each pass also opens the inbox workflows to every bound holder's roles, so
+ * a holder's own agent can start their sweep. Every step is idempotent, so a
+ * pass over bound accounts changes nothing.
  */
 
 import { Pool } from 'pg';
 import { api } from '@hotmeshio/long-tail';
 
 import { DB_CONFIG } from './database';
-import { HOLDERS, INBOX_ENTRIES, holderForEmail, holderPersona, holderRoleConfigs, type InboxEntries, type InboxHolder } from '../workflows/claude-workbench';
+import { HOLDERS, HOLDER_INVOCABLE_WORKFLOWS, INBOX_ENTRIES, holderForEmail, holderPersona, holderRoleConfigs, type InboxEntries, type InboxHolder } from '../workflows/claude-workbench';
 
 export const INBOX_BIND_SECONDS = Math.max(5, Number(process.env.WORKBENCH_INBOX_BIND_SECONDS ?? 15));
 
@@ -49,6 +51,17 @@ export function dynamicHolders(accounts: InboxAccount[], entries: InboxEntries =
   return [...seen.values()];
 }
 
+/** The roles holders invoke the inbox workflows with, inbox then agent queue per holder, holders by name so the worker and the binder write the same list. */
+export function holderInvocationRoles(holders: InboxHolder[]): string[] {
+  return [...holders].sort((a, b) => a.name.localeCompare(b.name)).flatMap((holder) => [holder.role, holder.agentRole]);
+}
+
+/** Pure: the stored invocation list with the roles it lacks appended, or undefined when it lacks none. */
+export function widenedInvocationRoles(stored: string[], roles: string[]): string[] | undefined {
+  const missing = roles.filter((role) => !stored.includes(role));
+  return missing.length ? [...stored, ...missing] : undefined;
+}
+
 const ACCOUNTS_SQL = `
   SELECT u.id, lower(u.email) AS email,
          coalesce(array_agg(p.key) FILTER (WHERE p.key IS NOT NULL), '{}') AS personas
@@ -69,6 +82,37 @@ async function readAccounts(): Promise<InboxAccount[]> {
 }
 
 const failed = (what: string, result: { status: number; error?: string }) => new Error(`${what}: ${result.error ?? result.status}`);
+
+/**
+ * The invocation roles of every holder bound from a domain rule, for the
+ * worker's code-owned configs at boot. Empty when the database cannot answer
+ * yet; the binder opens the workflows on its next pass in that case.
+ */
+export async function boundHolderRoles(): Promise<string[]> {
+  if (!INBOX_ENTRIES.domains.length) return [];
+  try {
+    return holderInvocationRoles(dynamicHolders(await readAccounts()));
+  } catch (err: any) {
+    console.error('[inbox] bound holders unreadable at boot (the binder will open the workflows later):', err.message);
+    return [];
+  }
+}
+
+/** Add the roles to the stored invocation list of each holder-invocable workflow that lacks them. */
+async function openWorkflows(roles: string[]) {
+  if (!roles.length) return;
+  for (const type of HOLDER_INVOCABLE_WORKFLOWS) {
+    const current = await api.workflows.getWorkflowConfig({ type });
+    if (current.status === 404) continue;
+    if (current.status >= 400) throw failed(`workflow ${type}`, current);
+    const { workflow_type, tier: _tier, input_lookup_data: _lookups, created_at: _created, updated_at: _updated, ...rest } = current.data;
+    const widened = widenedInvocationRoles(rest.invocation_roles ?? [], roles);
+    if (!widened) continue;
+    const saved = await api.workflows.upsertWorkflowConfig({ ...rest, type: workflow_type, invocation_roles: widened });
+    if (saved.status >= 400) throw failed(`workflow ${type}`, saved);
+    console.log(`[inbox] ${type} open to ${widened.length - (rest.invocation_roles?.length ?? 0)} more holder roles`);
+  }
+}
 
 /** Create the holder's two roles if absent, then apply the seat config so a code change reaches them. */
 async function ensureRoles(holder: InboxHolder) {
@@ -91,8 +135,10 @@ async function bind({ account, holder, dynamic }: Binding) {
 }
 
 /**
- * One pass: bind every entitled account that lacks its persona. With
- * `refreshRoles`, also re-apply the seat config to roles the binder made
+ * One pass: bind every entitled account that lacks its persona, then make
+ * sure the inbox workflows accept every bound holder's roles (the worker
+ * writes the code-owned list at its boot; this heals whatever it missed).
+ * With `refreshRoles`, also re-apply the seat config to roles the binder made
  * earlier, so they track the code the same way the boot-declared roles do.
  */
 export async function bindInboxHolders(options: { refreshRoles?: boolean } = {}): Promise<number> {
@@ -100,10 +146,12 @@ export async function bindInboxHolders(options: { refreshRoles?: boolean } = {})
   const accounts = await readAccounts();
   const pending = unboundHolders(accounts);
   for (const binding of pending) await bind(binding);
+  const dynamic = dynamicHolders(accounts);
   if (options.refreshRoles) {
     const bound = new Set(pending.map((binding) => binding.holder.name));
-    for (const holder of dynamicHolders(accounts)) if (!bound.has(holder.name)) await ensureRoles(holder);
+    for (const holder of dynamic) if (!bound.has(holder.name)) await ensureRoles(holder);
   }
+  await openWorkflows(holderInvocationRoles(dynamic));
   return pending.length;
 }
 

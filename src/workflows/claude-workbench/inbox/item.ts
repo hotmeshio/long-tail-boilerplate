@@ -13,6 +13,7 @@ import { parseAnswer } from '../contracts';
 import * as activities from './activities';
 import { readItem } from './admission';
 import { parseAct, parseTriage } from './contracts';
+import { refusalFor } from './ownership';
 import { actRow, decideRow } from './rows';
 import { actFailed, afterAct, afterTriage, openingStep, reclassified } from './steps';
 import {
@@ -34,6 +35,12 @@ type Return = { type: 'return'; data: ItemResult };
 
 function isState(data: unknown): data is { state: ItemState } {
   return typeof data === 'object' && data !== null && 'state' in data;
+}
+
+/** The inbox the envelope names, on a first start or a continuation. */
+function holderOf(data: unknown): string | undefined {
+  if (isState(data)) return data.state.item.holder;
+  return (data as Partial<ItemSpec> | undefined)?.holder;
 }
 
 /** A first start carries the item; a continuation carries the state. */
@@ -85,6 +92,8 @@ async function runStep(state: ItemState, signalId: string): Promise<ItemState> {
 
 export async function inboxItem(envelope: LTEnvelope): Promise<Return> {
   const { workflowId } = Durable.workflow.workflowInfo();
+  const refused = refusalFor(envelope, holderOf(envelope.data));
+  if (refused) return { type: 'return', data: { itemId: workflowId, refused } };
   let state = await stateOf(envelope, workflowId);
   if (!state) return { type: 'return', data: { itemId: workflowId, refused: 'The item needs a holder, a known kind, a headline and a summary.' } };
 

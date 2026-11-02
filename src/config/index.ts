@@ -1,5 +1,5 @@
 export { DB_CONFIG } from './database';
-export { WORKERS, READONLY_OBSERVERS } from './workers';
+export { WORKERS, READONLY_OBSERVERS, workersWithHolders } from './workers';
 export { MCP_SERVER_FACTORIES } from './mcp';
 export { AGENTS } from './agents';
 export { TOPICS } from './topics';
@@ -7,4 +7,4 @@ export { GRAPH_WORKFLOWS } from './graph-workflows';
 export { HITL_ROLES } from './hitl-roles';
 export { DOMAIN_DICTIONARY } from './domain-dictionary';
 export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg } from './seed';
-export { bindInboxHolders, startInboxBinding } from './inbox-holders';
+export { bindInboxHolders, boundHolderRoles, startInboxBinding } from './inbox-holders';

@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, DOMAIN_DICTIONARY, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg, startInboxBinding } from './config';
+import { DB_CONFIG, READONLY_OBSERVERS, workersWithHolders, boundHolderRoles, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, DOMAIN_DICTIONARY, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg, startInboxBinding } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -66,7 +66,9 @@ async function main() {
         : undefined,
     },
 
-    workers: isApi ? READONLY_OBSERVERS : WORKERS,
+    // The worker owns the workflow configs; the inbox workflows open to every
+    // holder bound so far, so a holder's own agent can start their sweep.
+    workers: isApi ? READONLY_OBSERVERS : workersWithHolders(await boundHolderRoles()),
 
     graphWorkflows: GRAPH_WORKFLOWS,
 

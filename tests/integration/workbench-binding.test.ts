@@ -69,4 +69,20 @@ describe.skipIf(!domain)('inbox binding', () => {
     const role = (details.data.roles ?? details.data).find((entry: any) => entry.role === `inbox-${persona}`);
     expect(role.default_pins.map((pin: any) => pin.label)).toEqual(['Next', 'Back to you', 'Waiting on others', 'FYI']);
   });
+
+  it('opens the inbox workflows to the bound holder so their own agent can start a sweep', async () => {
+    for (const type of ['inboxSweep', 'inboxItem']) {
+      const config = await poll(
+        `${type} open to inbox-${persona}`,
+        async () => {
+          const { data } = await api.get<any>(`/api/workflows/${type}/config`);
+          const roles: string[] = data.invocation_roles ?? [];
+          return roles.includes(`inbox-${persona}`) && roles.includes(`inbox-agent-${persona}`) ? data : null;
+        },
+        60_000,
+      );
+      expect(config.invocation_roles).toContain('superadmin');
+      expect(config.reset ?? true).toBeTruthy();
+    }
+  });
 });
