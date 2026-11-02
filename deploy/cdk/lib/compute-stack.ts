@@ -88,6 +88,9 @@ export class ComputeStack extends cdk.Stack {
       LT_S3_BUCKET: bucket.bucketName,
       LT_S3_REGION: cdk.Stack.of(this).region,
       BASE_URL: `https://${config.domainName}`,
+      // Who gets a workbench inbox; both containers must agree on the role list.
+      WORKBENCH_INBOX_HOLDERS: config.inboxHolders,
+      OAUTH_AUTO_PROVISION: String(config.oauthAutoProvision),
     };
 
     // --- ECS Cluster ---
@@ -161,8 +164,8 @@ export class ComputeStack extends cdk.Stack {
       internetFacing: true,
       securityGroup: albSecurityGroup,
       vpcSubnets: { subnetType: ec2.SubnetType.PUBLIC },
-      // 60s (the ALB default) mirrors hike-mono's backend ALB to reproduce its
-      // behavior: below NATS's 2-minute ping, so quiet /nats-ws connections drop.
+      // 60s (the ALB default) is below NATS's 2-minute ping, so a quiet /nats-ws
+      // connection drops and the dashboard reconnects; tested and kept on purpose.
       // Set explicitly; removing the prop would not reset the deployed value.
       // 300s keeps them open.
       idleTimeout: cdk.Duration.seconds(60),

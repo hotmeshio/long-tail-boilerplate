@@ -49,6 +49,14 @@ export function loadConfig(app: cdk.App) {
   /** Window the login limit is counted over: 60, 120, 300, or 600 seconds */
   const loginRateWindowSeconds = Number(app.node.tryGetContext('loginRateWindowSeconds') ?? 300);
 
+  // ── Workbench ──────────────────────────────────────────────────────────
+
+  /** Who gets a personal inbox (comma-separated domains, emails, names). Keep names out of the repo: set LT_INBOX_HOLDERS. */
+  const inboxHolders: string = app.node.tryGetContext('inboxHolders') || process.env.LT_INBOX_HOLDERS || 'sam';
+
+  /** Let a third-party sign-in create its own account. Pair with a domain in LT_INBOX_HOLDERS. Default off (invite-only). */
+  const oauthAutoProvision: boolean = (app.node.tryGetContext('oauthAutoProvision') ?? process.env.LT_OAUTH_AUTO_PROVISION) === 'true';
+
   /** CloudMap private DNS namespace for service discovery */
   const serviceDiscoveryNamespace = `${projectSlug}.local`;
 
@@ -64,6 +72,8 @@ export function loadConfig(app: cdk.App) {
     serviceDiscoveryNamespace,
     loginRateLimit,
     loginRateWindowSeconds,
+    inboxHolders,
+    oauthAutoProvision,
 
     // ── Derived values ─────────────────────────────────────────────────
     // Computed from the above — no need to override individually.

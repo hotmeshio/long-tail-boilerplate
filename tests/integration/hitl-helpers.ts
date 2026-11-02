@@ -46,3 +46,12 @@ export function resultOf(api: ApiClient, workflowId: string, timeoutMs = 30_000)
     return r.status === 200 && r.data?.result?.type === 'return' ? r.data.result.data : null;
   }, timeoutMs, 1_000);
 }
+
+/** The pending escalation in a role whose metadata carries the facet and whose subtype matches. */
+export function pendingBySubtype(api: ApiClient, role: string, key: string, value: string, subtype: string, timeoutMs = 30_000) {
+  return poll(`pending ${role}/${subtype} escalation with ${key}=${value}`, async () => {
+    const { data } = await api.get<any>('/api/escalations/by-metadata', { key, value, status: 'pending' });
+    const rows: any[] = data.escalations ?? data;
+    return rows.find((e) => e.role === role && e.subtype === subtype);
+  }, timeoutMs, 1_000);
+}

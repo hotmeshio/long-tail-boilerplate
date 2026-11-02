@@ -5,4 +5,6 @@ export { AGENTS } from './agents';
 export { TOPICS } from './topics';
 export { GRAPH_WORKFLOWS } from './graph-workflows';
 export { HITL_ROLES } from './hitl-roles';
-export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchPersonas } from './seed';
+export { DOMAIN_DICTIONARY } from './domain-dictionary';
+export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg } from './seed';
+export { bindInboxHolders, startInboxBinding } from './inbox-holders';

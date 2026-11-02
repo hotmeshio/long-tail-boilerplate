@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchPersonas } from './config';
+import { DB_CONFIG, WORKERS, READONLY_OBSERVERS, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, DOMAIN_DICTIONARY, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg, startInboxBinding } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -47,6 +47,12 @@ async function main() {
 
     auth: {
       secret: process.env.JWT_SECRET || 'change-me',
+      // Dashboard sign-in with Google/GitHub/Microsoft (OAUTH_<PROVIDER>_CLIENT_ID in env).
+      // Invite-only by default: a sign-in must match an account an admin created
+      // (by email). OAUTH_AUTO_PROVISION=true lets any sign-in create an account;
+      // which accounts get a workbench inbox is WORKBENCH_INBOX_HOLDERS (a domain
+      // binds every account that signs in with it; see config/inbox-holders.ts).
+      oauth: { autoProvision: process.env.OAUTH_AUTO_PROVISION === 'true' },
       // OAuth sign-in for MCP clients at /mcp. Loopback redirects (Claude Code)
       // are always allowed; https redirects must be listed exactly.
       oauthServer: process.env.LT_OAUTH_ISSUER
@@ -73,6 +79,9 @@ async function main() {
 
     mcp: {
       serverFactories: MCP_SERVER_FACTORIES,
+      // The front door for agents: terms, kill roads and runbooks; code-owned.
+      domainDictionary: DOMAIN_DICTIONARY,
+      domainDictionaryReset: true,
     },
 
     escalation: {
@@ -102,7 +111,9 @@ async function main() {
     await seedPrintFarmIfEmpty();
     await seedBambuFarmIfEmpty();
     await seedPullFarmIfEmpty();
-    await seedWorkbenchPersonas();
+    await seedWorkbenchOrg();
+    // 3. Bind inboxes to accounts as they sign in (domain rules in WORKBENCH_INBOX_HOLDERS)
+    startInboxBinding();
   }
 
   // 4. Graceful shutdown

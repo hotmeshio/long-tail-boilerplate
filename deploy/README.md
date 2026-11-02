@@ -285,6 +285,8 @@ CDK creates nine secrets. Some are auto-generated, some need manual setup:
 | `LongTail/AnthropicApiKey` | CDK (placeholder) | **Replace with your real key** |
 | `LongTail/OpenaiApiKey` | CDK (placeholder) | **Replace with your real key** |
 | `LongTail/OAuthProviders` | CDK (empty `{}`) | Optional — add OAuth provider credentials |
+
+With provider credentials set, the login page shows the sign-in buttons. Sign-in is invite-only by default: it logs in an account whose email matches one an admin already created (Accounts page or `POST /api/users`); anyone else gets "No account found". Set the repository variable `LT_OAUTH_AUTO_PROVISION=true` to let a sign-in create its own account. A self-provisioned account holds no roles; it gets a workbench inbox only if its email matches `LT_INBOX_HOLDERS` (a domain there binds everyone who signs in with it). Long Tail does not yet restrict self-provisioning by domain, so with it on, anyone with a Google, GitHub or Microsoft account can create an empty account.
 | `LongTail/ApiKeys` | CDK (empty `{}`) | Optional |
 
 Secrets are injected into containers via ECS task definition `secrets:` blocks. ECS resolves them at container start time, not continuously. After changing a secret value, restart the services.
@@ -313,6 +315,7 @@ The ALB idle timeout is 60 seconds (the AWS default). Quiet dashboard connection
 ```bash
 export LT_HOSTED_ZONE_DOMAIN=example.com   # the hosted zone you own
 export LT_SUBDOMAIN=app                     # the app serves at https://app.example.com
+export LT_INBOX_HOLDERS=example.com            # optional: who gets a workbench inbox (domains, emails, names)
 ```
 
   Context flags work too: `-c hostedZoneDomain=example.com -c subdomain=app`.
@@ -581,6 +584,7 @@ Then under **Secrets**, add the values the deploy and smoke jobs read. Secrets k
 | Secret | Value |
 |--------|-------|
 | `LT_HOSTED_ZONE_DOMAIN` | Your Route 53 hosted zone, e.g. `example.com` |
+| `LT_INBOX_HOLDERS` | Optional. Who gets a workbench inbox, comma-separated: a domain (`example.com`) binds every account that signs in with an email in it, an email (`ana.ruiz@example.com`) binds that account, a bare name (`sam`) makes an inbox with no account. An email becomes the roles `inbox-ana-ruiz-at-example-com` and `inbox-agent-ana-ruiz-at-example-com` and a persona holding both. Default `sam`. A secret so names stay out of the repo. |
 | `LT_SUBDOMAIN` | The app's subdomain, e.g. `app` |
 | `REMOTE_PASSWORD` | The superadmin password (the `LongTail/SeedAdminPassword` secret), for the post-deploy smoke tests |
 

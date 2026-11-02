@@ -1,0 +1,33 @@
+import { describe, it, expect } from 'vitest';
+
+import { DOMAIN_DICTIONARY } from '../../../src/config/domain-dictionary';
+import { WORKERS } from '../../../src/config/workers';
+import { ORG_PROGRAMS_ROLE, ORG_ROLES } from '../../../src/workflows/claude-workbench/types';
+
+const roles = new Set([...ORG_ROLES.map((entry) => entry.role), ORG_PROGRAMS_ROLE]);
+const workflows = new Set(WORKERS.map((worker) => worker.workflow.name));
+
+describe('DOMAIN_DICTIONARY', () => {
+  it('maps every term to a real role or workflow', () => {
+    for (const term of DOMAIN_DICTIONARY.terms ?? []) {
+      for (const role of [term.maps_to?.role, ...(term.maps_to?.roles ?? [])].filter(Boolean)) expect(roles.has(role!)).toBe(true);
+      if (term.maps_to?.workflow) expect(workflows.has(term.maps_to.workflow)).toBe(true);
+      expect(term.guidance.length).toBeGreaterThan(10);
+    }
+  });
+
+  it('gives every workflow term a kill road and an id convention', () => {
+    const workflowTerms = (DOMAIN_DICTIONARY.terms ?? []).filter((term) => term.kind === 'workflow');
+    expect(workflowTerms.length).toBeGreaterThanOrEqual(4);
+    for (const term of workflowTerms) {
+      expect(term.kill_road).toBeTruthy();
+      expect(term.id_convention).toBeTruthy();
+    }
+  });
+
+  it('points the inbox runbook at the triage guide first', () => {
+    const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'work the inbox');
+    expect(runbook?.steps[0]).toContain('inbox-triage-guide');
+    expect(DOMAIN_DICTIONARY.runbooks?.map((entry) => entry.name)).toContain('work a seat');
+  });
+});

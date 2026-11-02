@@ -76,6 +76,8 @@ jobs:
         env:
           LT_HOSTED_ZONE_DOMAIN: ${{ secrets.LT_HOSTED_ZONE_DOMAIN }}
           LT_SUBDOMAIN: ${{ secrets.LT_SUBDOMAIN }}
+          LT_INBOX_HOLDERS: ${{ secrets.LT_INBOX_HOLDERS }}
+          LT_OAUTH_AUTO_PROVISION: ${{ vars.LT_OAUTH_AUTO_PROVISION }}
         run: npx cdk diff --all || true
 
       - name: CDK deploy
@@ -83,6 +85,8 @@ jobs:
         env:
           LT_HOSTED_ZONE_DOMAIN: ${{ secrets.LT_HOSTED_ZONE_DOMAIN }}
           LT_SUBDOMAIN: ${{ secrets.LT_SUBDOMAIN }}
+          LT_INBOX_HOLDERS: ${{ secrets.LT_INBOX_HOLDERS }}
+          LT_OAUTH_AUTO_PROVISION: ${{ vars.LT_OAUTH_AUTO_PROVISION }}
         run: npx cdk deploy --all --require-approval never
 
   smoke:
