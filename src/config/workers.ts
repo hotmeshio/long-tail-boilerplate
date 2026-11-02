@@ -38,7 +38,7 @@ import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
 
-import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER } from './roles';
+import { CERTIFIED_ROLES, INVOCATION_ROLES, REVIEWER, STRESS_INVOCATION_ROLES } from './roles';
 
 // ── Workflow configs ──────────────────────────────────────────────────────
 // Configs with an `inputSchema` render a rich invoke form, and the invoke API
@@ -84,7 +84,7 @@ const screenshotConfig: LTWorkerConfig = {
 const assemblyLineConfig: LTWorkerConfig = {
   description: 'Assembly line — orchestrates sequential stations with parallel child workflows and human escalation',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
@@ -97,12 +97,13 @@ const assemblyLineConfig: LTWorkerConfig = {
     },
     metadata: { certified: true, source: 'dashboard' },
   },
+  reset: true,
 };
 
 const stepIteratorConfig: LTWorkerConfig = {
   description: 'Step iterator — walks stations sequentially, spawning a child workstation for each step',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
@@ -115,12 +116,13 @@ const stepIteratorConfig: LTWorkerConfig = {
     },
     metadata: { certified: true, source: 'dashboard' },
   },
+  reset: true,
 };
 
 const reverterConfig: LTWorkerConfig = {
   description: 'Reverter — like stepIterator but supports revert-on-rejection, stepping backwards',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   defaultRole: REVIEWER,
   roles: CERTIFIED_ROLES,
   envelopeSchema: {
@@ -133,6 +135,7 @@ const reverterConfig: LTWorkerConfig = {
     },
     metadata: { certified: true, source: 'dashboard' },
   },
+  reset: true,
 };
 
 const workstationConfig: LTWorkerConfig = {
@@ -172,7 +175,7 @@ const ORTHO_ROLES = ['ingester', 'renderer', 'validator', 'printer', 'grinder', 
 const pipelineConfig: LTWorkerConfig = {
   description: 'Ortho pipeline — sequential manufacturing flow with nested print fleet',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   defaultRole: REVIEWER,
   roles: [...CERTIFIED_ROLES, ...ORTHO_ROLES],
   envelopeSchema: {
@@ -185,6 +188,7 @@ const pipelineConfig: LTWorkerConfig = {
     },
     metadata: { certified: true, source: 'dashboard' },
   },
+  reset: true,
 };
 
 const orthoStationConfig: LTWorkerConfig = {
@@ -246,13 +250,14 @@ const PRINT_OPERATORS = operatorIds(false); // standard fleet's stable operator 
 const printShiftConfig: LTWorkerConfig = {
   description: 'Print shift — invocable entry: powers on the fleet + dispatcher, feeds order waves, drains, retires idle machines. Runs the whole print farm end to end.',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   defaultRole: REVIEWER,
   roles: [...CERTIFIED_ROLES, ...ALL_PRINT_ROLES],
   envelopeSchema: {
     data: { diabetic: false, ...PRINT_OPERATORS },
     metadata: { source: 'dashboard' },
   },
+  reset: true,
 };
 
 const printOrderConfig: LTWorkerConfig = {
@@ -306,11 +311,12 @@ const farmInspectorConfig: LTWorkerConfig = {
 const bambuPrinterConfig: LTWorkerConfig = {
   description: 'Bambu printer — virtual machine mirroring the Farm Manager gcode_state lifecycle. Advertises when idle; dispatch resolves the advert with Acme’s IoT payload; emits real Bambu webhook events (job_start/job_failed+hms/job_finished/printer_ready/job_rejected).',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   envelopeSchema: {
     data: { deviceId: 'VIRT-0001', machineName: 'virtual-a1', maxRuns: 50 },
     metadata: { source: 'dashboard' },
   },
+  reset: true,
 };
 
 // ── Pull Farm config ─────────────────────────────────────────────────────────
@@ -323,11 +329,12 @@ const bambuPrinterConfig: LTWorkerConfig = {
 const pullDemandConfig: LTWorkerConfig = {
   description: 'Pull demand — fans out N pullUnit children, each parking one escalation in the pull-pond. Returns who resolved what (the distribution proof).',
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   envelopeSchema: {
     data: { batch: 'batch-001', units: 24 },
     metadata: { source: 'dashboard' },
   },
+  reset: true,
 };
 
 const pullUnitConfig: LTWorkerConfig = {
@@ -338,11 +345,12 @@ const pullUnitConfig: LTWorkerConfig = {
 const pullerConfig: LTWorkerConfig = {
   description: `Puller — crew-loop running as its own principal (${PULLER_COUNT} seeded): scan → claim (a real lease) → work → resolve; counts lost races with their statuses; 'silent' claims and goes dark (claim-TTL recovery).`,
   invocable: true,
-  invocationRoles: INVOCATION_ROLES,
+  invocationRoles: STRESS_INVOCATION_ROLES,
   envelopeSchema: {
     data: { pullerId: 'puller-0', operatorId: pullOperatorIds()[0], batch: 'batch-001', workSeconds: 1 },
     metadata: { source: 'dashboard' },
   },
+  reset: true,
 };
 
 // ── Task Queue config ───────────────────────────────────────────────────────
@@ -473,12 +481,12 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxItem, config: inboxItemConfig },
   // Lifecycle proof — the isolated expression of the actor/waiter/director
   // patterns (see src/workflows/lifecycle-proof/workflows.ts RULES 1-5).
-  { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },
+  { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'], reset: true } },
   { taskQueue: PROOF_QUEUE, workflow: proofActor, config: { description: 'Lifecycle proof — batch-loop actor', invocable: false } },
   { taskQueue: PROOF_QUEUE, workflow: proofWaiter, config: { description: 'Lifecycle proof — event-driven waiter', invocable: false } },
   { taskQueue: PROOF_QUEUE, workflow: proofBroker, config: { description: 'Lifecycle proof — matcher', invocable: false } },
   { taskQueue: PROOF_QUEUE, workflow: proofPill, config: { description: 'Lifecycle proof — self-expiring pill', invocable: false } },
-  { taskQueue: PROOF_QUEUE, workflow: proofDirector2, config: { description: 'Lifecycle proof — CHAIN director (convergence by parked waits, zero held children)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },
+  { taskQueue: PROOF_QUEUE, workflow: proofDirector2, config: { description: 'Lifecycle proof — CHAIN director (convergence by parked waits, zero held children)', invocable: true, invocationRoles: ['superadmin', 'admin'], reset: true } },
   { taskQueue: PROOF_QUEUE, workflow: chainedActor, config: { description: 'Lifecycle proof — generation-chained actor (one batch per link, startChild successor)', invocable: false } },
 ];
 

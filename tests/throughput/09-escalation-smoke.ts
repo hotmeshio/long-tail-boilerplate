@@ -41,6 +41,7 @@ async function main() {
 
   // 2. Register pipeline workflow config
   await api('PUT', '/api/workflows/pipeline/config', {
+    invocation_roles: ['superadmin'],
     invocable: true,
     task_queue: 'ortho-pipeline',
     default_role: 'reviewer',

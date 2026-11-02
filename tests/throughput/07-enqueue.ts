@@ -39,6 +39,7 @@ async function main() {
   console.log(`[${ts()}] Enqueuer started — ${TARGET} orders, 1 every ${ENQUEUE_EVERY}s (run ${RUN_ID})`);
 
   await api('PUT', '/api/workflows/stepIterator/config', {
+    invocation_roles: ['superadmin'],
     invocable: true,
     task_queue: 'assembly-line',
     default_role: 'reviewer',

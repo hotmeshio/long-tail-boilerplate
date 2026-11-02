@@ -60,6 +60,7 @@ async function main() {
   // 2. Register workflow config
   console.log('2. Register stepIterator config');
   await api('PUT', '/api/workflows/stepIterator/config', {
+    invocation_roles: ['superadmin'],
     invocable: true,
     task_queue: TASK_QUEUE,
     default_role: 'reviewer',
