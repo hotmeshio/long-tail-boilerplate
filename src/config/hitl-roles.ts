@@ -24,6 +24,15 @@ import {
 } from '../workflows/lot-inspection/forms';
 import { WORKBENCH_ROLES } from '../workflows/claude-workbench';
 
+/**
+ * The ortho pipeline's stations. They exist for load testing and were once
+ * switched onto the Pace Board by hand; the boards belong to the workbench,
+ * so code keeps them off. Only the two board flags are declared, so the
+ * rest of each row (forms, capacity dials) stays as it is.
+ */
+const ORTHO_STATIONS = ['ingester', 'renderer', 'validator', 'printer', 'grinder', 'finisher', 'packager', 'shipper'];
+const BOARD_HIDDEN_ROLES: LTRoleConfig[] = ORTHO_STATIONS.map((role) => ({ role, ops_visible: false, ops_home_default: false, reset: true }));
+
 const queue = (role: string) => `/escalations/available?role=${role}`;
 
 export const HITL_ROLES: LTRoleConfig[] = [
@@ -70,4 +79,5 @@ export const HITL_ROLES: LTRoleConfig[] = [
   },
   // The workbench org: one seat per role, sharing one form, plus the program board.
   ...WORKBENCH_ROLES,
+  ...BOARD_HIDDEN_ROLES,
 ];
