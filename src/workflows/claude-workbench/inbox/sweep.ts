@@ -16,6 +16,7 @@ import { CLAUDE_WORKBENCH_QUEUE } from '../types';
 import * as activities from './activities';
 import { admit, itemWorkflowId, laterWatermark } from './admission';
 import { parseAct } from './contracts';
+import { refusalFor } from './ownership';
 import { checkRow } from './rows';
 import { INBOX_CHECKS_PER_LINK, INBOX_CHECK_MAX_ITEMS, INBOX_DEFAULT_INTERVAL_MINUTES, INBOX_DEFAULT_LOOKBACK_HOURS, type ItemSpec, type SweepInput } from './types';
 
@@ -40,9 +41,11 @@ async function startItem(item: ItemSpec): Promise<boolean> {
   }
 }
 
-export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepInput | { cancelled: true } }> {
+export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepInput | { cancelled: true } | { refused: string } }> {
   const { workflowId } = Durable.workflow.workflowInfo();
   const input = envelope.data as SweepInput;
+  const refused = refusalFor(envelope, input.holder);
+  if (refused) return { type: 'return', data: { refused } };
   const generation = input.generation ?? 0;
   const interval = input.intervalMinutes ?? INBOX_DEFAULT_INTERVAL_MINUTES;
   const max = input.maxItems ?? INBOX_CHECK_MAX_ITEMS;

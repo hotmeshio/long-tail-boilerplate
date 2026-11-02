@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { dynamicHolders, unboundHolders } from '../../../src/config/inbox-holders';
+import { dynamicHolders, holderInvocationRoles, unboundHolders, widenedInvocationRoles } from '../../../src/config/inbox-holders';
 import { parseInboxEntries } from '../../../src/workflows/claude-workbench/types';
 
 const entries = parseInboxEntries('example.com,ana.ruiz@other.io,sam');
@@ -29,5 +29,16 @@ describe('inbox binding', () => {
   it('lists each dynamic holder once for a schema refresh', () => {
     const accounts = [account('u1', 'kim.lee@example.com', ['kim-lee-at-example-com']), account('u5', 'Kim.Lee@example.com'), account('u2', 'ana.ruiz@other.io'), account('u3', 'x@elsewhere.io')];
     expect(dynamicHolders(accounts, entries, named).map((holder) => holder.name)).toEqual(['kim-lee-at-example-com']);
+  });
+
+  it('opens the inbox workflows to a bound holder through both of their roles', () => {
+    const holders = dynamicHolders([account('u1', 'kim.lee@example.com')], entries, named);
+    expect(holderInvocationRoles(holders)).toEqual(['inbox-kim-lee-at-example-com', 'inbox-agent-kim-lee-at-example-com']);
+  });
+
+  it('widens a stored invocation list only when it lacks a role', () => {
+    expect(widenedInvocationRoles(['superadmin', 'inbox-kim'], ['inbox-kim', 'inbox-agent-kim'])).toEqual(['superadmin', 'inbox-kim', 'inbox-agent-kim']);
+    expect(widenedInvocationRoles(['superadmin', 'inbox-kim', 'inbox-agent-kim'], ['inbox-kim', 'inbox-agent-kim'])).toBeUndefined();
+    expect(widenedInvocationRoles(['superadmin'], [])).toBeUndefined();
   });
 });

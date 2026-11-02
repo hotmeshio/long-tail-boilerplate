@@ -32,7 +32,7 @@ import { HELLO_INPUT_SCHEMA } from '../workflows/hello-world/forms';
 import { MODERATOR_ROLE, CONTENT_REVIEW_INPUT_SCHEMA } from '../workflows/content-review/forms';
 import { SCREENSHOT_INPUT_SCHEMA } from '../workflows/screenshot-research/forms';
 import { TASK_INPUT_SCHEMA } from '../workflows/task-queue/forms';
-import { program, programBoard, deliverable, ask, inboxSweep, inboxItem, CLAUDE_WORKBENCH_QUEUE, SEAT_ROLES, WORKBENCH_INPUT_LOOKUPS } from '../workflows/claude-workbench';
+import { program, programBoard, deliverable, ask, inboxSweep, inboxItem, CLAUDE_WORKBENCH_QUEUE, SEAT_ROLES, WORKBENCH_INPUT_LOOKUPS, HOLDER_INVOCABLE_WORKFLOWS } from '../workflows/claude-workbench';
 import { PROGRAM_INPUT_SCHEMA, DELIVERABLE_INPUT_SCHEMA, ASK_INPUT_SCHEMA, INBOX_SWEEP_INPUT_SCHEMA, INBOX_ITEM_INPUT_SCHEMA } from '../workflows/claude-workbench/forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
@@ -494,3 +494,18 @@ export const READONLY_OBSERVERS: LTStartConfig['workers'] = WORKERS!.map((w) => 
   ...w,
   connection: { readonly: true } as const,
 }));
+
+/**
+ * The worker list with the inbox workflows open to these holder roles too.
+ * Holders bound from a domain rule exist only in the database, so the worker
+ * reads them at boot (config/inbox-holders.ts) and the binder widens the
+ * stored lists for holders bound after that.
+ */
+export function workersWithHolders(holderRoles: string[]): LTStartConfig['workers'] {
+  if (!holderRoles.length) return WORKERS;
+  const open = new Set<string>(HOLDER_INVOCABLE_WORKFLOWS);
+  const nameOf = (workflow: string | { name: string }) => (typeof workflow === 'string' ? workflow : workflow.name);
+  return WORKERS!.map((w) => (open.has(nameOf(w.workflow)) && w.config
+    ? { ...w, config: { ...w.config, invocationRoles: [...new Set([...(w.config.invocationRoles ?? []), ...holderRoles])] } }
+    : w));
+}

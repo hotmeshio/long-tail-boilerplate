@@ -76,7 +76,7 @@ Who gets a personal inbox is `WORKBENCH_INBOX_HOLDERS` in `.env` (comma-separate
 | `ana.ruiz@example.com` | One person. The roles exist from boot; the account that carries that email is bound when it appears. |
 | `sam` | A name with no account; the public code keeps this fictional one. |
 
-A sign-in email becomes the seat `inbox-ana-ruiz-at-example-com` and its agent queue `inbox-agent-ana-ruiz-at-example-com` (the whole email in the role alphabet `[a-z0-9_-]`, so holders from different domains never collide and the names are URL-safe), and the persona `ana-ruiz-at-example-com` holding both. Accounts outside the list get nothing: no roles, no persona, no inbox. `src/config/inbox-holders.ts` is the binder; the roles it makes carry the same seat form and pins as the code-declared ones and are refreshed from code at every boot.
+A sign-in email becomes the seat `inbox-ana-ruiz-at-example-com` and its agent queue `inbox-agent-ana-ruiz-at-example-com` (the whole email in the role alphabet `[a-z0-9_-]`, so holders from different domains never collide and the names are URL-safe), and the persona `ana-ruiz-at-example-com` holding both. Accounts outside the list get nothing: no roles, no persona, no inbox. `src/config/inbox-holders.ts` is the binder; the roles it makes carry the same seat form and pins as the code-declared ones and are refreshed from code at every boot. The binder also opens `inboxSweep` and `inboxItem` to every bound holder's roles, so a holder (or their agent acting as them) starts their own sweep and adds their own notes; both workflows refuse a caller who names an inbox they do not hold, unless the caller is an admin or superadmin.
 
 ## What changes without a deploy
 

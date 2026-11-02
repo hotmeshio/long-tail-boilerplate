@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { WORKERS } from '../../../src/config/workers';
+import { WORKERS, workersWithHolders } from '../../../src/config/workers';
 import { STRESS_INVOCATION_ROLES, SUPERADMIN } from '../../../src/config/roles';
 
 const invocable = WORKERS.filter((worker) => worker.config?.invocable);
@@ -16,6 +16,21 @@ describe('worker configs', () => {
     for (const worker of invocable) {
       expect(worker.config!.reset, worker.workflow.name).toBe(true);
     }
+  });
+
+  it('opens only the inbox workflows to bound holders, and leaves the list alone when there are none', () => {
+    const roles = ['inbox-kim', 'inbox-agent-kim'];
+    const workers = workersWithHolders(roles)!;
+    const configOf = (name: string) => workers.find((worker) => worker.workflow.name === name)!.config!;
+    for (const name of ['inboxSweep', 'inboxItem']) {
+      expect(configOf(name).invocationRoles).toEqual(expect.arrayContaining(roles));
+      expect(configOf(name).reset).toBe(true);
+    }
+    for (const name of ['ask', 'deliverable', 'program', 'assemblyLine']) {
+      expect(configOf(name).invocationRoles).not.toEqual(expect.arrayContaining(roles));
+    }
+    expect(workersWithHolders([])).toBe(WORKERS);
+    expect(WORKERS!.find((worker) => worker.workflow.name === 'inboxSweep')!.config!.invocationRoles).not.toContain('inbox-kim');
   });
 
   it('keeps the load and farm simulations to superadmin', () => {
