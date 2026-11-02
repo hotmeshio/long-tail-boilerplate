@@ -9,7 +9,7 @@ import type { LTRoleConfig } from '@hotmeshio/long-tail';
 import { PROGRAM_FORM_SCHEMA, PROGRAM_LIST_SCHEMA, SEAT_FORM_SCHEMA, SEAT_LIST_SCHEMA, SEAT_METADATA_SCHEMA } from './forms';
 import { FACET } from './facets';
 import { INBOX_STAGE } from './inbox/types';
-import { ORG_PROGRAMS_ROLE, ORG_ROLES, SECTION, holderRoleSpecs, type InboxHolder, type OrgRoleSpec } from './types';
+import { ORG_PROGRAMS_ROLE, ORG_ROLES, SECTION, holderRoleSpecs, inboxRole, type InboxHolder, type OrgRoleSpec } from './types';
 
 const available = (role: string) => `/escalations/available?role=${role}`;
 const bySection = (role: string, section: string) => `${available(role)}&subtype=${section}`;
@@ -69,6 +69,33 @@ function verbsFor(spec: OrgRoleSpec) {
   };
 }
 
+/**
+ * What the Pace and Trend Boards see of a seat. Every seat is visible; the
+ * entity it tracks is the item (inboxes and agent queues) or the deliverable
+ * (teams), and its states are the row subtypes, so the Trend Board answers
+ * "where did the time go" per view (triage, findings, waiting) or per act,
+ * sliceable by category, kind, need or RACI. An agent queue's prior step is
+ * its inbox, so the two draw as one segment. The SLA is the age at which an
+ * undecided row counts as jeopardy.
+ */
+export const BOARD = {
+  INBOX_SLA_MINUTES: 240,
+  AGENT_SLA_MINUTES: 60,
+  TEAM_SLA_MINUTES: 1440,
+  PROGRAM_SLA_MINUTES: 10080,
+} as const;
+
+function boardFor(spec: OrgRoleSpec): Pick<LTRoleConfig, 'ops_visible' | 'sla_minutes' | 'entity_facet' | 'entity_state_source' | 'parent_role'> {
+  if (spec.domain === 'people') {
+    return { ops_visible: true, sla_minutes: BOARD.INBOX_SLA_MINUTES, entity_facet: FACET.ITEM, entity_state_source: 'subtype' };
+  }
+  if (spec.domain === 'agents') {
+    const holder = inboxRole(spec.role.slice('inbox-agent-'.length));
+    return { ops_visible: true, sla_minutes: BOARD.AGENT_SLA_MINUTES, entity_facet: FACET.ITEM, entity_state_source: 'subtype', parent_role: holder };
+  }
+  return { ops_visible: true, sla_minutes: BOARD.TEAM_SLA_MINUTES, entity_facet: FACET.DELIVERABLE, entity_state_source: 'subtype' };
+}
+
 function seatRole(spec: OrgRoleSpec): LTRoleConfig {
   return {
     role: spec.role,
@@ -80,6 +107,7 @@ function seatRole(spec: OrgRoleSpec): LTRoleConfig {
     enforce_schema: true,
     default_pins: pinsFor(spec),
     properties: verbsFor(spec),
+    ...boardFor(spec),
     reset: true,
   };
 }
@@ -92,6 +120,10 @@ const programsRole: LTRoleConfig = {
   list_schema: PROGRAM_LIST_SCHEMA,
   enforce_schema: true,
   default_pins: [{ label: 'Programs', url: PROGRAMS_URL, badge: true }],
+  ops_visible: true,
+  sla_minutes: BOARD.PROGRAM_SLA_MINUTES,
+  entity_facet: FACET.PROGRAM,
+  entity_state_source: 'role',
   reset: true,
 };
 
