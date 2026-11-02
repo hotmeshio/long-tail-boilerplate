@@ -32,6 +32,8 @@ import { HELLO_INPUT_SCHEMA } from '../workflows/hello-world/forms';
 import { MODERATOR_ROLE, CONTENT_REVIEW_INPUT_SCHEMA } from '../workflows/content-review/forms';
 import { SCREENSHOT_INPUT_SCHEMA } from '../workflows/screenshot-research/forms';
 import { TASK_INPUT_SCHEMA } from '../workflows/task-queue/forms';
+import { program, programBoard, deliverable, ask, inboxSweep, inboxItem, CLAUDE_WORKBENCH_QUEUE, SEAT_ROLES, WORKBENCH_INPUT_LOOKUPS } from '../workflows/claude-workbench';
+import { PROGRAM_INPUT_SCHEMA, DELIVERABLE_INPUT_SCHEMA, ASK_INPUT_SCHEMA, INBOX_SWEEP_INPUT_SCHEMA, INBOX_ITEM_INPUT_SCHEMA } from '../workflows/claude-workbench/forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
@@ -365,6 +367,74 @@ const taskWorkflowConfig: LTWorkerConfig = {
   reset: true,
 };
 
+// ── Claude workbench configs ────────────────────────────────────────────────
+// An organization as queues: roles are seats, a persona is a collection of
+// roles, and work crosses roles as validated handoffs. A bot holding a seat
+// may invoke these too, so the seat roles join the invocation roles.
+
+const WORKBENCH_INVOCATION_ROLES = [...INVOCATION_ROLES, ...SEAT_ROLES];
+
+const programConfig: LTWorkerConfig = {
+  description: 'Program: phases of deliverables closed by per-role gates, with a board row in org-programs; pins the org editions it started under.',
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CHECKLIST,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: PROGRAM_INPUT_SCHEMA,
+  inputLookups: WORKBENCH_INPUT_LOOKUPS,
+  reset: true,
+};
+
+const programBoardConfig: LTWorkerConfig = {
+  description: 'Program board: the open row in org-programs that finished deliverables join; started by program, never by hand.',
+  invocable: false,
+  reset: true,
+};
+
+const deliverableConfig: LTWorkerConfig = {
+  description: 'Deliverable: produced by one role, reviewed by another; work, decide or review rounds until accepted.',
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD_CHECK,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: DELIVERABLE_INPUT_SCHEMA,
+  inputLookups: WORKBENCH_INPUT_LOOKUPS,
+  reset: true,
+};
+
+const inboxSweepConfig: LTWorkerConfig = {
+  description: 'Inbox sweep: asks the AI to check one source for one inbox on a schedule; each item found becomes an inbox item.',
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.SPARKLES,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: INBOX_SWEEP_INPUT_SCHEMA,
+  inputLookups: WORKBENCH_INPUT_LOOKUPS,
+  reset: true,
+};
+
+const inboxItemConfig: LTWorkerConfig = {
+  description: 'Inbox item: one thing that needs a holder; a decision in their inbox, an act in the AI queue, and back until it closes.',
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: INBOX_ITEM_INPUT_SCHEMA,
+  inputLookups: WORKBENCH_INPUT_LOOKUPS,
+  reset: true,
+};
+
+const askConfig: LTWorkerConfig = {
+  description: 'Ask: one decision parked in a role\'s queue; what an agent invokes when it needs a person.',
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.CLIPBOARD,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: ASK_INPUT_SCHEMA,
+  inputLookups: WORKBENCH_INPUT_LOOKUPS,
+  reset: true,
+};
+
 // ── Worker list ───────────────────────────────────────────────────────────
 
 export const WORKERS: LTStartConfig['workers'] = [
@@ -395,6 +465,12 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: PULL_FARM_QUEUE, workflow: pullUnit, config: pullUnitConfig },
   { taskQueue: PULL_FARM_QUEUE, workflow: puller, config: pullerConfig },
   { taskQueue: TASK_QUEUE, workflow: taskWorkflow, config: taskWorkflowConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: program, config: programConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: programBoard, config: programBoardConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: deliverable, config: deliverableConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: ask, config: askConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxSweep, config: inboxSweepConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxItem, config: inboxItemConfig },
   // Lifecycle proof — the isolated expression of the actor/waiter/director
   // patterns (see src/workflows/lifecycle-proof/workflows.ts RULES 1-5).
   { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'] } },

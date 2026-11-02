@@ -1,6 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 import { Pool } from 'pg';
-import { KnowledgeApi } from '@hotmeshio/long-tail';
+import { KnowledgeApi, api } from '@hotmeshio/long-tail';
 
 import { REVIEWER, ENGINEER, ADMIN, SUPERADMIN } from './roles';
 import { DB_CONFIG } from './database';
@@ -11,6 +11,8 @@ import { ALL_BAMBU_ROLES } from '../workflows/bambu-farm/types';
 import { bambuOperatorSeeds, bambuOperatorIds } from '../workflows/bambu-farm/operators';
 import { PULL_POND } from '../workflows/pull-farm/types';
 import { pullOperatorSeeds, pullOperatorIds } from '../workflows/pull-farm/operators';
+import { WORKBENCH_PERSONAS, WORKBENCH_BOTS, STARTER_ENTRIES, CODE_OWNED_ENTRIES, ORG_DOMAIN } from '../workflows/claude-workbench';
+import { bindInboxHolders } from './inbox-holders';
 
 const bcrypt: any = require('bcryptjs');
 
@@ -150,6 +152,64 @@ export async function seedHitlLookups() {
     } catch (err: any) {
       console.error(`[seed] HITL lookup ${LOOKUP_DOMAIN}/${key} failed (non-fatal):`, err.message);
     }
+  }
+}
+
+/**
+ * Seed the workbench org: the `org` editions (starter entries written once,
+ * when absent; the handoff guide replaced when it changes), the personas
+ * (declarative and idempotent: a spec reconciles every holder), the bot
+ * principals, each assigned its persona, and the inbox bindings for accounts
+ * that already exist. Non-fatal.
+ */
+export async function seedWorkbenchOrg() {
+  try {
+    await seedOrgEditions();
+    const result = await api.personas.seedPersonas({ personas: WORKBENCH_PERSONAS });
+    if (result.status >= 400) throw new Error(result.error ?? `status ${result.status}`);
+    await seedWorkbenchBots();
+    await bindInboxHolders({ refreshRoles: true });
+  } catch (err: any) {
+    console.error('[seed] workbench org failed (non-fatal):', err.message);
+  }
+}
+
+async function seedOrgEditions() {
+  for (const { key, data } of STARTER_ENTRIES) {
+    const existing = await KnowledgeApi.getEntry({ domain: ORG_DOMAIN, key });
+    if (existing.status === 200 && existing.data?.found !== false) continue;
+    const result = await KnowledgeApi.storeEntry({ domain: ORG_DOMAIN, key, data, tags: ['org', 'workbench'], replace: true });
+    if (result.status >= 400) throw new Error(`org/${key}: ${result.error ?? result.status}`);
+    console.log(`[seed] org edition ${ORG_DOMAIN}/${key} written`);
+  }
+  for (const { key, data } of CODE_OWNED_ENTRIES) {
+    const existing = await KnowledgeApi.getEntry({ domain: ORG_DOMAIN, key });
+    if (existing.status === 200 && isDeepStrictEqual(existing.data?.data, data)) continue;
+    const result = await KnowledgeApi.storeEntry({ domain: ORG_DOMAIN, key, data, tags: ['org', 'workbench', 'guide'], replace: true });
+    if (result.status >= 400) throw new Error(`org/${key}: ${result.error ?? result.status}`);
+    console.log(`[seed] org guide ${ORG_DOMAIN}/${key} written`);
+  }
+}
+
+async function seedWorkbenchBots() {
+  const pool = new Pool(DB_CONFIG);
+  try {
+    for (const bot of WORKBENCH_BOTS) {
+      // Mirrors the bot-accounts API: the column and metadata.account_type both say bot,
+      // so the key and persona surfaces recognize the row.
+      await pool.query(
+        `INSERT INTO lt_users (id, external_id, display_name, account_type, status, metadata)
+         VALUES ($1, $2, $3, 'bot', 'active', $4::jsonb)
+         ON CONFLICT (id) DO UPDATE SET metadata = coalesce(lt_users.metadata, '{}'::jsonb) || EXCLUDED.metadata`,
+        [bot.id, bot.externalId, bot.display, JSON.stringify({ account_type: 'bot', description: bot.display })],
+      );
+      for (const key of bot.personas) {
+        const assigned = await api.personas.assignPersona({ id: bot.id, key });
+        if (assigned.status >= 400) throw new Error(`${bot.externalId}: ${assigned.error ?? assigned.status}`);
+      }
+    }
+  } finally {
+    await pool.end();
   }
 }
 

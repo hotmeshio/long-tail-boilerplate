@@ -403,6 +403,8 @@ claude mcp add --transport http long-tail-aws https://app.example.com/mcp
 
 Run `/mcp` and sign in. Claude acts as you, under your roles: it can invoke workflows, read and resolve escalations (forms are enforced), and inspect runs. Disconnect it any time from **Connected apps** in the dashboard's user menu.
 
+To see Claude hold a seat in an organization rather than act as you, read [src/workflows/claude-workbench/README.md](../src/workflows/claude-workbench/README.md): roles as queues, personas as collections of roles, and a bot principal that works only the rows assigned to it.
+
 ### The loop
 
 1. **Describe** the workflow: inputs, outputs, business rules, and who decides what.

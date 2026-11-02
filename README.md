@@ -39,6 +39,7 @@ Port already taken by another project? Set `PORT`, `PG_PORT`, `NATS_PORT`, `NATS
 1. **Invoke Tool → Hello Workflow → Submit.** The run sleeps, greets you, and shows the identity it ran as.
 2. **Invoke Tool → Rich Form → Submit**, then open **Intake Reviewer** under escalations (`/escalations/available?role=intake-reviewer`). Claim it: the form is prefilled from what you submitted, and picking a decision reveals only the fields that decision needs.
 3. **Invoke Tool → Lot Inspection** twice with the same part family. Receive one lot at `/escalations/available?role=lot-receiver`; the inspector's queue (`?role=lot-inspector`) shows the other one under **Arriving**.
+4. **Invoke Tool → Inbox Item** (inbox `inbox-sam`, kind `request`, need `approve`). The item opens in `inbox-sam` on the decision the rules suggest; pick *Investigate*, and an act row appears in `inbox-agent-sam`, the inbox's own agent queue. Resolve it with findings and the item comes back to the inbox. This is the organization-as-queues example; its README is [src/workflows/claude-workbench/README.md](src/workflows/claude-workbench/README.md), and `WORKBENCH_INBOX_HOLDERS` in `.env` says who gets an inbox of their own (a domain, an email, or a name).
 
 ### Connect Claude Code (optional)
 
@@ -62,6 +63,8 @@ Run `/mcp` in Claude Code and sign in in the browser window it opens. Claude can
 | `lotInspection` | Two stations, knowledge lookups, cascading selects, dynamic bounds, signature, list page with look-ahead | `src/workflows/lot-inspection/` |
 | `reviewContent` | Confidence-based escalation from a certified workflow | `src/workflows/content-review/` |
 | `taskWorkflow` | One durable instance per task with an SLA timer | `src/workflows/task-queue/` |
+| **Cross-functional work** | | |
+| `program`, `deliverable`, `ask` | An organization as queues: roles as seats, personas as role collections, handoffs between roles, programs with gates, AI holding a seat | `src/workflows/claude-workbench/` ([README](src/workflows/claude-workbench/README.md), [PRD](docs/workbench/PRD.md)) |
 | **Orchestration** | | |
 | `assemblyLine`, `stepIterator`, `reverter` | Parent and child workflows, sequential stations, send work back | `src/workflows/assembly-line/` |
 | `screenshotResearch` | Playwright capture, vision LLM, knowledge store | `src/workflows/screenshot-research/` |

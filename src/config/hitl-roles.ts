@@ -22,6 +22,7 @@ import {
   INSPECT_FORM_SCHEMA,
   INSPECT_LIST_SCHEMA,
 } from '../workflows/lot-inspection/forms';
+import { WORKBENCH_ROLES } from '../workflows/claude-workbench';
 
 const queue = (role: string) => `/escalations/available?role=${role}`;
 
@@ -67,4 +68,6 @@ export const HITL_ROLES: LTRoleConfig[] = [
     ],
     reset: true,
   },
+  // The workbench org: one seat per role, sharing one form, plus the program board.
+  ...WORKBENCH_ROLES,
 ];
