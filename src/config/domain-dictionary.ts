@@ -52,6 +52,16 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
   ],
   runbooks: [
     {
+      name: 'start your day',
+      steps: [
+        'get_domain_context once, then get_user_personas { user_id: <yours> }: your inbox is the inbox-<holder> role in your persona, your agent queue is inbox-agent-<holder>. You act as the holder; you see nothing else.',
+        `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" }: the standing rules for every act and for how you report back. Read it once per session; it changes without a deploy.`,
+        'find_escalations { workflow_type: "inboxSweep", status: "pending", role: "inbox-agent-<holder>" }: a pending check row means a sweep is running. None means no sweep; ask the superadmin to start one (see "start a sweep for a holder"), since a holder cannot invoke it yet.',
+        'Work the agent queue per "work the inbox" until it is empty.',
+        'Report to the holder in the shape the guide names: what landed, filed as, what you skipped and why, what waits under Back to you. Nothing else.',
+      ],
+    },
+    {
       name: 'work the inbox',
       steps: [
         `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" } once per session; read org/${INBOX_EDITION.CORRECTIONS} before classifying.`,
@@ -82,7 +92,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     {
       name: 'start a sweep for a holder',
       steps: [
-        'invoke_workflow { workflow_type: "inboxSweep", data: { holder: "<inbox-role>", source: "slack", intervalMinutes: 15, lookbackHours: 36 } }.',
+        'A superadmin or admin invokes it today; a holder\'s own grant cannot: invoke_workflow { workflow_type: "inboxSweep", data: { holder: "<inbox-role>", source: "slack", intervalMinutes: 60, lookbackHours: 36 } }.',
         'The check row appears in the holder\'s agent queue (inbox-agent-<holder>); work it per "work the inbox".',
         'Stop it with terminate_workflow on the sweep id.',
       ],

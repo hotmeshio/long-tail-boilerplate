@@ -25,6 +25,13 @@ describe('DOMAIN_DICTIONARY', () => {
     }
   });
 
+  it('tells a new agent how to start its day', () => {
+    const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start your day');
+    expect(runbook?.steps[0]).toContain('get_user_personas');
+    expect(runbook?.steps.some((step) => step.includes('inbox-triage-guide'))).toBe(true);
+    expect(runbook?.steps[runbook.steps.length - 1]).toContain('Report to the holder');
+  });
+
   it('points the inbox runbook at the triage guide first', () => {
     const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'work the inbox');
     expect(runbook?.steps[0]).toContain('inbox-triage-guide');
