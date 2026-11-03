@@ -8,3 +8,4 @@ export { HITL_ROLES } from './hitl-roles';
 export { DOMAIN_DICTIONARY } from './domain-dictionary';
 export { seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg } from './seed';
 export { bindInboxHolders, boundHolderRoles, startInboxBinding } from './inbox-holders';
+export { oauthProviders } from './oauth';
