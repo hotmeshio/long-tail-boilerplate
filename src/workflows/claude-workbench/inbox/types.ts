@@ -111,6 +111,10 @@ export const INBOX_DECIDE_TIMEOUT = '7d';
 export const INBOX_WAITING_TIMEOUT = '7d';
 export const INBOX_ACT_TIMEOUT = '24h';
 export const INBOX_CHECK_TIMEOUT = '7d';
+/** The holder's reactions row waits this long before it lapses unsaved. */
+export const INBOX_PREFERENCES_TIMEOUT = '30d';
+export const INBOX_PREFERENCES_PRIORITY = 3;
+export const PREFERENCES_SUBTYPE = 'preferences';
 export const INBOX_ACT_PRIORITY = 2;
 export const INBOX_CHECK_PRIORITY = 3;
 export const INBOX_DEFAULT_INTERVAL_MINUTES = 15;

@@ -32,8 +32,24 @@ export const ActResultSchema = z.object({
   items: blankAsAbsent(z.array(z.unknown())),
 });
 
+/** What the holder submits on their reactions row: paste boxes and two choices. */
+export const PreferencesSchema = z.object({
+  done: text(),
+  approved: text(),
+  onIt: text(),
+  read: text(),
+  dismissed: text(),
+  ticket: text(),
+  readCloses: blankAsAbsent(z.enum(['fyi', 'always', 'never'])),
+  replyMeans: blankAsAbsent(z.enum(['on-it', 'done', 'nothing'])),
+  closeFor: blankAsAbsent(z.array(z.string())),
+});
+export type PreferencesForm = z.infer<typeof PreferencesSchema>;
+
 const TriagePayload = z.object({ triage: TriageSchema });
 const ActPayload = z.object({ act: ActResultSchema });
+const PreferencesPayload = z.object({ preferences: PreferencesSchema });
 
 export const parseTriage = (payload: unknown): Triage => parseFormPayload(TriagePayload, payload).triage as Triage;
 export const parseAct = (payload: unknown): ActResult => parseFormPayload(ActPayload, payload).act as ActResult;
+export const parsePreferences = (payload: unknown): PreferencesForm => parseFormPayload(PreferencesPayload, payload).preferences;

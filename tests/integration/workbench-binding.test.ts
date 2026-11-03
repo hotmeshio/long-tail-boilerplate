@@ -11,7 +11,7 @@ import { resolve } from 'node:path';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 
 import { ApiClient, poll, waitForHealth } from './helpers';
-import { PASSWORD, RUN } from './hitl-helpers';
+import { PASSWORD, RUN, claimAndResolve, pendingBySubtype } from './hitl-helpers';
 import { parseInboxEntries } from '../../src/workflows/claude-workbench/types';
 
 function holdersSetting(): string | undefined {
@@ -84,5 +84,30 @@ describe.skipIf(!domain)('inbox binding', () => {
       expect(config.invocation_roles).toContain('superadmin');
       expect(config.reset ?? true).toBeTruthy();
     }
+  });
+
+  it('parks a "Your reactions" row first, and saves what the holder submits as their own edition', async () => {
+    const row = await pendingBySubtype(api, `inbox-${persona}`, 'holder', `inbox-${persona}`, 'preferences', 60_000);
+    expect(row.assigned_to).toBe(userId);
+    const envelope = typeof row.envelope === 'string' ? JSON.parse(row.envelope) : row.envelope;
+    expect(envelope.formDefaults.preferences.onIt).toBe(':eyes:');
+
+    const resolved = await claimAndResolve(api, row.id, {
+      preferences: { done: '✅ :github-approve:', approved: ':approved:', onIt: '👀', read: '👍 🔥', dismissed: ':x:', ticket: ':ticket:', readCloses: 'always', replyMeans: 'done', closeFor: ['responsible', 'accountable'] },
+    });
+    expect(resolved.status).toBeLessThan(300);
+
+    const saved = await poll(
+      `org/inbox-reactions-${persona} saved`,
+      async () => {
+        const { data } = await api.get<any>('/api/knowledge/entry', { domain: 'org', key: `inbox-reactions-${persona}` });
+        const entry = data?.data ?? data;
+        return entry?.done ? entry : null;
+      },
+      30_000,
+    );
+    expect(saved.done).toEqual(['white_check_mark', 'github-approve']);
+    expect(saved.read).toEqual(['+1', 'fire']);
+    expect(saved).toMatchObject({ readCloses: 'always', replyMeans: 'done', closeFor: ['responsible', 'accountable'] });
   });
 });

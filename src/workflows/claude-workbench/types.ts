@@ -152,7 +152,7 @@ export const SEAT_ROLES: string[] = ORG_ROLES.map((entry) => entry.role);
 export const DOMAINS: string[] = [...new Set(ORG_ROLES.map((entry) => entry.domain))];
 
 /** The part of the shared form a row opens; also the row's subtype. */
-export const SECTION = { WORK: 'work', REVIEW: 'review', DECIDE: 'decide', GATE: 'gate', TRIAGE: 'triage', ACT: 'act' } as const;
+export const SECTION = { WORK: 'work', REVIEW: 'review', DECIDE: 'decide', GATE: 'gate', TRIAGE: 'triage', ACT: 'act', PREFERENCES: 'preferences' } as const;
 export type Section = (typeof SECTION)[keyof typeof SECTION];
 export const PROGRAM_SUBTYPE = 'program';
 

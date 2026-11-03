@@ -6,7 +6,7 @@ const principal = (roles: string[], roleType = 'member') => ({ lt: { userId: 'u1
 
 describe('inbox ownership', () => {
   it('names the two workflows a holder may start', () => {
-    expect([...HOLDER_INVOCABLE_WORKFLOWS]).toEqual(['inboxSweep', 'inboxItem']);
+    expect([...HOLDER_INVOCABLE_WORKFLOWS]).toEqual(['inboxSweep', 'inboxItem', 'inboxPreferences']);
     expect(agentRoleOf('inbox-kim')).toBe('inbox-agent-kim');
   });
 

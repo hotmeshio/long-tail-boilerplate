@@ -31,7 +31,7 @@ const SUMMARY_MIN_LENGTH = 20;
 const ASSETS_MAX = 50;
 
 const inSection = (section: Section) => `envelope.section=${section}`;
-const SECTION_TITLE: Record<Section, string> = { work: 'Handoff', review: 'Review', decide: 'Decision', gate: 'Gate', triage: 'Decide', act: 'Report' };
+const SECTION_TITLE: Record<Section, string> = { work: 'Handoff', review: 'Review', decide: 'Decision', gate: 'Gate', triage: 'Decide', act: 'Report', preferences: 'Your reactions' };
 
 function choice(title: string, description: string, bind: string, section: Section, options: readonly { value: string; label: string }[] | string) {
   return {

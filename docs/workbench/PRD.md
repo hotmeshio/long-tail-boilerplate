@@ -202,7 +202,7 @@ The inbox is event-driven: a new item, a result from the AI, a tie change or a d
 **Intake and acts**
 - FR-7 A standing sweep per source (chat; issues; calendar) parks a check act on a schedule; the AI resolves it with items found since a watermark that only moves forward.
 - FR-8 Every act has a typed result shape in the role's form; results return to the originating item as a new section.
-- FR-9 Reactions by the item's owner on the source message count as decisions.
+- FR-9 Reactions by the item's owner on the source message count as decisions. What each emoji means is the owner's own setting, kept as an edition under their identity (an org default applies until they save one), edited on a row in their inbox where they paste the emoji they use and pick the canonical meaning, what a read emoji may close, what their reply means, and which of their roles a reaction may close.
 
 **Ties**
 - FR-10 An item may hold any number of ties (issue, chat thread, escalation); ties are facets so items can be found by them.

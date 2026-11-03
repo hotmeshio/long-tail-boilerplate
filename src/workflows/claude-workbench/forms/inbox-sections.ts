@@ -1,17 +1,27 @@
 /**
- * The inbox's two sections of the shared seat form: `triage` (the holder's
- * decision on an item, with its classification editable in place) and `act`
- * (the AI's result, whose fields follow the act named on the row). Merged
- * into SEAT_FORM_SCHEMA; every seat carries them, only inbox rows show them.
+ * The inbox's sections of the shared seat form: `triage` (the holder's
+ * decision on an item, with its classification editable in place), `act`
+ * (the AI's result, whose fields follow the act named on the row) and
+ * `preferences` (what the holder's own reactions mean). Merged into
+ * SEAT_FORM_SCHEMA; every seat carries them, only inbox rows show them.
  */
 
 import { NOTES_MAX_LENGTH, SECTION } from '../types';
 import { ACT_OUTCOMES, INBOX_ACT, INBOX_CHECK_MAX_ITEMS, REPLY_MODES } from '../inbox/types';
+import { RACI_VALUES, READ_CLOSES, REPLY_MEANS } from '../inbox/reactions';
 
 const TRIAGE = `envelope.section=${SECTION.TRIAGE}`;
 const ACT = `envelope.section=${SECTION.ACT}`;
+const PREFERENCES = `envelope.section=${SECTION.PREFERENCES}`;
 const TRIAGE_TITLE = 'Decide';
 const ACT_TITLE = 'Report';
+const PREFERENCES_TITLE = 'Your reactions';
+const REACTIONS_MAX_LENGTH = 300;
+
+/** One paste box: the emoji that carry one meaning. */
+function reactionBox(title: string, description: string, bind: string) {
+  return { type: 'string', title, description, maxLength: REACTIONS_MAX_LENGTH, 'x-lt-bind': bind, 'x-lt-section': PREFERENCES_TITLE, 'x-lt-showIf': PREFERENCES };
+}
 
 const actFor = (name: string) => `envelope.act=${name}`;
 const DONE = 'resolver.act_outcome=done';
@@ -139,6 +149,42 @@ export const INBOX_FIELDS = {
     'x-lt-section': ACT_TITLE,
     'x-lt-showIf': [ACT, DONE, actFor(INBOX_ACT.CHECK)],
   },
+
+  prefs_done: reactionBox('Done', 'Paste the emoji that mean "I took care of it", from Slack or anywhere: ✅ or :white_check_mark:', 'preferences.done'),
+  prefs_approved: reactionBox('Approved', 'I approved what was asked: a PR, a plan, a request', 'preferences.approved'),
+  prefs_on_it: reactionBox('On it', "I'm looking at it; keep it open and wait on me", 'preferences.onIt'),
+  prefs_read: reactionBox('Read', 'I read it', 'preferences.read'),
+  prefs_dismissed: reactionBox('Not mine', 'Dismiss it; nothing for me here', 'preferences.dismissed'),
+  prefs_ticket: reactionBox('Ticket', 'File the ticket', 'preferences.ticket'),
+  prefs_read_closes: {
+    type: 'string',
+    title: 'A Read emoji closes',
+    description: 'What a Read emoji is enough to close',
+    'x-lt-options': [...READ_CLOSES],
+    'x-lt-bind': 'preferences.readCloses',
+    'x-lt-section': PREFERENCES_TITLE,
+    'x-lt-showIf': PREFERENCES,
+  },
+  prefs_reply_means: {
+    type: 'string',
+    title: 'My reply in the thread means',
+    description: 'When you answer in the thread and add no emoji',
+    'x-lt-options': [...REPLY_MEANS],
+    'x-lt-bind': 'preferences.replyMeans',
+    'x-lt-section': PREFERENCES_TITLE,
+    'x-lt-showIf': PREFERENCES,
+  },
+  prefs_close_for: {
+    type: 'array',
+    title: 'Close only when my role is',
+    description: 'A reaction closes an item only when your role on it is one of these',
+    items: { type: 'string' },
+    'x-lt-options': RACI_VALUES.map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
+    'x-lt-span': 2,
+    'x-lt-bind': 'preferences.closeFor',
+    'x-lt-section': PREFERENCES_TITLE,
+    'x-lt-showIf': PREFERENCES,
+  },
 };
 
 export const INBOX_ORDER = Object.keys(INBOX_FIELDS);
@@ -154,4 +200,6 @@ export const INBOX_REQUIRED = [
   'act_findings',
   'act_issue',
   'act_checked_through',
+  'prefs_read_closes',
+  'prefs_reply_means',
 ];

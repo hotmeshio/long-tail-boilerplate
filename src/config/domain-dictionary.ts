@@ -39,7 +39,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     { term: 'inboxSweep', aliases: ['sweep', 'check'], kind: 'workflow', maps_to: { workflow: 'inboxSweep' }, id_convention: 'inboxSweep-<id>; one per holder and source', kill_road: 'terminate_workflow on the sweep; its pending check row is then cancelled.', guidance: 'Parks a check act on a schedule; the AI resolves it with the items found since the watermark.' },
     { term: 'deliverable workflow', kind: 'workflow', maps_to: { workflow: 'deliverable' }, id_convention: '<programWfId>-p<phase>-<kind>-g<gateRound>, or the invoke id when standalone', kill_road: 'Cancel its pending row; the deliverable ends cancelled and, inside a program, reports that to the board.', guidance: 'Work, then decide or review, until accepted or the rounds run out.' },
     { term: 'program workflow', kind: 'workflow', maps_to: { workflow: 'program' }, id_convention: 'program-<id>; its board is <id>-board', kill_road: 'terminate_workflow on the program, then close its board row by hand with closing.outcome = cancelled.', guidance: 'Phases of deliverables; one gate row per signing role; a hold goes to the owner role.' },
-    { term: 'section', kind: 'facet', maps_to: { facet: 'section' }, values: ['work', 'review', 'decide', 'gate', 'triage', 'act'], guidance: 'Which part of the shared form a row shows; also the row\'s subtype for seats.' },
+    { term: 'section', kind: 'facet', maps_to: { facet: 'section' }, values: ['work', 'review', 'decide', 'gate', 'triage', 'act', 'preferences'], guidance: 'Which part of the shared form a row shows; also the row\'s subtype for seats.' },
     { term: 'raci', kind: 'facet', maps_to: { facet: 'raci' }, values: ['responsible', 'accountable', 'consulted', 'informed'], guidance: 'The row holder\'s role on the item.' },
     { term: 'ai', kind: 'facet', maps_to: { facet: 'ai' }, values: ['none', 'eligible', 'only'], guidance: 'A work row\'s AI mode: none, a first-right window for the bot, or AI only.' },
     { term: 'handoff', kind: 'action', maps_to: { verb: 'resolve' }, guidance: 'Resolve a work row with { handoff: { outcome, summary, assets, decisions, openQuestions, nextSuggested } }. Pick outcome = blocked and write blockerQuestion instead of guessing.' },
@@ -65,6 +65,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
       name: 'work the inbox',
       steps: [
         `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" } once per session; read org/${INBOX_EDITION.CORRECTIONS} before classifying.`,
+        `First, the holder's reactions: read org/${INBOX_EDITION.REACTIONS}-<holder> (else org/${INBOX_EDITION.REACTIONS}), then for every open row in inbox-<holder> read the holder's own reactions and replies on the source message and resolve the row as the guide's "Before anything" section says. Their emoji is their decision.`,
         'find_escalations { role: "inbox-agent-<holder>", status: "pending", available: true }, oldest first; you see only the holder you act for.',
         'claim_escalation { id, duration_minutes: 240 }; read the brief and envelope.act.',
         'Do the act with your own tools; for a check, search the source since envelope.watermark for the holder, oldest first.',
@@ -95,6 +96,15 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
         'invoke_workflow { workflow_type: "inboxSweep", data: { holder: "<inbox-role>", source: "slack", intervalMinutes: 60, lookbackHours: 36 } }. A holder, or their agent acting as them, starts it for their own inbox; an admin or superadmin for any inbox. The sweep returns refused when the caller holds neither.',
         'The check row appears in the holder\'s agent queue (inbox-agent-<holder>); work it per "work the inbox".',
         'Stop it with terminate_workflow on the sweep id.',
+      ],
+    },
+    {
+      name: 'set what your reactions mean',
+      steps: [
+        'invoke_workflow { workflow_type: "inboxPreferences", data: { holder: "<inbox-role>" } }: a holder or their agent for their own inbox; an admin for any. A "Your reactions" row appears in the inbox, pre-filled with what is in force.',
+        'The holder pastes the emoji they use into each box (Done, Approved, On it, Read, Not mine, Ticket), picks what a Read emoji closes, what their reply means, and which of their roles a reaction may close, then submits.',
+        `Saved as org/${INBOX_EDITION.REACTIONS}-<holder>, one edition per save; the org default is org/${INBOX_EDITION.REACTIONS}. The agent reads it at the start of every pass.`,
+        'When the holder tells you in words what an emoji means, invoke the row for them and say it is waiting; do not write the edition by hand.',
       ],
     },
     {
