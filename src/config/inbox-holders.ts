@@ -12,7 +12,7 @@ import { Pool } from 'pg';
 import { api } from '@hotmeshio/long-tail';
 
 import { DB_CONFIG } from './database';
-import { HOLDERS, HOLDER_INVOCABLE_WORKFLOWS, INBOX_ENTRIES, holderForEmail, holderPersona, holderRoleConfigs, type InboxEntries, type InboxHolder } from '../workflows/claude-workbench';
+import { HOLDERS, HOLDER_INVOCABLE_WORKFLOWS, INBOX_ENTRIES, PREFERENCES_WORKFLOW, holderForEmail, holderPersona, holderRoleConfigs, type InboxEntries, type InboxHolder } from '../workflows/claude-workbench';
 
 export const INBOX_BIND_SECONDS = Math.max(5, Number(process.env.WORKBENCH_INBOX_BIND_SECONDS ?? 15));
 
@@ -135,11 +135,25 @@ async function bind({ account, holder, dynamic }: Binding) {
 }
 
 /**
- * One pass: bind every entitled account that lacks its persona, then make
- * sure the inbox workflows accept every bound holder's roles (the worker
- * writes the code-owned list at its boot; this heals whatever it missed).
- * With `refreshRoles`, also re-apply the seat config to roles the binder made
- * earlier, so they track the code the same way the boot-declared roles do.
+ * The first row a new holder sees: what their reactions mean, pre-filled,
+ * started as them so the row is theirs. Not fatal: they or their agent can
+ * invoke it later.
+ */
+async function parkPreferences({ account, holder }: Binding) {
+  const started = await api.workflows.invokeWorkflow(
+    { type: PREFERENCES_WORKFLOW, data: { holder: holder.role }, options: { workflowId: `${PREFERENCES_WORKFLOW}-${holder.name}-welcome` } },
+    { userId: account.id },
+  );
+  if (started.status >= 400) console.error(`[inbox] reactions row for ${holder.role} not parked (${started.error ?? started.status}); invoke ${PREFERENCES_WORKFLOW} later`);
+}
+
+/**
+ * One pass: bind every entitled account that lacks its persona, make sure
+ * the inbox workflows accept every bound holder's roles (the worker writes
+ * the code-owned list at its boot; this heals whatever it missed), then park
+ * the reactions row for each holder bound in this pass. With `refreshRoles`,
+ * also re-apply the seat config to roles the binder made earlier, so they
+ * track the code the same way the boot-declared roles do.
  */
 export async function bindInboxHolders(options: { refreshRoles?: boolean } = {}): Promise<number> {
   if (!INBOX_ENTRIES.domains.length && !HOLDERS.some((holder) => holder.email)) return 0;
@@ -152,6 +166,7 @@ export async function bindInboxHolders(options: { refreshRoles?: boolean } = {})
     for (const holder of dynamic) if (!bound.has(holder.name)) await ensureRoles(holder);
   }
   await openWorkflows(holderInvocationRoles(dynamic));
+  for (const binding of pending) await parkPreferences(binding);
   return pending.length;
 }
 

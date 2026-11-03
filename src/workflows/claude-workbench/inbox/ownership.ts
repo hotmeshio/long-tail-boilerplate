@@ -9,7 +9,7 @@
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 
 /** The workflows a holder may invoke for their own inbox. */
-export const HOLDER_INVOCABLE_WORKFLOWS = ['inboxSweep', 'inboxItem'] as const;
+export const HOLDER_INVOCABLE_WORKFLOWS = ['inboxSweep', 'inboxItem', 'inboxPreferences'] as const;
 
 const ADMIN_TYPES = new Set(['admin', 'superadmin']);
 

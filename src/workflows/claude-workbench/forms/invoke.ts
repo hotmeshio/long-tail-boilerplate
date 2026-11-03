@@ -175,3 +175,22 @@ export const INBOX_ITEM_INPUT_SCHEMA = {
     summary: { ...BRIEF_INPUT_FIELD, title: 'Summary', description: 'Markdown: what is asked and what matters' },
   },
 };
+
+/** Any inbox, named: holders bound from a domain rule are not in the static list. */
+export const INBOX_PREFERENCES_INPUT_SCHEMA = {
+  type: 'object',
+  'x-lt-layout': 'two-column',
+  'x-lt-help': '1. Name the inbox.\n2. A "Your reactions" row opens in it, pre-filled with what is in force; the holder submits what their emoji mean.',
+  'x-lt-order': ['holder'],
+  required: ['holder'],
+  properties: {
+    holder: {
+      type: 'string',
+      title: 'Inbox',
+      description: 'The inbox role, e.g. inbox-sam; yours unless you hold admin',
+      pattern: '^inbox-[a-z][a-z0-9_-]*$',
+      'x-lt-pattern-error': 'An inbox role: inbox- followed by the holder name',
+      maxLength: 128,
+    },
+  },
+};

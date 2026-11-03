@@ -32,8 +32,8 @@ import { HELLO_INPUT_SCHEMA } from '../workflows/hello-world/forms';
 import { MODERATOR_ROLE, CONTENT_REVIEW_INPUT_SCHEMA } from '../workflows/content-review/forms';
 import { SCREENSHOT_INPUT_SCHEMA } from '../workflows/screenshot-research/forms';
 import { TASK_INPUT_SCHEMA } from '../workflows/task-queue/forms';
-import { program, programBoard, deliverable, ask, inboxSweep, inboxItem, CLAUDE_WORKBENCH_QUEUE, SEAT_ROLES, WORKBENCH_INPUT_LOOKUPS, HOLDER_INVOCABLE_WORKFLOWS } from '../workflows/claude-workbench';
-import { PROGRAM_INPUT_SCHEMA, DELIVERABLE_INPUT_SCHEMA, ASK_INPUT_SCHEMA, INBOX_SWEEP_INPUT_SCHEMA, INBOX_ITEM_INPUT_SCHEMA } from '../workflows/claude-workbench/forms';
+import { program, programBoard, deliverable, ask, inboxSweep, inboxItem, inboxPreferences, CLAUDE_WORKBENCH_QUEUE, SEAT_ROLES, WORKBENCH_INPUT_LOOKUPS, HOLDER_INVOCABLE_WORKFLOWS } from '../workflows/claude-workbench';
+import { PROGRAM_INPUT_SCHEMA, DELIVERABLE_INPUT_SCHEMA, ASK_INPUT_SCHEMA, INBOX_SWEEP_INPUT_SCHEMA, INBOX_ITEM_INPUT_SCHEMA, INBOX_PREFERENCES_INPUT_SCHEMA } from '../workflows/claude-workbench/forms';
 import { bambuPrinter, BAMBU_FARM_QUEUE } from '../workflows/bambu-farm';
 import { pullDemand, pullUnit, puller, PULL_FARM_QUEUE, PULLER_COUNT } from '../workflows/pull-farm';
 import { pullOperatorIds } from '../workflows/pull-farm/operators';
@@ -432,6 +432,16 @@ const inboxItemConfig: LTWorkerConfig = {
   reset: true,
 };
 
+const inboxPreferencesConfig: LTWorkerConfig = {
+  description: "Inbox preferences: a row in the holder's inbox where they say what their own reactions mean; saved as their edition.",
+  invocable: true,
+  invocationRoles: WORKBENCH_INVOCATION_ROLES,
+  icon: WORKFLOW_ICONS.COG,
+  envelopeSchema: { data: {}, metadata: DASHBOARD_METADATA },
+  inputSchema: INBOX_PREFERENCES_INPUT_SCHEMA,
+  reset: true,
+};
+
 const askConfig: LTWorkerConfig = {
   description: 'Ask: one decision parked in a role\'s queue; what an agent invokes when it needs a person.',
   invocable: true,
@@ -479,6 +489,7 @@ export const WORKERS: LTStartConfig['workers'] = [
   { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: ask, config: askConfig },
   { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxSweep, config: inboxSweepConfig },
   { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxItem, config: inboxItemConfig },
+  { taskQueue: CLAUDE_WORKBENCH_QUEUE, workflow: inboxPreferences, config: inboxPreferencesConfig },
   // Lifecycle proof — the isolated expression of the actor/waiter/director
   // patterns (see src/workflows/lifecycle-proof/workflows.ts RULES 1-5).
   { taskQueue: PROOF_QUEUE, workflow: proofDirector, config: { description: 'Lifecycle proof — director (wind-down, cast, timer, retire, converge)', invocable: true, invocationRoles: ['superadmin', 'admin'], reset: true } },

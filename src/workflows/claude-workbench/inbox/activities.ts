@@ -9,6 +9,7 @@ import { Pool } from 'pg';
 
 import { DB_CONFIG } from '../../../config/database';
 import { ORG_DOMAIN } from '../types';
+import { DEFAULT_REACTIONS, reactionSettingsFrom, reactionsKey, type ReactionSettings } from './reactions';
 import { INBOX_CORRECTIONS_KEPT, type Correction, type Rule, type Vocabulary } from './types';
 import { INBOX_EDITION, STARTER_VOCABULARY, editionValues, readRule } from './vocabulary';
 
@@ -71,6 +72,25 @@ export async function holderAccount(input: { holder: string }): Promise<{ userId
 /** A source timestamp this many hours ago, as the first watermark of a sweep. */
 export async function watermarkHoursAgo(input: { hours: number }): Promise<{ watermark: string }> {
   return { watermark: `${Math.floor((Date.now() - input.hours * 3_600_000) / 1000)}.000000` };
+}
+
+export type ReactionSource = 'holder' | 'org' | 'default';
+
+/** What the holder's reactions mean: their own edition, else the org's, else the code default. */
+export async function readReactionSettings(input: { holder: string }): Promise<{ settings: ReactionSettings; source: ReactionSource }> {
+  const own = entryData(await KnowledgeApi.getEntry({ domain: ORG_DOMAIN, key: reactionsKey(input.holder) }));
+  if (own) return { settings: reactionSettingsFrom(own), source: 'holder' };
+  const org = entryData(await KnowledgeApi.getEntry({ domain: ORG_DOMAIN, key: INBOX_EDITION.REACTIONS }));
+  if (org) return { settings: reactionSettingsFrom(org), source: 'org' };
+  return { settings: DEFAULT_REACTIONS, source: 'default' };
+}
+
+/** Write the holder's own edition; every save mints the next version. */
+export async function storeReactionSettings(input: { holder: string; settings: ReactionSettings }): Promise<{ key: string }> {
+  const key = reactionsKey(input.holder);
+  const result = await KnowledgeApi.storeEntry({ domain: ORG_DOMAIN, key, data: { ...input.settings }, tags: ['org', 'workbench', 'inbox', 'reactions'], replace: true });
+  if (result.status >= 400) throw new Error(`org/${key}: ${result.error ?? result.status}`);
+  return { key };
 }
 
 /** Keep a re-filing, once per decision, newest last, capped. */

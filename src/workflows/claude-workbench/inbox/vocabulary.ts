@@ -10,6 +10,7 @@ import type { EscalationLookupRef } from '@hotmeshio/long-tail';
 
 import { ORG_DOMAIN } from '../types';
 import { TRIAGE_GUIDE } from './guide';
+import { DEFAULT_REACTIONS, REACTIONS_EDITION } from './reactions';
 import { TRIAGE_DECISION, type Rule, type Vocabulary } from './types';
 
 export const INBOX_EDITION = {
@@ -19,6 +20,8 @@ export const INBOX_EDITION = {
   RULES: 'inbox-rules',
   CORRECTIONS: 'inbox-corrections',
   GUIDE: 'inbox-triage-guide',
+  /** The org default; a holder's own is `inbox-reactions-<holder>`. */
+  REACTIONS: REACTIONS_EDITION,
 } as const;
 
 export const INBOX_KINDS = [
@@ -79,6 +82,7 @@ export const INBOX_STARTER_ENTRIES: { key: string; data: Record<string, unknown>
   { key: INBOX_EDITION.NEEDS, data: { items: INBOX_NEEDS } },
   { key: INBOX_EDITION.RULES, data: { items: STARTER_RULES } },
   { key: INBOX_EDITION.CORRECTIONS, data: { items: [] } },
+  { key: INBOX_EDITION.REACTIONS, data: { ...DEFAULT_REACTIONS } },
 ];
 
 export const INBOX_CODE_OWNED_ENTRIES: { key: string; data: Record<string, unknown> }[] = [

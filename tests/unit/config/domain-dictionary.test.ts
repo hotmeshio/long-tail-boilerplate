@@ -41,9 +41,18 @@ describe('DOMAIN_DICTIONARY', () => {
     expect(sweep?.steps[0]).toContain('refused');
   });
 
-  it('points the inbox runbook at the triage guide first', () => {
+  it('points the inbox runbook at the triage guide first, then at the holder\'s reactions', () => {
     const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'work the inbox');
     expect(runbook?.steps[0]).toContain('inbox-triage-guide');
+    expect(runbook?.steps[1]).toContain('inbox-reactions-<holder>');
     expect(DOMAIN_DICTIONARY.runbooks?.map((entry) => entry.name)).toContain('work a seat');
+  });
+
+  it('tells a holder how to set what their reactions mean', () => {
+    const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'set what your reactions mean');
+    expect(runbook?.steps[0]).toContain('inboxPreferences');
+    expect(runbook?.steps.some((step) => step.includes('inbox-reactions-<holder>'))).toBe(true);
+    const section = DOMAIN_DICTIONARY.terms?.find((term) => term.term === 'section');
+    expect(section?.values).toContain('preferences');
   });
 });

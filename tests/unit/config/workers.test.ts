@@ -22,7 +22,7 @@ describe('worker configs', () => {
     const roles = ['inbox-kim', 'inbox-agent-kim'];
     const workers = workersWithHolders(roles)!;
     const configOf = (name: string) => workers.find((worker) => worker.workflow.name === name)!.config!;
-    for (const name of ['inboxSweep', 'inboxItem']) {
+    for (const name of ['inboxSweep', 'inboxItem', 'inboxPreferences']) {
       expect(configOf(name).invocationRoles).toEqual(expect.arrayContaining(roles));
       expect(configOf(name).reset).toBe(true);
     }
