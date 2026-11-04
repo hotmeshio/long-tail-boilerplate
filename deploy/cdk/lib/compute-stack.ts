@@ -91,6 +91,8 @@ export class ComputeStack extends cdk.Stack {
       // Who gets a workbench inbox; both containers must agree on the role list.
       WORKBENCH_INBOX_HOLDERS: config.inboxHolders,
       OAUTH_AUTO_PROVISION: String(config.oauthAutoProvision),
+      // Unset (not empty) when no list is given, so the app falls back to the inbox-holder domains.
+      ...(config.oauthAllowedDomains ? { OAUTH_ALLOWED_DOMAINS: config.oauthAllowedDomains } : {}),
     };
 
     // --- ECS Cluster ---

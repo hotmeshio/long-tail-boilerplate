@@ -57,6 +57,9 @@ export function loadConfig(app: cdk.App) {
   /** Let a third-party sign-in create its own account. Pair with a domain in LT_INBOX_HOLDERS. Default off (invite-only). */
   const oauthAutoProvision: boolean = (app.node.tryGetContext('oauthAutoProvision') ?? process.env.LT_OAUTH_AUTO_PROVISION) === 'true';
 
+  /** Email domains a sign-in may self-provision from (comma-separated). Empty: the app falls back to the domains in LT_INBOX_HOLDERS. */
+  const oauthAllowedDomains: string = app.node.tryGetContext('oauthAllowedDomains') || process.env.LT_OAUTH_ALLOWED_DOMAINS || '';
+
   /** CloudMap private DNS namespace for service discovery */
   const serviceDiscoveryNamespace = `${projectSlug}.local`;
 
@@ -74,6 +77,7 @@ export function loadConfig(app: cdk.App) {
     loginRateWindowSeconds,
     inboxHolders,
     oauthAutoProvision,
+    oauthAllowedDomains,
 
     // ── Derived values ─────────────────────────────────────────────────
     // Computed from the above — no need to override individually.

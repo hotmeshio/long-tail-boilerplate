@@ -28,7 +28,7 @@
 try { require('dotenv/config'); } catch {}
 import { start } from '@hotmeshio/long-tail';
 
-import { DB_CONFIG, READONLY_OBSERVERS, workersWithHolders, boundHolderRoles, oauthProviders, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, DOMAIN_DICTIONARY, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg, startInboxBinding } from './config';
+import { DB_CONFIG, READONLY_OBSERVERS, workersWithHolders, boundHolderRoles, oauthProviders, oauthAllowedDomains, MCP_SERVER_FACTORIES, AGENTS, TOPICS, GRAPH_WORKFLOWS, HITL_ROLES, DOMAIN_DICTIONARY, seedIfEmpty, seedHitlLookups, seedPrintFarmIfEmpty, seedBambuFarmIfEmpty, seedPullFarmIfEmpty, seedWorkbenchOrg, startInboxBinding } from './config';
 
 /** Controls which capabilities this process runs. */
 const APP_ROLE = process.env.APP_ROLE as 'api' | 'worker' | undefined;
@@ -51,10 +51,11 @@ async function main() {
       // Google is registered explicitly with identity scopes only (config/oauth.ts);
       // the library default would also ask for Gmail. Invite-only by default: a
       // sign-in must match an account an admin created (by email).
-      // OAUTH_AUTO_PROVISION=true lets any sign-in create an account; which accounts
-      // get a workbench inbox is WORKBENCH_INBOX_HOLDERS (a domain binds every
-      // account that signs in with it; see config/inbox-holders.ts).
-      oauth: { providers: oauthProviders(), autoProvision: process.env.OAUTH_AUTO_PROVISION === 'true' },
+      // OAUTH_AUTO_PROVISION=true lets a sign-in create its own account, limited to
+      // the domains in OAUTH_ALLOWED_DOMAINS (default: the domains in
+      // WORKBENCH_INBOX_HOLDERS). Which accounts get a workbench inbox is
+      // WORKBENCH_INBOX_HOLDERS (see config/inbox-holders.ts).
+      oauth: { providers: oauthProviders(), autoProvision: process.env.OAUTH_AUTO_PROVISION === 'true', allowedDomains: oauthAllowedDomains() },
       // OAuth sign-in for MCP clients at /mcp. Loopback redirects (Claude Code)
       // are always allowed; https redirects must be listed exactly.
       oauthServer: process.env.LT_OAUTH_ISSUER

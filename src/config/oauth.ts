@@ -8,6 +8,8 @@
 
 import type { LTOAuthProviderConfig } from '@hotmeshio/long-tail';
 
+import { parseInboxEntries } from '../workflows/claude-workbench/types';
+
 /** What Google sign-in may see: who the person is, nothing they own. */
 export const GOOGLE_IDENTITY_SCOPES = ['openid', 'email', 'profile'];
 
@@ -23,4 +25,17 @@ export function oauthProviders(env: NodeJS.ProcessEnv = process.env): LTOAuthPro
   const clientSecret = env.OAUTH_GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) return [];
   return [{ provider: 'google', clientId, clientSecret, scopes: GOOGLE_IDENTITY_SCOPES, redirectUri: oauthRedirectUri('google', env) }];
+}
+
+/**
+ * Email domains a sign-in may self-provision from. OAUTH_ALLOWED_DOMAINS when
+ * set (comma-separated; empty means any domain), else the domain entries of
+ * WORKBENCH_INBOX_HOLDERS, since those are the org's domains. Long Tail applies
+ * the list to self-provisioning only; invited accounts sign in regardless.
+ */
+export function oauthAllowedDomains(env: NodeJS.ProcessEnv = process.env): string[] {
+  if (env.OAUTH_ALLOWED_DOMAINS !== undefined) {
+    return env.OAUTH_ALLOWED_DOMAINS.split(',').map((domain) => domain.trim()).filter(Boolean);
+  }
+  return parseInboxEntries(env.WORKBENCH_INBOX_HOLDERS).domains;
 }
