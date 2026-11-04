@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { GOOGLE_IDENTITY_SCOPES, oauthProviders, oauthRedirectUri } from '../../../src/config/oauth';
+import { GOOGLE_IDENTITY_SCOPES, oauthAllowedDomains, oauthProviders, oauthRedirectUri } from '../../../src/config/oauth';
 
 describe('sign-in providers', () => {
   it('registers Google with identity scopes only, never mail', () => {
@@ -20,5 +20,21 @@ describe('sign-in providers', () => {
   it('registers nothing when the Google credentials are not set', () => {
     expect(oauthProviders({})).toEqual([]);
     expect(oauthProviders({ OAUTH_GOOGLE_CLIENT_ID: 'id' })).toEqual([]);
+  });
+});
+
+describe('domains a sign-in may self-provision from', () => {
+  it('reads OAUTH_ALLOWED_DOMAINS as a comma-separated list', () => {
+    expect(oauthAllowedDomains({ OAUTH_ALLOWED_DOMAINS: 'example.com, other.org ,,' })).toEqual(['example.com', 'other.org']);
+  });
+
+  it('falls back to the domain entries of WORKBENCH_INBOX_HOLDERS', () => {
+    expect(oauthAllowedDomains({ WORKBENCH_INBOX_HOLDERS: 'example.com,ana.ruiz@example.com,sam' })).toEqual(['example.com']);
+  });
+
+  it('is open when neither is set, or when the list is set empty on purpose', () => {
+    expect(oauthAllowedDomains({})).toEqual([]);
+    expect(oauthAllowedDomains({ WORKBENCH_INBOX_HOLDERS: 'sam' })).toEqual([]);
+    expect(oauthAllowedDomains({ OAUTH_ALLOWED_DOMAINS: '', WORKBENCH_INBOX_HOLDERS: 'example.com' })).toEqual([]);
   });
 });
