@@ -13,7 +13,7 @@ import { parseAnswer } from '../contracts';
 import * as activities from './activities';
 import { readItem } from './admission';
 import { parseAct, parseTriage } from './contracts';
-import { refusalFor } from './ownership';
+import { holderFor, refusalFor } from './ownership';
 import { actRow, decideRow } from './rows';
 import { actFailed, afterAct, afterTriage, openingStep, reclassified } from './steps';
 import {
@@ -44,11 +44,11 @@ function holderOf(data: unknown): string | undefined {
 }
 
 /** A first start carries the item; a continuation carries the state. */
-async function stateOf(envelope: LTEnvelope, workflowId: string): Promise<ItemState | undefined> {
+async function stateOf(envelope: LTEnvelope, workflowId: string, holder: string | undefined): Promise<ItemState | undefined> {
   if (isState(envelope.data)) return envelope.data.state;
   const raw = envelope.data as Partial<ItemSpec>;
   const vocabulary = raw.kind && STARTER_VOCABULARY.kinds.includes(raw.kind) ? STARTER_VOCABULARY : await readInboxVocabulary();
-  const item = readItem(raw, vocabulary, { holder: raw.holder ?? '', source: raw.source ?? 'manual' });
+  const item = readItem({ ...raw, holder }, vocabulary, { holder: holder ?? '', source: raw.source ?? 'manual' });
   if (!item || !item.holder) return undefined;
   const { userId } = await holderAccount({ holder: item.holder });
   return { itemId: workflowId, item, assignee: userId, step: openingStep(), context: {}, generation: 0 };
@@ -92,9 +92,10 @@ async function runStep(state: ItemState, signalId: string): Promise<ItemState> {
 
 export async function inboxItem(envelope: LTEnvelope): Promise<Return> {
   const { workflowId } = Durable.workflow.workflowInfo();
-  const refused = refusalFor(envelope, holderOf(envelope.data));
+  const holder = holderFor(envelope, holderOf(envelope.data));
+  const refused = refusalFor(envelope, holder);
   if (refused) return { type: 'return', data: { itemId: workflowId, refused } };
-  let state = await stateOf(envelope, workflowId);
+  let state = await stateOf(envelope, workflowId, holder);
   if (!state) return { type: 'return', data: { itemId: workflowId, refused: 'The item needs a holder, a known kind, a headline and a summary.' } };
 
   for (let round = 0; round < INBOX_ROUNDS_PER_LINK && state.step.kind !== 'done'; round++) {

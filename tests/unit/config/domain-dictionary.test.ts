@@ -34,11 +34,17 @@ describe('DOMAIN_DICTIONARY', () => {
 
   it('lets the agent start its own sweep instead of asking an admin', () => {
     const day = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start your day');
-    expect(day?.steps.some((step) => step.includes('start one for your holder'))).toBe(true);
+    expect(day?.steps.some((step) => step.includes('naming no holder'))).toBe(true);
     expect(day?.steps.some((step) => step.includes('ask the superadmin'))).toBe(false);
     const sweep = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start a sweep for a holder');
-    expect(sweep?.steps[0]).toContain('their own inbox');
-    expect(sweep?.steps[0]).toContain('refused');
+    expect(sweep?.steps[0]).toContain('own inbox');
+    expect(sweep?.steps[0]).toContain('data: { source: "slack"');
+  });
+
+  it('never asks a holder or their agent to name their own inbox', () => {
+    const prefs = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'set what your reactions mean');
+    expect(prefs?.steps[0]).toContain('data: {}');
+    expect(DOMAIN_DICTIONARY.overview).toContain("caller's own inbox");
   });
 
   it('points the inbox runbook at the triage guide first, then at the holder\'s reactions', () => {

@@ -23,7 +23,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
   overview: [
     'An organization as queues. A role is a seat: a team, a leadership circle or a personal inbox; a persona is the collection of roles a holder has.',
     'Work crosses seats as validated handoffs: a deliverable is produced by one role and reviewed by another, a program is phases of deliverables closed by gates, an ask parks one decision.',
-    `Each holder has an inbox (inbox-<holder>), their decide queue, and an agent queue (inbox-agent-<holder>) their agent works acting as them; a sign-in email becomes the holder name (ana.ruiz@example.com is ana-ruiz-at-example-com).`,
+    `Each holder has an inbox (inbox-<holder>), their decide queue, and an agent queue (inbox-agent-<holder>) their agent works acting as them; a sign-in email becomes the holder name (ana.ruiz@example.com is ana-ruiz-at-example-com). The inbox workflows run for the caller's own inbox unless they name another; only an admin names one.`,
     inboxRoles.length ? `Named inboxes here: ${inboxRoles.join(', ')}.` : '',
     `Standing rules live in knowledge: org/${EDITION_KEY.GUIDE} for seats, org/${INBOX_EDITION.GUIDE} for the inbox. Read them before acting.`,
   ].filter(Boolean).join(' '),
@@ -35,7 +35,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     { term: 'item', kind: 'entity', maps_to: { roles: inboxRoles }, idFacet: 'item', guidance: 'One thing that needs a holder, from arrival to close. Find its rows with facets={item: <workflow id>}.' },
     { term: 'program', kind: 'entity', maps_to: { roles: [ORG_PROGRAMS_ROLE, ...teamRoles] }, idFacet: 'program', guidance: 'One launch, by slug. Every row it parks carries facets.program.' },
     { term: 'deliverable', kind: 'entity', maps_to: { roles: teamRoles }, idFacet: 'deliverable', guidance: 'One piece of work between a producer role and a reviewer role. Rows carry facets.deliverable and facets.round.' },
-    { term: 'inboxItem', aliases: ['item workflow'], kind: 'workflow', maps_to: { workflow: 'inboxItem' }, id_convention: 'inbox-<holder>-<source>-<channel>-<thread>', kill_road: 'Cancel its pending row (cancel_escalation); the item closes as cancelled. Never terminate the sweep to stop one item.', guidance: 'Rounds of one row: a decision in the holder\'s inbox or an act in the agent queue.' },
+    { term: 'inboxItem', aliases: ['item workflow'], kind: 'workflow', maps_to: { workflow: 'inboxItem' }, id_convention: 'inbox-<holder>-<source>-<channel>-<thread>', kill_road: 'Cancel its pending row (cancel_escalation). A row in the holder\'s inbox closes the item as cancelled; a cancelled act returns to the inbox as an outcome row, and cancelling that closes it. Never terminate the sweep to stop one item.', guidance: 'Rounds of one row: a decision in the holder\'s inbox or an act in the agent queue.' },
     { term: 'inboxSweep', aliases: ['sweep', 'check'], kind: 'workflow', maps_to: { workflow: 'inboxSweep' }, id_convention: 'inboxSweep-<id>; one per holder and source', kill_road: 'terminate_workflow on the sweep; its pending check row is then cancelled.', guidance: 'Parks a check act on a schedule; the AI resolves it with the items found since the watermark.' },
     { term: 'deliverable workflow', kind: 'workflow', maps_to: { workflow: 'deliverable' }, id_convention: '<programWfId>-p<phase>-<kind>-g<gateRound>, or the invoke id when standalone', kill_road: 'Cancel its pending row; the deliverable ends cancelled and, inside a program, reports that to the board.', guidance: 'Work, then decide or review, until accepted or the rounds run out.' },
     { term: 'program workflow', kind: 'workflow', maps_to: { workflow: 'program' }, id_convention: 'program-<id>; its board is <id>-board', kill_road: 'terminate_workflow on the program, then close its board row by hand with closing.outcome = cancelled.', guidance: 'Phases of deliverables; one gate row per signing role; a hold goes to the owner role.' },
@@ -55,8 +55,8 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
       name: 'start your day',
       steps: [
         'get_domain_context once, then get_user_personas { user_id: <yours> }: your inbox is the inbox-<holder> role in your persona, your agent queue is inbox-agent-<holder>. You act as the holder; you see nothing else.',
-        `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" }: the standing rules for every act and for how you report back. Read it once per session; it changes without a deploy.`,
-        'find_escalations { workflow_type: "inboxSweep", status: "pending", role: "inbox-agent-<holder>" }: a pending check row means a sweep is running. None means no sweep; start one for your holder per "start a sweep for a holder".',
+        `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" }: the standing rules for every act and for how you report back. Read it once per session.`,
+        'find_escalations { workflow_type: "inboxSweep", status: "pending", role: "inbox-agent-<holder>" }: a pending check row means a sweep is running. None means no sweep; start one per "start a sweep for a holder", naming no holder.',
         'Work the agent queue per "work the inbox" until it is empty.',
         'Report to the holder in the shape the guide names: what landed, filed as, what you skipped and why, what waits under Back to you. Nothing else.',
       ],
@@ -93,7 +93,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     {
       name: 'start a sweep for a holder',
       steps: [
-        'invoke_workflow { workflow_type: "inboxSweep", data: { holder: "<inbox-role>", source: "slack", intervalMinutes: 60, lookbackHours: 36 } }. A holder, or their agent acting as them, starts it for their own inbox; an admin or superadmin for any inbox. The sweep returns refused when the caller holds neither.',
+        'invoke_workflow { workflow_type: "inboxSweep", data: { source: "slack", intervalMinutes: 30, lookbackHours: 24 } }. With no holder named it sweeps the caller\'s own inbox, so a holder or their agent acting as them names none. An admin adds holder: "<inbox-role>" to sweep someone else\'s.',
         'The check row appears in the holder\'s agent queue (inbox-agent-<holder>); work it per "work the inbox".',
         'Stop it with terminate_workflow on the sweep id.',
       ],
@@ -101,7 +101,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     {
       name: 'set what your reactions mean',
       steps: [
-        'invoke_workflow { workflow_type: "inboxPreferences", data: { holder: "<inbox-role>" } }: a holder or their agent for their own inbox; an admin for any. A "Your reactions" row appears in the inbox, pre-filled with what is in force.',
+        'invoke_workflow { workflow_type: "inboxPreferences", data: {} }: the caller\'s own inbox; an admin adds holder: "<inbox-role>" for someone else\'s. A "Your reactions" row appears in the inbox, pre-filled with what is in force.',
         'The holder pastes the emoji they use into each box (Done, Approved, On it, Read, Not mine, Ticket), picks what a Read emoji closes, what their reply means, and which of their roles a reaction may close, then submits.',
         `Saved as org/${INBOX_EDITION.REACTIONS}-<holder>, one edition per save; the org default is org/${INBOX_EDITION.REACTIONS}. The agent reads it at the start of every pass.`,
         'When the holder tells you in words what an emoji means, invoke the row for them and say it is waiting; do not write the edition by hand.',
@@ -109,7 +109,11 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     },
     {
       name: 'stop one item',
-      steps: ['find_escalations with facets={item: <id>} and status pending.', 'cancel_escalation on that row; the item closes as cancelled and keeps its history.'],
+      steps: [
+        'find_escalations with facets={item: <id>} and status pending.',
+        'cancel_escalation on that row. A row in the holder\'s inbox closes the item as cancelled and keeps its history.',
+        'A row in the agent queue does not: the cancelled act returns to the inbox as an outcome row. Cancel that row too, then find_escalations again to confirm nothing is pending.',
+      ],
     },
   ],
 };

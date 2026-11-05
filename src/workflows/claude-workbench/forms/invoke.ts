@@ -134,19 +134,27 @@ const SOURCE_FIELD = {
   'x-lt-options': INBOX_SOURCES.map((source) => ({ value: source, label: source })),
 };
 
+/**
+ * Optional everywhere: left empty, the run is for the caller's own inbox (the
+ * one their sign-in email is bound to). Only an admin acting for someone else
+ * names one. Free text, because holders bound from a domain rule are not in
+ * any static list.
+ */
 const HOLDER_FIELD = {
   type: 'string',
   title: 'Inbox',
-  description: 'The personal inbox the items are for',
-  'x-lt-options': HOLDER_ROLES.map((entry) => ({ value: entry.role, label: entry.title })),
+  description: `Leave empty for your own inbox. Admins may name another, e.g. ${HOLDER_ROLES[0]?.role ?? 'inbox-sam'}.`,
+  pattern: '^(inbox-[a-z][a-z0-9_-]*)?$',
+  'x-lt-pattern-error': 'An inbox role: inbox- followed by the holder name',
+  maxLength: 128,
 };
 
 export const INBOX_SWEEP_INPUT_SCHEMA = {
   type: 'object',
   'x-lt-layout': 'two-column',
-  'x-lt-help': '1. Pick the inbox and the source.\n2. The AI is asked to check on the interval; each item it finds becomes a row in that inbox.',
-  'x-lt-order': ['holder', 'source', 'intervalMinutes', 'lookbackHours', 'maxItems', 'watermark'],
-  required: ['holder', 'source'],
+  'x-lt-help': '1. Pick the source; the sweep is for your own inbox.\n2. The AI is asked to check on the interval; each item it finds becomes a row in your inbox.',
+  'x-lt-order': ['source', 'intervalMinutes', 'lookbackHours', 'maxItems', 'watermark', 'holder'],
+  required: ['source'],
   properties: {
     holder: HOLDER_FIELD,
     source: SOURCE_FIELD,
@@ -160,9 +168,9 @@ export const INBOX_SWEEP_INPUT_SCHEMA = {
 export const INBOX_ITEM_INPUT_SCHEMA = {
   type: 'object',
   'x-lt-layout': 'two-column',
-  'x-lt-help': '1. Pick the inbox.\n2. Say what it is and what it needs; the rules suggest a decision.',
-  'x-lt-order': ['holder', 'kind', 'headline', 'category', 'need', 'raci', 'priority', 'permalink', 'summary'],
-  required: ['holder', 'kind', 'headline', 'summary'],
+  'x-lt-help': '1. Say what it is and what it needs; it lands in your own inbox.\n2. The rules suggest a decision.',
+  'x-lt-order': ['kind', 'headline', 'category', 'need', 'raci', 'priority', 'permalink', 'summary', 'holder'],
+  required: ['kind', 'headline', 'summary'],
   properties: {
     holder: HOLDER_FIELD,
     kind: { type: 'string', title: 'Kind', description: 'What it is', 'x-lt-options': 'lookup.kinds.items' },
@@ -176,21 +184,13 @@ export const INBOX_ITEM_INPUT_SCHEMA = {
   },
 };
 
-/** Any inbox, named: holders bound from a domain rule are not in the static list. */
 export const INBOX_PREFERENCES_INPUT_SCHEMA = {
   type: 'object',
   'x-lt-layout': 'two-column',
-  'x-lt-help': '1. Name the inbox.\n2. A "Your reactions" row opens in it, pre-filled with what is in force; the holder submits what their emoji mean.',
+  'x-lt-help': '1. Submit; nothing to fill in here.\n2. A "Your reactions" row opens in your inbox, pre-filled with what is in force. Say there what your emoji mean.',
   'x-lt-order': ['holder'],
-  required: ['holder'],
+  required: [],
   properties: {
-    holder: {
-      type: 'string',
-      title: 'Inbox',
-      description: 'The inbox role, e.g. inbox-sam; yours unless you hold admin',
-      pattern: '^inbox-[a-z][a-z0-9_-]*$',
-      'x-lt-pattern-error': 'An inbox role: inbox- followed by the holder name',
-      maxLength: 128,
-    },
+    holder: HOLDER_FIELD,
   },
 };

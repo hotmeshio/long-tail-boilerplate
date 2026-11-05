@@ -18,7 +18,7 @@ import * as activities from './activities';
 import type { ReactionSource } from './activities';
 import { safeMarkdown } from './brief';
 import { parsePreferences, type PreferencesForm } from './contracts';
-import { refusalFor } from './ownership';
+import { holderFor, refusalFor } from './ownership';
 import {
   PREFERENCES_WORKFLOW,
   READ_CLOSES,
@@ -32,8 +32,8 @@ import { INBOX_PREFERENCES_PRIORITY, INBOX_PREFERENCES_TIMEOUT, INBOX_STAGE, PRE
 const { readReactionSettings, storeReactionSettings, holderAccount } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export interface PreferencesInput {
-  /** The holder's inbox role, e.g. `inbox-sam`. */
-  holder: string;
+  /** The holder's inbox role, e.g. `inbox-sam`; omitted, the caller's own inbox. */
+  holder?: string;
 }
 
 export interface PreferencesResult {
@@ -133,8 +133,8 @@ export function settingsFromForm(form: PreferencesForm, current: ReactionSetting
 export async function inboxPreferences(envelope: LTEnvelope): Promise<{ type: 'return'; data: PreferencesResult }> {
   const { workflowId } = Durable.workflow.workflowInfo();
   const input = envelope.data as PreferencesInput;
-  const holder = input?.holder ?? '';
-  const refused = refusalFor(envelope, holder) ?? (holder.startsWith('inbox-') ? undefined : 'The row needs an inbox role.');
+  const holder = holderFor(envelope, input?.holder) ?? '';
+  const refused = refusalFor(envelope, holder || undefined) ?? (holder.startsWith('inbox-') ? undefined : 'The row needs an inbox role.');
   if (refused) return { type: 'return', data: { holder, saved: false, refused } };
 
   const { settings, source } = await readReactionSettings({ holder });
