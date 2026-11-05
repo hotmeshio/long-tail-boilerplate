@@ -29,7 +29,7 @@ import {
 } from './reactions';
 import { INBOX_PREFERENCES_PRIORITY, INBOX_PREFERENCES_TIMEOUT, INBOX_STAGE, PREFERENCES_SUBTYPE } from './types';
 
-const { readReactionSettings, storeReactionSettings, holderAccount } = Durable.workflow.proxyActivities<typeof activities>({ activities });
+const { readReactionSettings, storeReactionSettings } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export interface PreferencesInput {
   /** The holder's inbox role, e.g. `inbox-sam`; omitted, the caller's own inbox. */
@@ -77,10 +77,9 @@ export function preferencesBrief(settings: ReactionSettings, source: ReactionSou
 }
 
 /** The row the holder decides on; its answer is the next edition. */
-export function preferencesRow(holder: string, settings: ReactionSettings, source: ReactionSource, assignee?: string) {
+export function preferencesRow(holder: string, settings: ReactionSettings, source: ReactionSource) {
   const brief = preferencesBrief(settings, source);
   return {
-    ...(assignee ? { assignee } : {}),
     type: ROW_TYPE,
     subtype: PREFERENCES_SUBTYPE,
     role: holder,
@@ -138,8 +137,7 @@ export async function inboxPreferences(envelope: LTEnvelope): Promise<{ type: 'r
   if (refused) return { type: 'return', data: { holder, saved: false, refused } };
 
   const { settings, source } = await readReactionSettings({ holder });
-  const { userId } = await holderAccount({ holder });
-  const answer = parseAnswer(await conditional<Record<string, unknown>>(`${workflowId}-prefs`, preferencesRow(holder, settings, source, userId)), parsePreferences);
+  const answer = parseAnswer(await conditional<Record<string, unknown>>(`${workflowId}-prefs`, preferencesRow(holder, settings, source)), parsePreferences);
   if (answer === null) return { type: 'return', data: { holder, saved: false, cancelled: true } };
   if (answer === false) return { type: 'return', data: { holder, saved: false, expired: true } };
 

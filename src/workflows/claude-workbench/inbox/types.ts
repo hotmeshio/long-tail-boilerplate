@@ -209,8 +209,6 @@ export interface Next {
 export interface ItemState {
   itemId: string;
   item: ItemSpec;
-  /** The holder's account; every row of the item opens pre-assigned to it. */
-  assignee?: string;
   step: Step;
   context: ItemContext;
   generation: number;
@@ -248,7 +246,7 @@ export interface SweepInput {
   watermark?: string;
   generation?: number;
   admitted?: number;
-  /** The holder's account, found once; check rows open pre-assigned to it. */
+  /** Set by runs from before rows stopped being pre-assigned; read only for replay. */
   assignee?: string;
 }
 

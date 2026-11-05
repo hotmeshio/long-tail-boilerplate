@@ -50,8 +50,9 @@ async function stateOf(envelope: LTEnvelope, workflowId: string, holder: string 
   const vocabulary = raw.kind && STARTER_VOCABULARY.kinds.includes(raw.kind) ? STARTER_VOCABULARY : await readInboxVocabulary();
   const item = readItem({ ...raw, holder }, vocabulary, { holder: holder ?? '', source: raw.source ?? 'manual' });
   if (!item || !item.holder) return undefined;
-  const { userId } = await holderAccount({ holder: item.holder });
-  return { itemId: workflowId, item, assignee: userId, step: openingStep(), context: {}, generation: 0 };
+  // Unused; kept so runs started when rows were pre-assigned replay the same sequence.
+  await holderAccount({ holder: item.holder });
+  return { itemId: workflowId, item, step: openingStep(), context: {}, generation: 0 };
 }
 
 /** A re-filing is kept as a correction and applied to the item before routing. */
@@ -63,7 +64,7 @@ async function refile(state: ItemState, triage: ReturnType<typeof parseTriage>, 
 }
 
 async function awaitDecision(state: ItemState, view: InboxView, signalId: string): Promise<{ next: Next; item: ItemSpec }> {
-  const answer = parseAnswer(await conditional<Record<string, unknown>>(signalId, decideRow(state.itemId, view, state.item, state.context, state.assignee)), parseTriage);
+  const answer = parseAnswer(await conditional<Record<string, unknown>>(signalId, decideRow(state.itemId, view, state.item, state.context)), parseTriage);
   if (answer === null) return { next: { step: { kind: 'done', close: ITEM_CLOSE.CANCELLED }, context: state.context }, item: state.item };
   if (answer === false) return { next: { step: { kind: 'decide', view }, context: state.context }, item: state.item };
   const item = await refile(state, answer, signalId);
@@ -72,7 +73,7 @@ async function awaitDecision(state: ItemState, view: InboxView, signalId: string
 
 async function awaitAct(state: ItemState, name: InboxAct, signalId: string): Promise<Next> {
   if (name === 'check') return actFailed(state.context, 'A check is not an item act.');
-  const answer = parseAnswer(await conditional<Record<string, unknown>>(signalId, actRow(state.itemId, name, state.item, state.context, state.assignee)), parseAct);
+  const answer = parseAnswer(await conditional<Record<string, unknown>>(signalId, actRow(state.itemId, name, state.item, state.context)), parseAct);
   if (answer === null) return actFailed(state.context, `The ${name} act was cancelled.`);
   if (answer === false) return actFailed(state.context, `The ${name} act was not done within a day.`);
   return afterAct(name, answer, state.context);

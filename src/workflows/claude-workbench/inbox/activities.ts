@@ -45,10 +45,9 @@ export async function readInboxVocabulary(): Promise<Vocabulary> {
 }
 
 /**
- * The account that owns an inbox.
- * Rows open pre-assigned to it: a durable routing hint with no claim window,
- * so they stay available and appear under the holder's own items without a
- * claim. The account is whoever holds the holder's persona, which covers
+ * The account that owns an inbox. Rows no longer open assigned to it; the
+ * sweep and item still call this so earlier runs replay the same sequence.
+ * The account is whoever holds the holder's persona, which covers
  * holders named in code and holders bound from a domain rule alike.
  * Undefined when nobody holds it yet.
  */

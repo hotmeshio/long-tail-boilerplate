@@ -9,8 +9,9 @@ const HOLDER = 'inbox-sam';
 
 describe('the reactions row', () => {
   it('opens in the holder\'s inbox under Next, pre-filled with what is in force', () => {
-    const row = preferencesRow(HOLDER, DEFAULT_REACTIONS, 'org', 'user-1');
-    expect(row).toMatchObject({ role: HOLDER, subtype: 'preferences', workflowType: 'inboxPreferences', assignee: 'user-1' });
+    const row = preferencesRow(HOLDER, DEFAULT_REACTIONS, 'org');
+    expect(row).toMatchObject({ role: HOLDER, subtype: 'preferences', workflowType: 'inboxPreferences' });
+    expect('assignee' in row).toBe(false);
     expect(row.metadata).toMatchObject({ holder: HOLDER, seat: HOLDER, section: 'preferences', stage: 'new' });
     expect(row.envelope.section).toBe('preferences');
     expect(row.envelope.formDefaults.preferences).toMatchObject({ done: ':white_check_mark: :heavy_check_mark: :ballot_box_with_check:', onIt: ':eyes:', readCloses: 'fyi', replyMeans: 'on-it' });
