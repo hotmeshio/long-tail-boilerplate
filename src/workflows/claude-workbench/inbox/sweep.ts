@@ -23,7 +23,7 @@ const { readInboxVocabulary, watermarkHoursAgo, holderAccount, startInboxItem } 
 
 export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepInput | { cancelled: true } | { refused: string } }> {
   const { workflowId } = Durable.workflow.workflowInfo();
-  const named = envelope.data as SweepInput;
+  const { assignee, ...named } = envelope.data as SweepInput;
   const input: SweepInput = { ...named, holder: holderFor(envelope, named.holder) ?? '' };
   const refused = refusalFor(envelope, input.holder || undefined) ?? (input.holder ? undefined : 'Name the inbox to sweep.');
   if (refused) return { type: 'return', data: { refused } };
@@ -32,10 +32,11 @@ export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'
   const max = input.maxItems ?? INBOX_CHECK_MAX_ITEMS;
   let watermark = input.watermark ?? (await watermarkHoursAgo({ hours: input.lookbackHours ?? INBOX_DEFAULT_LOOKBACK_HOURS })).watermark;
   let admitted = input.admitted ?? 0;
-  const assignee = input.assignee ?? (await holderAccount({ holder: input.holder })).userId;
+  // Unused; kept so runs started when rows were pre-assigned replay the same sequence.
+  if (assignee === undefined) await holderAccount({ holder: input.holder });
 
   for (let gate = 0; gate < INBOX_CHECKS_PER_LINK; gate++) {
-    const answer = parseAnswer(await conditional<Record<string, unknown>>(`${workflowId}-g${generation}-c${gate}`, checkRow({ ...input, maxItems: max }, watermark, assignee)), parseAct);
+    const answer = parseAnswer(await conditional<Record<string, unknown>>(`${workflowId}-g${generation}-c${gate}`, checkRow({ ...input, maxItems: max }, watermark)), parseAct);
     if (answer === null) return { type: 'return', data: { cancelled: true } };
     if (answer !== false && answer.outcome === 'done') {
       const vocabulary = await readInboxVocabulary();
@@ -46,7 +47,7 @@ export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'
     await Durable.workflow.sleep(`${interval} minutes`);
   }
 
-  const next: SweepInput = { ...input, watermark, generation: generation + 1, admitted, assignee };
+  const next: SweepInput = { ...input, watermark, generation: generation + 1, admitted };
   await Durable.workflow.continueAsNew({ data: next, metadata: envelope.metadata ?? {} });
   return { type: 'return', data: next };
 }

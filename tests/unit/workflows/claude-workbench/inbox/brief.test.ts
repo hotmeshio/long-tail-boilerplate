@@ -58,8 +58,7 @@ describe('inbox rows', () => {
     const row = actRow('item-1', 'investigate', item, {});
     expect(row).toMatchObject({ role: 'inbox-agent-sam', subtype: 'investigate' });
     expect('assignee' in row).toBe(false);
-    expect(actRow('item-1', 'investigate', item, {}, 'user-1').assignee).toBe('user-1');
-    expect(decideRow('item-1', 'triage', item, {}, 'user-1').assignee).toBe('user-1');
+    expect('assignee' in decideRow('item-1', 'triage', item, {})).toBe(false);
     expect(row.envelope).toMatchObject({ section: 'act', act: 'investigate' });
     const check = checkRow({ holder: 'inbox-sam', source: 'slack' }, '1.0');
     expect(check).toMatchObject({ role: 'inbox-agent-sam', subtype: 'check' });

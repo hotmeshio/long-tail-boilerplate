@@ -57,10 +57,9 @@ export function stageOf(view: InboxView, item: ItemSpec): InboxStage {
 }
 
 /** The holder's row: the card, what came back, and the decision the rules suggest. */
-export function decideRow(itemId: string, view: InboxView, item: ItemSpec, context: ItemContext, assignee?: string) {
+export function decideRow(itemId: string, view: InboxView, item: ItemSpec, context: ItemContext) {
   const prefill = view === INBOX_VIEW.TRIAGE ? item.suggestion : undefined;
   return {
-    ...(assignee ? { assignee } : {}),
     type: ROW_TYPE,
     subtype: view,
     role: item.holder,
@@ -96,10 +95,9 @@ export function decideRow(itemId: string, view: InboxView, item: ItemSpec, conte
 }
 
 /** The agent's row in the holder's agent queue: the instructions for one act. */
-export function actRow(itemId: string, name: Exclude<InboxAct, 'check'>, item: ItemSpec, context: ItemContext, assignee?: string) {
+export function actRow(itemId: string, name: Exclude<InboxAct, 'check'>, item: ItemSpec, context: ItemContext) {
   const role = agentRoleFor(item.holder);
   return {
-    ...(assignee ? { assignee } : {}),
     type: ROW_TYPE,
     subtype: name,
     role,
@@ -114,10 +112,9 @@ export function actRow(itemId: string, name: Exclude<InboxAct, 'check'>, item: I
 }
 
 /** The sweep's row: one check of one source for one holder. */
-export function checkRow(input: SweepInput, watermark: string | undefined, assignee?: string) {
+export function checkRow(input: SweepInput, watermark: string | undefined) {
   const role = agentRoleFor(input.holder);
   return {
-    ...(assignee ? { assignee } : {}),
     type: ROW_TYPE,
     subtype: INBOX_ACT.CHECK,
     role,
