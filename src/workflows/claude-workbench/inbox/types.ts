@@ -123,6 +123,8 @@ export const INBOX_DEFAULT_LOOKBACK_HOURS = 36;
 export const INBOX_CHECK_MAX_ITEMS = 50;
 export const INBOX_CORRECTIONS_KEPT = 200;
 export const INBOX_DEFAULT_PRIORITY = 3;
+/** How long a finished item's record is kept; its id stays taken, so a re-report is a no-op. */
+export const INBOX_ITEM_EXPIRE_SECONDS = 30 * 24 * 3600;
 
 /** The rule-suggested decision an item's row opens on. */
 export interface Suggestion {
