@@ -4,13 +4,15 @@
  * reads before it classifies. Both are safe to run twice.
  */
 
+import { Durable } from '@hotmeshio/hotmesh';
 import { KnowledgeApi } from '@hotmeshio/long-tail';
 import { Pool } from 'pg';
 
+import { getConnection } from '../../../config/connection';
 import { DB_CONFIG } from '../../../config/database';
-import { ORG_DOMAIN } from '../types';
+import { CLAUDE_WORKBENCH_QUEUE, ORG_DOMAIN } from '../types';
 import { DEFAULT_REACTIONS, reactionSettingsFrom, reactionsKey, type ReactionSettings } from './reactions';
-import { INBOX_CORRECTIONS_KEPT, type Correction, type Rule, type Vocabulary } from './types';
+import { INBOX_CORRECTIONS_KEPT, INBOX_ITEM_EXPIRE_SECONDS, type Correction, type ItemSpec, type Rule, type Vocabulary } from './types';
 import { INBOX_EDITION, STARTER_VOCABULARY, editionValues, readRule } from './vocabulary';
 
 function entryData(result: { status: number; data?: any }): unknown {
@@ -66,6 +68,28 @@ export async function holderAccount(input: { holder: string }): Promise<{ userId
     return rows.length ? { userId: rows[0].id } : {};
   } finally {
     await pool.end();
+  }
+}
+
+/**
+ * Start one item under its source id; false when that id is already taken.
+ * Started here rather than as a child: a child start on a taken id parks the
+ * parent with no reply, while a client start throws. Safe to retry.
+ */
+export async function startInboxItem(input: { workflowId: string; item: ItemSpec }): Promise<{ started: boolean }> {
+  const client = new Durable.Client({ connection: getConnection() });
+  try {
+    await client.workflow.start({
+      taskQueue: CLAUDE_WORKBENCH_QUEUE,
+      workflowName: 'inboxItem',
+      workflowId: input.workflowId,
+      args: [{ data: input.item, metadata: {} }],
+      expire: INBOX_ITEM_EXPIRE_SECONDS,
+    });
+    return { started: true };
+  } catch (err) {
+    if (/duplicate/i.test(String((err as Error)?.message ?? err))) return { started: false };
+    throw err;
   }
 }
 

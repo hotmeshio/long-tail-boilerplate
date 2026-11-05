@@ -12,34 +12,14 @@ import { conditional } from '@hotmeshio/long-tail';
 import type { LTEnvelope } from '@hotmeshio/long-tail';
 
 import { parseAnswer } from '../contracts';
-import { CLAUDE_WORKBENCH_QUEUE } from '../types';
 import * as activities from './activities';
 import { admit, itemWorkflowId, laterWatermark } from './admission';
 import { parseAct } from './contracts';
 import { holderFor, refusalFor } from './ownership';
 import { checkRow } from './rows';
-import { INBOX_CHECKS_PER_LINK, INBOX_CHECK_MAX_ITEMS, INBOX_DEFAULT_INTERVAL_MINUTES, INBOX_DEFAULT_LOOKBACK_HOURS, type ItemSpec, type SweepInput } from './types';
+import { INBOX_CHECKS_PER_LINK, INBOX_CHECK_MAX_ITEMS, INBOX_DEFAULT_INTERVAL_MINUTES, INBOX_DEFAULT_LOOKBACK_HOURS, type SweepInput } from './types';
 
-const { readInboxVocabulary, watermarkHoursAgo, holderAccount } = Durable.workflow.proxyActivities<typeof activities>({ activities });
-
-const ITEM_WORKFLOW = 'inboxItem';
-
-/** Start one item; a duplicate id means it already exists, which is the point. */
-async function startItem(item: ItemSpec): Promise<boolean> {
-  try {
-    await Durable.workflow.startChild({
-      taskQueue: CLAUDE_WORKBENCH_QUEUE,
-      workflowName: ITEM_WORKFLOW,
-      workflowId: itemWorkflowId(item),
-      args: [{ data: item, metadata: {} }],
-    });
-    return true;
-  } catch (err) {
-    if (Durable.workflow.didInterrupt(err)) throw err;
-    if (/duplicate/i.test(String((err as Error)?.message ?? err))) return false;
-    throw err;
-  }
-}
+const { readInboxVocabulary, watermarkHoursAgo, holderAccount, startInboxItem } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
 export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepInput | { cancelled: true } | { refused: string } }> {
   const { workflowId } = Durable.workflow.workflowInfo();
@@ -60,7 +40,7 @@ export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'
     if (answer !== false && answer.outcome === 'done') {
       const vocabulary = await readInboxVocabulary();
       const items = admit(answer.items ?? [], vocabulary, { holder: input.holder, source: input.source }, max);
-      for (const item of items) if (await startItem(item)) admitted += 1;
+      for (const item of items) if ((await startInboxItem({ workflowId: itemWorkflowId(item), item })).started) admitted += 1;
       watermark = laterWatermark(watermark, answer.checkedThrough);
     }
     await Durable.workflow.sleep(`${interval} minutes`);
