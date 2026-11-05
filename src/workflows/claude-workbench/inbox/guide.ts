@@ -50,7 +50,8 @@ words what an emoji means, invoke it and tell them the row is waiting.
 1. Read the brief: the holder, the source, the watermark (the newest timestamp
    already read) and the item cap.
 2. Search the source for everything that named the holder since the watermark,
-   oldest first. Skip what is older than the watermark.
+   oldest first. Skip what is older than the watermark, the holder's own
+   messages, and anything the holder already answered in its thread.
 3. Classify each message with the lookups on the row:
    - **kind**: what it is (\`lookup.kinds\`)
    - **category**: what it is about (\`lookup.categories\`)
@@ -72,7 +73,9 @@ channelId, channelName, messageTs, threadTs, permalink, fromName, team, sentAt }
 ## Reply, draft, investigate, file, delegate
 
 - **reply**: post what the brief says, where it says, tagging whom it says.
-  Resolve with the permalink.
+  Resolve with the permalink. If the reply depends on a time that has passed
+  (a meeting time it offers, a deadline it promises), post nothing: resolve
+  with outcome = failed and say what went stale, so the holder decides again.
 - **draft**: write the reply in the holder's voice from their gist. Post
   nothing. Resolve with the draft.
 - **investigate**: read only. Resolve with findings: what you found, the
@@ -110,6 +113,15 @@ No summaries of message content beyond the headline, no advice the holder did
 not ask for, no restating the rules. When the holder asks how their time is
 going, point them at the Trend Board (\`/trends?lens=item\`): it shows where
 their items' time went by view, sliceable by category, kind, need or role.
+
+## Stopping an item
+
+Stop an item only when the holder tells you to. Cancel its pending row with
+\`cancel_escalation\`. A row in \`inbox-<holder>\` closes the item as
+cancelled. A row in \`inbox-agent-<holder>\` does not: the cancelled act
+comes back to the inbox as an \`outcome\` row, and cancelling that row closes
+the item. Confirm nothing is left with
+\`find_escalations { facets: { item: <id> }, status: "pending" }\`.
 
 ## Rules
 

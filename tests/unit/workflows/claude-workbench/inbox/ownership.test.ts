@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { HOLDER_INVOCABLE_WORKFLOWS, agentRoleOf, refusalFor } from '../../../../../src/workflows/claude-workbench/inbox/ownership';
+import { HOLDER_INVOCABLE_WORKFLOWS, agentRoleOf, holderFor, refusalFor } from '../../../../../src/workflows/claude-workbench/inbox/ownership';
 
 const principal = (roles: string[], roleType = 'member') => ({ lt: { userId: 'u1', principal: { id: 'google:1', type: 'user' as const, displayName: 'Kim Lee', roles, roleType } } });
 
@@ -31,6 +31,32 @@ describe('inbox ownership', () => {
 
   it('refuses a caller it cannot resolve, and a row with no holder', () => {
     expect(refusalFor({ lt: { userId: 'u9' } }, 'inbox-kim')).toContain('could not be resolved');
-    expect(refusalFor(principal(['inbox-kim']), undefined)).toContain('needs a holder');
+    expect(refusalFor(principal(['inbox-kim']), undefined)).toContain('Name the inbox');
+  });
+});
+
+describe('the inbox a run is for', () => {
+  it('is the caller\'s own inbox when they name none', () => {
+    expect(holderFor(principal(['inbox-kim', 'inbox-agent-kim', 'engineering-platform']), undefined)).toBe('inbox-kim');
+  });
+
+  it('is found from the agent role alone, for an agent acting as its holder', () => {
+    expect(holderFor(principal(['inbox-agent-kim']), undefined)).toBe('inbox-kim');
+  });
+
+  it('is the named inbox when one is named, so a replay reads its first start the same way', () => {
+    expect(holderFor(principal(['inbox-kim']), 'inbox-ana')).toBe('inbox-ana');
+    expect(holderFor({}, 'inbox-ana')).toBe('inbox-ana');
+  });
+
+  it('is unknown when the caller holds no inbox or more than one', () => {
+    expect(holderFor(principal(['superadmin'], 'superadmin'), undefined)).toBeUndefined();
+    expect(holderFor(principal(['inbox-kim', 'inbox-ana']), undefined)).toBeUndefined();
+    expect(holderFor({}, undefined)).toBeUndefined();
+  });
+
+  it('lets the holder act for the inbox it resolved to', () => {
+    const caller = principal(['inbox-agent-kim']);
+    expect(refusalFor(caller, holderFor(caller, undefined))).toBeUndefined();
   });
 });
