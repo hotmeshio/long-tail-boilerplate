@@ -155,6 +155,7 @@ docker compose -f docker-compose.yml -f docker-compose.multi.yml up -d --build
 - For an external database, set `DOCKER_POSTGRES_HOST=host.docker.internal` and `DOCKER_POSTGRES_PORT` for the container, and `POSTGRES_*` for host processes.
 - `SEED_ADMIN_PASSWORD` creates the `superadmin` on first boot (`l0ngt@1l` locally).
 - `LT_OAUTH_ISSUER` turns on OAuth sign-in for MCP clients at `/mcp`; it must be the URL the app is reached at.
+- `LT_OAUTH_ALLOWED_REDIRECT_URIS` lists the exact https redirects an MCP client may register (comma-separated). Loopback redirects (Claude Code, Claude Desktop) are always allowed; a claude.ai connector needs `https://claude.ai/api/mcp/auth_callback`. The AWS stack sets the claude.ai and claude.com callbacks.
 - `ANTHROPIC_API_KEY` (and `OPENAI_API_KEY`) are optional; they enable the workflow builder, tool orchestration, and screenshot vision.
 
 ### Connecting a SQL Client

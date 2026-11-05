@@ -259,6 +259,8 @@ export class ComputeStack extends cdk.Stack {
         NATS_WS_TARGET: `ws://nats.${config.serviceDiscoveryNamespace}:9222`,
         // OAuth sign-in for MCP clients at https://{domain}/mcp
         LT_OAUTH_ISSUER: `https://${config.domainName}`,
+        // claude.ai connectors redirect here; loopback (Claude Code) needs no entry
+        LT_OAUTH_ALLOWED_REDIRECT_URIS: 'https://claude.ai/api/mcp/auth_callback,https://claude.com/api/mcp/auth_callback',
       },
       secrets: {
         ...sharedSecrets,
