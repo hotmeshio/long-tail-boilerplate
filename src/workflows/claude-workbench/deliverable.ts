@@ -15,7 +15,7 @@ import * as activities from './activities';
 import { reviewBrief, workBrief, type RoundNote } from './brief';
 import { parseAnswer, parseDecision, parseHandoff, parseReview } from './contracts';
 import { aiAssignment, roundSignal, rowFacets, sectionEnvelope } from './facets';
-import { orgLookups } from './org';
+import { seatLookups } from './org';
 import { CLAUDE_BOT_ID } from './personas';
 import { exhaustedVerdict, routeDecision, routeReview, routeWork, type FollowRoute } from './steps';
 import {
@@ -44,7 +44,7 @@ function rowBase(input: DeliverableInput, seat: string, section: (typeof SECTION
     workflowType: WORKFLOW_TYPE,
     timeout: ROW_TIMEOUT,
     metadata: rowFacets({ seat, section, raci, round, program: input.program, phase: input.phase, deliverable: input.key, kind: input.kind, ai: input.ai }),
-    ...(input.pins ? { lookups: orgLookups(input.pins) } : {}),
+    lookups: seatLookups(input.pins),
   };
 }
 

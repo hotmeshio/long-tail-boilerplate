@@ -124,6 +124,11 @@ export function orgLookups(pins: OrgPins): EscalationLookupRef[] {
   ];
 }
 
+/** What a seat row carries: its program's pins, when it has them, and the current handoff guide. */
+export function seatLookups(pins?: OrgPins): EscalationLookupRef[] {
+  return [...(pins ? orgLookups(pins) : []), { domain: ORG_DOMAIN, key: EDITION_KEY.GUIDE, as: 'guide' }];
+}
+
 /** Current refs for invoke forms; seeds run after worker registration, so nothing is pinned here. */
 export const WORKBENCH_INPUT_LOOKUPS: EscalationLookupRef[] = [
   { domain: ORG_DOMAIN, key: EDITION_KEY.ROLES, as: LOOKUP_AS.roles },

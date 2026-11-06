@@ -17,7 +17,7 @@ import * as activities from './activities';
 import { boardBrief, gateBrief, holdBrief } from './brief';
 import { parseAnswer, parseDecision, parseGate } from './contracts';
 import { FACET, boardSignal, deliverableChildId, gateSignal, holdSignal, present, rowFacets, sectionEnvelope } from './facets';
-import { orgLookups } from './org';
+import { orgLookups, seatLookups } from './org';
 import { routeGate, routeHold } from './steps';
 import {
   BOARD_TIMEOUT,
@@ -115,7 +115,7 @@ function gateRow(state: ProgramState, phase: PhaseTemplate, role: string, result
     timeout: `${state.input.gateTimeoutHours ?? DEFAULT_GATE_TIMEOUT_HOURS}h`,
     metadata: rowFacets({ seat: role, section: SECTION.GATE, raci: RACI.ACCOUNTABLE, program: state.input.program, phase: phase.key, round: state.gateRound, template: state.template.value }),
     envelope: sectionEnvelope(SECTION.GATE, gateBrief(state.input.headline, phase, results)),
-    lookups: orgLookups(state.pins),
+    lookups: seatLookups(state.pins),
   };
 }
 
@@ -138,7 +138,7 @@ async function askOwner(state: ProgramState, phase: PhaseTemplate, results: Deli
     timeout: `${state.input.gateTimeoutHours ?? DEFAULT_GATE_TIMEOUT_HOURS}h`,
     metadata: rowFacets({ seat: state.template.owner, section: SECTION.DECIDE, raci: RACI.ACCOUNTABLE, program: state.input.program, phase: phase.key, round: state.gateRound, template: state.template.value }),
     envelope: sectionEnvelope(SECTION.DECIDE, holdBrief(state.input.headline, phase, results, holds), { decision_options: [...HOLD_DECISIONS] }),
-    lookups: orgLookups(state.pins),
+    lookups: seatLookups(state.pins),
   });
   return routeHold(parseAnswer(answer, parseDecision), phase);
 }

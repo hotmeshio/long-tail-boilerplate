@@ -64,4 +64,23 @@ describe('inbox rows', () => {
     expect(check).toMatchObject({ role: 'inbox-agent-sam', subtype: 'check' });
     expect(check.envelope).toMatchObject({ act: 'check', watermark: '1.0', holder: 'inbox-sam' });
   });
+
+  it('carries what the agent reads as lookups, so a member needs no knowledge grant', () => {
+    const asOf = (refs: { key: string; as?: string; version?: unknown }[]) => Object.fromEntries(refs.map((ref) => [ref.as, ref.key]));
+    const act = actRow('item-1', 'reply', item, {}).lookups;
+    expect(asOf(act)).toMatchObject({ guide: 'inbox-triage-guide', reactions: 'inbox-reactions-sam', reactionsDefault: 'inbox-reactions', kinds: 'inbox-kinds' });
+    expect(asOf(act)).not.toHaveProperty('corrections');
+    const check = checkRow({ holder: 'inbox-sam', source: 'slack' }, '1.0').lookups;
+    expect(asOf(check)).toMatchObject({ guide: 'inbox-triage-guide', reactions: 'inbox-reactions-sam', rules: 'inbox-rules', corrections: 'inbox-corrections' });
+    expect([...act, ...check].every((ref) => ref.version === undefined)).toBe(true);
+    expect(asOf(decideRow('item-1', 'triage', item, {}).lookups)).not.toHaveProperty('guide');
+  });
+
+  it('points the agent at the row\'s lookups, not at the knowledge store', () => {
+    for (const text of [actInstructions('reply', item, { approvedReply: 'Yes.' }), checkInstructions('inbox-sam', 'slack', '1.0')]) {
+      expect(text).toContain('`guide` lookup');
+      expect(text).not.toContain('org/');
+    }
+    expect(checkInstructions('inbox-sam', 'slack', '1.0')).toContain('`corrections` lookup');
+  });
 });

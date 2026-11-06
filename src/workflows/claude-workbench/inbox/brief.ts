@@ -5,9 +5,7 @@
  */
 
 import { INBOX_ACT, INBOX_CHECK_MAX_ITEMS, INBOX_VIEW, type InboxAct, type InboxSource, type InboxView, type ItemContext, type ItemSpec } from './types';
-import { INBOX_EDITION } from './vocabulary';
-
-const GUIDE = `org/${INBOX_EDITION.GUIDE}`;
+const RULES = 'Rules: the `guide` lookup on this row (`get_escalation_lookups`).';
 
 /** Escapes HTML and drops links that are not http(s). */
 export function safeMarkdown(text: string): string {
@@ -128,7 +126,7 @@ const ACT_LINES: Record<Exclude<InboxAct, 'check'>, (item: ItemSpec, context: It
 
 /** The AI's instructions for one act on one item. */
 export function actInstructions(name: Exclude<InboxAct, 'check'>, item: ItemSpec, context: ItemContext): string {
-  return [...ACT_LINES[name](item, context), '', '---', '', ...threadLines(item), '', `Rules: \`${GUIDE}\`.`].join('\n');
+  return [...ACT_LINES[name](item, context), '', '---', '', ...threadLines(item), '', RULES].join('\n');
 }
 
 /** The AI's instructions for a check. */
@@ -143,11 +141,11 @@ export function checkInstructions(holder: string, source: InboxSource, watermark
   return [
     `Check **${source}** for everything that named the holder of \`${holder}\` since ${sinceText(watermark)}, oldest first.`,
     '',
-    `Classify each with the lookups on this row (kinds, categories, needs, raci) and the corrections in \`org/${INBOX_EDITION.CORRECTIONS}\`.`,
+    'Classify each with the lookups on this row (kinds, categories, needs, raci) and follow its `corrections` lookup.',
     '',
     `Resolve with act.outcome = done, act.checkedThrough (the newest timestamp you read) and act.items (at most ${max}). An empty check resolves with no items.`,
     '',
-    `Rules: \`${GUIDE}\`.`,
+    RULES,
   ].join('\n');
 }
 

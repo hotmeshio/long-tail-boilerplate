@@ -10,7 +10,7 @@ import type { EscalationLookupRef } from '@hotmeshio/long-tail';
 
 import { ORG_DOMAIN } from '../types';
 import { TRIAGE_GUIDE } from './guide';
-import { DEFAULT_REACTIONS, REACTIONS_EDITION } from './reactions';
+import { DEFAULT_REACTIONS, REACTIONS_EDITION, reactionsKey } from './reactions';
 import { TRIAGE_DECISION, type Rule, type Vocabulary } from './types';
 
 export const INBOX_EDITION = {
@@ -97,6 +97,29 @@ export const INBOX_LOOKUPS: EscalationLookupRef[] = [
   { domain: ORG_DOMAIN, key: INBOX_EDITION.CATEGORIES, as: 'categories' },
   { domain: ORG_DOMAIN, key: INBOX_EDITION.NEEDS, as: 'needs' },
 ];
+
+/**
+ * What an agent row carries for the agent, so a member reads it with
+ * get_escalation_lookups: the guide and the holder's reactions, their own
+ * (missing until saved) beside the org default.
+ */
+export function actLookups(holder: string): EscalationLookupRef[] {
+  return [
+    ...INBOX_LOOKUPS,
+    { domain: ORG_DOMAIN, key: INBOX_EDITION.GUIDE, as: 'guide' },
+    { domain: ORG_DOMAIN, key: reactionsKey(holder), as: 'reactions' },
+    { domain: ORG_DOMAIN, key: INBOX_EDITION.REACTIONS, as: 'reactionsDefault' },
+  ];
+}
+
+/** A check also classifies, so it adds the rules and the holder's corrections. */
+export function checkLookups(holder: string): EscalationLookupRef[] {
+  return [
+    ...actLookups(holder),
+    { domain: ORG_DOMAIN, key: INBOX_EDITION.RULES, as: 'rules' },
+    { domain: ORG_DOMAIN, key: INBOX_EDITION.CORRECTIONS, as: 'corrections' },
+  ];
+}
 
 /** The values an edition lists: `{ items: [{ value }] }`. */
 export function editionValues(payload: unknown): string[] | undefined {
