@@ -28,7 +28,7 @@ describe('DOMAIN_DICTIONARY', () => {
   it('tells a new agent how to start its day', () => {
     const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'start your day');
     expect(runbook?.steps[0]).toContain('get_user_personas');
-    expect(runbook?.steps.some((step) => step.includes('inbox-triage-guide'))).toBe(true);
+    expect(runbook?.steps.some((step) => step.includes('guide lookup'))).toBe(true);
     expect(runbook?.steps[runbook.steps.length - 1]).toContain('Report to the holder');
   });
 
@@ -47,11 +47,20 @@ describe('DOMAIN_DICTIONARY', () => {
     expect(DOMAIN_DICTIONARY.overview).toContain("caller's own inbox");
   });
 
-  it('points the inbox runbook at the triage guide first, then at the holder\'s reactions', () => {
+  it('reads the guide and reactions off the claimed row, then applies the reactions', () => {
     const runbook = DOMAIN_DICTIONARY.runbooks?.find((entry) => entry.name === 'work the inbox');
-    expect(runbook?.steps[0]).toContain('inbox-triage-guide');
-    expect(runbook?.steps[1]).toContain('inbox-reactions-<holder>');
+    const steps = runbook?.steps ?? [];
+    const claim = steps.findIndex((step) => step.startsWith('claim_escalation'));
+    expect(steps[claim + 1]).toContain('get_escalation_lookups');
+    expect(steps[claim + 1]).toContain('reactionsDefault');
+    expect(steps[claim + 2]).toContain('reactions');
     expect(DOMAIN_DICTIONARY.runbooks?.map((entry) => entry.name)).toContain('work a seat');
+  });
+
+  it('never sends an agent to get_knowledge, which members cannot call', () => {
+    const text = [DOMAIN_DICTIONARY.overview, ...(DOMAIN_DICTIONARY.runbooks ?? []).flatMap((entry) => entry.steps)].join('\n');
+    expect(text).not.toContain('get_knowledge');
+    expect(text).toContain('get_escalation_lookups');
   });
 
   it('tells a holder how to set what their reactions mean', () => {

@@ -2,7 +2,7 @@
  * The domain dictionary: how this deployment's words map to roles, workflows,
  * facets and verbs, plus the runbooks an agent follows. It is the front door
  * for any MCP client: `get_domain_context` serves it before anything else, and
- * its runbooks point at the knowledge editions that hold the standing rules.
+ * its runbooks point at the lookups each row carries with the standing rules.
  * Code-owned (reset on boot); editable live with PUT /api/domain.
  */
 
@@ -25,7 +25,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     'Work crosses seats as validated handoffs: a deliverable is produced by one role and reviewed by another, a program is phases of deliverables closed by gates, an ask parks one decision.',
     `Each holder has an inbox (inbox-<holder>), their decide queue, and an agent queue (inbox-agent-<holder>) their agent works acting as them; a sign-in email becomes the holder name (ana.ruiz@example.com is ana-ruiz-at-example-com). The inbox workflows run for the caller's own inbox unless they name another; only an admin names one.`,
     inboxRoles.length ? `Named inboxes here: ${inboxRoles.join(', ')}.` : '',
-    `Standing rules live in knowledge: org/${EDITION_KEY.GUIDE} for seats, org/${INBOX_EDITION.GUIDE} for the inbox. Read them before acting.`,
+    `Standing rules ride on every row as lookups: get_escalation_lookups { escalation_id } on any row you can read returns them; guide is org/${EDITION_KEY.GUIDE} on seat rows and org/${INBOX_EDITION.GUIDE} on agent rows. Read them before acting.`,
   ].filter(Boolean).join(' '),
   terms: [
     { term: 'seat', aliases: ['role', 'queue', ...teamRoles], kind: 'role', maps_to: { roles: teamRoles }, guidance: 'A team or circle with a queue. One shared form; the row\'s envelope.section picks the part that shows.' },
@@ -55,19 +55,18 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
       name: 'start your day',
       steps: [
         'get_domain_context once, then get_user_personas { user_id: <yours> }: your inbox is the inbox-<holder> role in your persona, your agent queue is inbox-agent-<holder>. You act as the holder; you see nothing else.',
-        `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" }: the standing rules for every act and for how you report back. Read it once per session.`,
         'find_escalations { workflow_type: "inboxSweep", status: "pending", role: "inbox-agent-<holder>" }: a pending check row means a sweep is running. None means no sweep; start one per "start a sweep for a holder", naming no holder.',
-        'Work the agent queue per "work the inbox" until it is empty.',
+        'Work the agent queue per "work the inbox" until it is empty. Every row there carries the standing rules as its guide lookup.',
         'Report to the holder in the shape the guide names: what landed, filed as, what you skipped and why, what waits under Back to you. Nothing else.',
       ],
     },
     {
       name: 'work the inbox',
       steps: [
-        `get_knowledge { domain: "org", key: "${INBOX_EDITION.GUIDE}" } once per session; read org/${INBOX_EDITION.CORRECTIONS} before classifying.`,
-        `First, the holder's reactions: read org/${INBOX_EDITION.REACTIONS}-<holder> (else org/${INBOX_EDITION.REACTIONS}), then for every open row in inbox-<holder> read the holder's own reactions and replies on the source message and resolve the row as the guide's "Before anything" section says. Their emoji is their decision.`,
         'find_escalations { role: "inbox-agent-<holder>", status: "pending", available: true }, oldest first; you see only the holder you act for.',
         'claim_escalation { id, duration_minutes: 240 }; read the brief and envelope.act.',
+        'get_escalation_lookups { escalation_id }: guide (the standing rules for every act and for how you report back; once per session), reactions (reactionsDefault when reactions is missing), and on a check rules and corrections. Follow corrections when you classify.',
+        'Once per pass, after the first claim: the holder\'s reactions. With that mapping, for every open row in inbox-<holder> read the holder\'s own reactions and replies on the source message and resolve the row as the guide\'s "Before anything" section says. Their emoji is their decision.',
         'Do the act with your own tools; for a check, search the source since envelope.watermark for the holder, oldest first.',
         'resolve_escalation { escalation_id, payload: { act: {...} } } with the fields the act names; a 422 names what is missing.',
         'When a person must decide, resolve what you have; the item returns to their inbox as a view.',
@@ -84,9 +83,8 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     {
       name: 'work a seat',
       steps: [
-        `get_knowledge { domain: "org", key: "${EDITION_KEY.GUIDE}" } once per session.`,
         'find_escalations { role: "<seat>", status: "pending", available: true }; subtype says which section: work, review, decide, gate.',
-        'claim_escalation, read the brief and the lookups (get_escalation_lookups), do the work.',
+        'claim_escalation, then get_escalation_lookups { escalation_id }: guide (the standing rules; once per session) and the editions the row pins. Read the brief, do the work.',
         'resolve_escalation with { handoff }, { review }, { decision } or { gate }; blocked beats guessing.',
       ],
     },
@@ -103,7 +101,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
       steps: [
         'invoke_workflow { workflow_type: "inboxPreferences", data: {} }: the caller\'s own inbox; an admin adds holder: "<inbox-role>" for someone else\'s. A "Your reactions" row appears in the inbox, pre-filled with what is in force.',
         'The holder pastes the emoji they use into each box (Done, Approved, On it, Read, Not mine, Ticket), picks what a Read emoji closes, what their reply means, and which of their roles a reaction may close, then submits.',
-        `Saved as org/${INBOX_EDITION.REACTIONS}-<holder>, one edition per save; the org default is org/${INBOX_EDITION.REACTIONS}. The agent reads it at the start of every pass.`,
+        `Saved as org/${INBOX_EDITION.REACTIONS}-<holder>, one edition per save; the org default is org/${INBOX_EDITION.REACTIONS}. Every agent row carries both as lookups (reactions, reactionsDefault), so the agent reads them at the start of every pass.`,
         'When the holder tells you in words what an emoji means, invoke the row for them and say it is waiting; do not write the edition by hand.',
       ],
     },

@@ -39,8 +39,8 @@ The example bot `claude-at-work` holds `ai-engineering-platform` (write-self). T
 
 1. As superadmin, `create_bot_api_key { id: "0d000000-0000-4000-8000-000000000011", name: "claude", scopes: ["mcp:read", "mcp:full"] }` over MCP, or `POST /api/bot-accounts/:id/api-keys`.
 2. Give Claude Code the key: `claude mcp add --transport http workbench-bot http://localhost:3030/mcp --header "Authorization: Bearer lt_bot_..."`.
-3. Claude follows the handoff guide for deliverables and the triage guide (`get_knowledge { domain: "org", key: "inbox-triage-guide" }`) for inbox acts: it finds the rows in the holder's agent queue (`inbox-agent-<holder>`), claims one, reads the brief, does the work with its own tools (chat, issue tracker, calendar), and resolves `{ act: {...} }`. For the inbox it needs no identity of its own: it acts as the holder through their MCP grant.
-4. Claude follows the handoff guide (`get_knowledge { domain: "org", key: "handoff-guide" }`): find its rows, claim, work, resolve `{ handoff: {...} }`. Rows it may not act on are not available to it; a malformed handoff comes back as a 422 naming the fields.
+3. Claude follows the handoff guide for deliverables and the triage guide for inbox acts. Each rides on the row as its `guide` lookup, read with `get_escalation_lookups { escalation_id }`, so a member needs no knowledge grant; agent rows also carry the holder's reactions and, on a check, the rules and corrections. It finds the rows in the holder's agent queue (`inbox-agent-<holder>`), claims one, reads the brief and lookups, does the work with its own tools (chat, issue tracker, calendar), and resolves `{ act: {...} }`. For the inbox it needs no identity of its own: it acts as the holder through their MCP grant.
+4. Claude follows the handoff guide (the `guide` lookup on every seat row): find its rows, claim, read the lookups, work, resolve `{ handoff: {...} }`. Rows it may not act on are not available to it; a malformed handoff comes back as a 422 naming the fields.
 
 Three modes, all data:
 

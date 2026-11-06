@@ -9,6 +9,7 @@ import {
   STARTER_ENTRIES,
   WORKBENCH_INPUT_LOOKUPS,
   orgLookups,
+  seatLookups,
 } from '../../../../src/workflows/claude-workbench/org';
 import { SEAT_ROLES } from '../../../../src/workflows/claude-workbench/types';
 
@@ -59,6 +60,8 @@ describe('org editions', () => {
       { domain: 'org', key: 'deliverable-types', version: 7, as: 'types' },
     ]);
     expect(WORKBENCH_INPUT_LOOKUPS.every((ref) => ref.version === undefined)).toBe(true);
+    expect(seatLookups({ roles: 3, raci: 1, channels: 1, 'deliverable-types': 7, programs: 2 })).toEqual([...refs, { domain: 'org', key: 'handoff-guide', as: 'guide' }]);
+    expect(seatLookups()).toEqual([{ domain: 'org', key: 'handoff-guide', as: 'guide' }]);
     expect(STARTER_ENTRIES.map((entry) => entry.key).slice(0, 4)).toEqual(['raci', 'channels', 'deliverable-types', 'programs']);
     expect(STARTER_ENTRIES.map((entry) => entry.key)).not.toContain('roles');
     expect(STARTER_ENTRIES.map((entry) => entry.key)).toContain('inbox-rules');

@@ -24,7 +24,7 @@ import {
   type ItemSpec,
   type SweepInput,
 } from './types';
-import { INBOX_LOOKUPS } from './vocabulary';
+import { INBOX_LOOKUPS, actLookups, checkLookups } from './vocabulary';
 
 const WORKFLOW = { ITEM: 'inboxItem', SWEEP: 'inboxSweep' } as const;
 
@@ -107,7 +107,7 @@ export function actRow(itemId: string, name: Exclude<InboxAct, 'check'>, item: I
     timeout: INBOX_ACT_TIMEOUT,
     metadata: present({ ...itemFacets(itemId, item), [FACET.SEAT]: role, [FACET.SECTION]: SECTION.ACT, [FACET.ACT]: name, [FACET.RACI]: RACI.RESPONSIBLE }),
     envelope: sectionEnvelope(SECTION.ACT, actInstructions(name, item, context), { act: name, permalink: item.permalink }),
-    lookups: INBOX_LOOKUPS,
+    lookups: actLookups(item.holder),
   };
 }
 
@@ -129,6 +129,6 @@ export function checkRow(input: SweepInput, watermark: string | undefined) {
       holder: input.holder,
       watermark,
     }),
-    lookups: INBOX_LOOKUPS,
+    lookups: checkLookups(input.holder),
   };
 }

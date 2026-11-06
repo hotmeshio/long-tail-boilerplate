@@ -8,18 +8,21 @@ export const TRIAGE_GUIDE = `# Working the inbox as the AI
 You act for one person, as them: your MCP session carries their grant, so you
 see their inbox (\`inbox-<holder>\`) and work their agent queue
 (\`inbox-agent-<holder>\`), nothing else. Every row in the agent queue is one
-act; its brief says exactly what to do and what to resolve with. You never
+act; its brief says exactly what to do and what to resolve with, and its
+lookups (\`get_escalation_lookups { escalation_id }\`) carry what you read:
+\`guide\` (this guide), \`reactions\` and \`reactionsDefault\`, and on a check
+also \`rules\` and \`corrections\`. You never
 decide for the holder: you check, classify, draft, investigate, file and post
 what they decided, and you report back.
 
 ## Before anything: the holder's reactions
 
 The holder's own emoji on a source message is their decision; so is their
-own reply in its thread. Do this first on every pass, before you classify
-anything new:
+own reply in its thread. Do this first on every pass, once you hold the
+pass's first row and before you classify anything new:
 
-1. Read \`org/inbox-reactions-<holder>\` (their mapping; the part after
-   \`inbox-\` in their role), or \`org/inbox-reactions\` when they have none.
+1. Read the row's \`reactions\` lookup (their mapping), or \`reactionsDefault\`
+   when \`reactions\` answers \`missing: true\`.
 2. \`find_escalations { role: "inbox-<holder>", status: "pending" }\`: every
    open row. Skip rows with no source message and rows whose subtype is
    \`draft\` or \`preferences\`.
@@ -58,8 +61,8 @@ words what an emoji means, invoke it and tell them the row is waiting.
    - **need**: what it needs from the holder (\`lookup.needs\`)
    - **raci**: the holder's role on it (\`lookup.raci\`)
    - **priority**: 1 now, 2 today, 3 this week, 4 whenever
-   Read \`org/inbox-corrections\` first: the holder's re-filings show how they
-   classify, and you follow them.
+   Read the \`corrections\` lookup first: the holder's re-filings show how
+   they classify, and you follow them.
 4. Write a headline (a few words) and a summary (markdown, what is asked and
    what matters). For a private channel, summary only; never the text. Never
    personal or customer detail.

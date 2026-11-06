@@ -88,7 +88,7 @@ describe.skipIf(!domain)('inbox binding', () => {
 
   it('parks a "Your reactions" row first, and saves what the holder submits as their own edition', async () => {
     const row = await pendingBySubtype(api, `inbox-${persona}`, 'holder', `inbox-${persona}`, 'preferences', 60_000);
-    expect(row.assigned_to).toBe(userId);
+    expect(row.assigned_to).toBeNull();
     const envelope = typeof row.envelope === 'string' ? JSON.parse(row.envelope) : row.envelope;
     expect(envelope.formDefaults.preferences.onIt).toBe(':eyes:');
 
