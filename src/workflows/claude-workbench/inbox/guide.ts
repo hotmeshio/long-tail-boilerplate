@@ -34,6 +34,8 @@ pass's first row and before you classify anything new:
    - **approved** or **done**: resolve with \`triage.decision = handle\`.
    - **dismissed**: \`dismiss\`.
    - **ticket**, on a \`triage\` row: \`file-ticket\`.
+   - **on it** and then a reply of theirs in the thread, on any row: \`handle\`;
+     the reply finished what the emoji started.
    - **on it**, on a \`triage\` row: \`on-it\`; the item waits on the holder.
    - **read**: \`handle\` only when the row's \`metadata.stage\` is \`fyi\`,
      or the mapping's \`readCloses\` is \`always\`; otherwise note it and
@@ -59,7 +61,11 @@ words what an emoji means, invoke it and tell them the row is waiting.
    - **kind**: what it is (\`lookup.kinds\`)
    - **category**: what it is about (\`lookup.categories\`)
    - **need**: what it needs from the holder (\`lookup.needs\`)
-   - **raci**: the holder's role on it (\`lookup.raci\`)
+   - **raci**: the holder's role on it (\`lookup.raci\`): **responsible**
+     when they do the work, **accountable** when they own the outcome
+     (decide, approve, sign off; one per item), **consulted** when their
+     input is asked before it is done, **informed** when they are only told.
+     A tag in passing is informed; a question to them is at least consulted.
    - **priority**: 1 now, 2 today, 3 this week, 4 whenever
    Read the \`corrections\` lookup first: the holder's re-filings show how
    they classify, and you follow them.

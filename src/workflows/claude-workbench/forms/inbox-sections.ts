@@ -14,6 +14,21 @@ const TRIAGE = `envelope.section=${SECTION.TRIAGE}`;
 const ACT = `envelope.section=${SECTION.ACT}`;
 const PREFERENCES = `envelope.section=${SECTION.PREFERENCES}`;
 const TRIAGE_TITLE = 'Decide';
+const FILED_TITLE = 'Filed as';
+
+/** Read-only preamble for the classification fields below the decision. */
+export const FILED_AS_GUIDE = [
+  '**Above is your intent:** what happens to this message now. **Below is how it is filed:** what the AI took it to be.',
+  '',
+  'Filing changes nothing about this item. It is how the AI learns: fix a wrong category, need or role and submit, and the next message like this one is filed your way and opens on a better suggestion.',
+  '',
+  '| Your role | Means |',
+  '|---|---|',
+  '| **Responsible** | You do the work. |',
+  '| **Accountable** | You own the outcome: you decide, approve or sign off. One per item. |',
+  '| **Consulted** | Your input is asked for before it is done. |',
+  '| **Informed** | You are told after; nothing to do. Files as FYI. |',
+].join('\n');
 const ACT_TITLE = 'Report';
 const PREFERENCES_TITLE = 'Your reactions';
 const REACTIONS_MAX_LENGTH = 300;
@@ -31,7 +46,7 @@ function textarea(title: string, description: string, bind: string, section: str
 }
 
 function lookupSelect(title: string, description: string, bind: string, lookup: string) {
-  return { type: 'string', title, description, 'x-lt-options': `lookup.${lookup}.items`, 'x-lt-bind': bind, 'x-lt-section': 'Filed as', 'x-lt-showIf': TRIAGE };
+  return { type: 'string', title, description, 'x-lt-options': `lookup.${lookup}.items`, 'x-lt-bind': bind, 'x-lt-section': FILED_TITLE, 'x-lt-showIf': TRIAGE };
 }
 
 export const INBOX_FIELDS = {
@@ -63,9 +78,19 @@ export const INBOX_FIELDS = {
     'x-lt-section': TRIAGE_TITLE,
     'x-lt-showIf': [TRIAGE, 'resolver.triage_decision=delegate'],
   },
+  triage_filed_guide: {
+    type: 'string',
+    title: 'How this is filed',
+    readOnly: true,
+    default: FILED_AS_GUIDE,
+    'x-lt-widget': 'markdown',
+    'x-lt-span': 2,
+    'x-lt-section': FILED_TITLE,
+    'x-lt-showIf': TRIAGE,
+  },
   triage_category: lookupSelect('Category', 'What it is about; change it and the AI learns', 'triage.category', 'categories'),
-  triage_need: lookupSelect('Needs', 'What it needs from you', 'triage.need', 'needs'),
-  triage_raci: lookupSelect('Your role', 'Responsible, accountable, consulted or informed', 'triage.raci', 'raci'),
+  triage_need: lookupSelect('Needs', 'What it needs from you; change it and the AI learns', 'triage.need', 'needs'),
+  triage_raci: lookupSelect('Your role', 'Your part in it, per the table above; change it and the AI learns', 'triage.raci', 'raci'),
 
   act_outcome: {
     type: 'string',

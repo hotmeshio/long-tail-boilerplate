@@ -70,11 +70,27 @@ describe('inbox item', () => {
   });
 });
 
+const SWEEP_BASE = `inboxSweep-${HOLDER}-slack`;
+const isStanding = (id: string) => id === SWEEP_BASE || /^\d+$/.test(id.slice(SWEEP_BASE.length + 1));
+
+/** Stop any standing sweep that has a check parked, and cancel the check. */
+async function stopSweeps() {
+  const { escalations } = await api.listEscalations({ role: AGENT, status: 'pending' });
+  for (const row of escalations.filter((e: any) => e.workflow_id?.startsWith(SWEEP_BASE) && isStanding(e.workflow_id))) {
+    await api.send('POST', `/api/workflows/${row.workflow_id}/terminate`).catch(() => undefined);
+    await api.send('POST', `/api/escalations/${row.id}/cancel`).catch(() => undefined);
+  }
+}
+
 describe('inbox sweep', () => {
   it('parks a check, admits what the AI found, and parks the item for the holder', async () => {
+    await stopSweeps();
     const r = await invoke(api, 'inboxSweep', { holder: HOLDER, source: 'slack', intervalMinutes: 60 });
     expect(r.status).toBe(202);
-    const wfId = r.data.workflowId as string;
+    const launched = await resultOf(api, r.data.workflowId);
+    expect(launched.started).toBe(true);
+    expect(isStanding(launched.sweep)).toBe(true);
+    const wfId = launched.sweep as string;
 
     const check = await poll(`check row of ${wfId}`, async () => {
       const { escalations } = await api.listEscalations({ role: AGENT, status: 'pending' });
@@ -95,6 +111,9 @@ describe('inbox sweep', () => {
       },
     });
     expect(resolved.status).toBe(200);
+
+    const again = await invoke(api, 'inboxSweep', { holder: HOLDER, source: 'slack', intervalMinutes: 60 });
+    expect(await resultOf(api, again.data.workflowId)).toEqual({ sweep: wfId, started: false });
 
     const item = await poll(`item row for channel C${RUN}`, async () => {
       const { escalations } = await api.listEscalations({ role: HOLDER, status: 'pending' });

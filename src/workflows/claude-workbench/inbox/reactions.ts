@@ -147,8 +147,9 @@ function firstMatch(settings: ReactionSettings, list: ReactionList, reactions: s
 
 /**
  * The decision the holder's signals amount to on one open row, or undefined
- * when they amount to none. Done, approved and dismissed beat the rest; a
- * ticket or on-it emoji only applies to a fresh triage row; a read emoji
+ * when they amount to none. Done, approved and dismissed beat the rest; an
+ * on-it emoji followed by a reply is done; a ticket or a bare on-it emoji
+ * only applies to a fresh triage row; a read emoji
  * closes what the settings say it closes; a reply means what the holder
  * chose. A close applies only for the roles in `closeFor`, never on a draft.
  */
@@ -167,6 +168,7 @@ export function decideFromReactions(settings: ReactionSettings, row: ReactionRow
   const ticket = pick('ticket');
   if (ticket && fresh) return { decision: TRIAGE_DECISION.FILE_TICKET, emoji: ticket, reason: `ticket asked for with :${ticket}:` };
   const onIt = pick('onIt');
+  if (onIt && signals.replied && mayClose) return { decision: TRIAGE_DECISION.HANDLE, emoji: onIt, reason: `on it with :${onIt}:, then you replied in the thread` };
   if (onIt && fresh) return { decision: TRIAGE_DECISION.ON_IT, emoji: onIt, reason: `on it, marked :${onIt}:` };
   const read = pick('read');
   if (read && mayClose && (settings.readCloses === 'always' || (settings.readCloses === 'fyi' && row.stage === INBOX_STAGE.FYI))) {

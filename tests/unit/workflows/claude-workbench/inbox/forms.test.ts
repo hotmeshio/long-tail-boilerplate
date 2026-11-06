@@ -16,6 +16,17 @@ describe('inbox sections of the seat form', () => {
     expect(Object.keys(violationsOf(SEAT_FORM_SCHEMA, { triage: { decision: 'nope', category: 'poetry' } }, triage())).sort()).toEqual(['triage_category', 'triage_decision']);
   });
 
+  it('heads the filing fields with a read-only note: intent above, filing below, and what each role means', () => {
+    const props = SEAT_FORM_SCHEMA.properties as Record<string, any>;
+    const guide = props.triage_filed_guide;
+    expect(guide).toMatchObject({ readOnly: true, 'x-lt-widget': 'markdown', 'x-lt-section': 'Filed as', 'x-lt-showIf': 'envelope.section=triage' });
+    expect(guide.default).toContain('Above is your intent');
+    for (const role of ['Responsible', 'Accountable', 'Consulted', 'Informed']) expect(guide.default).toContain(`**${role}**`);
+    const filed = (SEAT_FORM_SCHEMA['x-lt-order'] as string[]).filter((key) => props[key]?.['x-lt-section'] === 'Filed as');
+    expect(filed).toEqual(['triage_filed_guide', 'triage_category', 'triage_need', 'triage_raci']);
+    expect(SEAT_FORM_SCHEMA.required).not.toContain('triage_filed_guide');
+  });
+
   it('requires a reply mode on reply and a role on delegate', () => {
     expect(Object.keys(violationsOf(SEAT_FORM_SCHEMA, { triage: { decision: 'reply' } }, triage()))).toEqual(['triage_reply_mode']);
     expect(violationsOf(SEAT_FORM_SCHEMA, { triage: { decision: 'reply', replyMode: 'ai-drafts', guidance: 'Say yes.' } }, triage())).toEqual({});

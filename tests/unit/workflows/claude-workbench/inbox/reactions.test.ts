@@ -69,6 +69,13 @@ describe('what the holder decided', () => {
     expect(decideFromReactions(settings, row(), { reactions: ['x'], replied: false })?.decision).toBe('dismiss');
   });
 
+  it('treats on it followed by a reply as done, on a fresh or a waiting row', () => {
+    expect(decideFromReactions(settings, row(), { reactions: ['eyes'], replied: true })).toMatchObject({ decision: 'handle', emoji: 'eyes', reason: 'on it with :eyes:, then you replied in the thread' });
+    expect(decideFromReactions(settings, row({ view: 'waiting', stage: 'waiting' }), { reactions: ['eyes'], replied: true })?.decision).toBe('handle');
+    expect(decideFromReactions({ ...settings, closeFor: ['responsible'] }, row({ raci: 'informed' }), { reactions: ['eyes'], replied: true })?.decision).toBe('on-it');
+    expect(decideFromReactions(settings, row(), { reactions: ['ticket', 'eyes'], replied: true })?.decision).toBe('file-ticket');
+  });
+
   it('lets a read emoji close only what the holder allows', () => {
     expect(decideFromReactions(settings, row(), { reactions: ['+1'], replied: false })).toBeUndefined();
     expect(decideFromReactions(settings, row({ stage: 'fyi', raci: 'informed', need: 'read' }), { reactions: ['fire'], replied: false })?.decision).toBe('handle');
