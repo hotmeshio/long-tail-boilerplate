@@ -5,6 +5,10 @@
  * own inboxItem (ids derive from the source, so a repeat is a no-op); the
  * sweep rests, then checks again. After a bounded number of checks it
  * continues as a new generation.
+ *
+ * One sweep per holder and source: a run under any other id starts the
+ * standing one (`inboxSweep-<holder>-<source>`, numbered after a stop) and
+ * returns, so starting it again while it runs is a no-op.
  */
 
 import { Durable } from '@hotmeshio/hotmesh';
@@ -19,14 +23,31 @@ import { holderFor, refusalFor } from './ownership';
 import { checkRow } from './rows';
 import { INBOX_CHECKS_PER_LINK, INBOX_CHECK_MAX_ITEMS, INBOX_DEFAULT_INTERVAL_MINUTES, INBOX_DEFAULT_LOOKBACK_HOURS, type SweepInput } from './types';
 
-const { readInboxVocabulary, watermarkHoursAgo, holderAccount, startInboxItem } = Durable.workflow.proxyActivities<typeof activities>({ activities });
+const { readInboxVocabulary, watermarkHoursAgo, holderAccount, startInboxItem, startInboxSweep } = Durable.workflow.proxyActivities<typeof activities>({ activities });
 
-export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepInput | { cancelled: true } | { refused: string } }> {
+/** The standing sweep's base id for a holder and source. */
+export function sweepWorkflowId(holder: string, source: string): string {
+  return `inboxSweep-${holder}-${source}`;
+}
+
+/** Whether a run is the standing sweep: the base id, or the base numbered after a stop. */
+export function isStandingSweep(workflowId: string, base: string): boolean {
+  return workflowId === base || (workflowId.startsWith(`${base}-`) && /^\d+$/.test(workflowId.slice(base.length + 1)));
+}
+
+type SweepReturn = SweepInput | { cancelled: true } | { refused: string } | { sweep: string; started: boolean };
+
+export async function inboxSweep(envelope: LTEnvelope): Promise<{ type: 'return'; data: SweepReturn }> {
   const { workflowId } = Durable.workflow.workflowInfo();
   const { assignee, ...named } = envelope.data as SweepInput;
   const input: SweepInput = { ...named, holder: holderFor(envelope, named.holder) ?? '' };
   const refused = refusalFor(envelope, input.holder || undefined) ?? (input.holder ? undefined : 'Name the inbox to sweep.');
   if (refused) return { type: 'return', data: { refused } };
+  const base = sweepWorkflowId(input.holder, input.source);
+  if (!isStandingSweep(workflowId, base)) {
+    const { workflowId: sweep, started } = await startInboxSweep({ base, sweep: input, metadata: envelope.metadata ?? {} });
+    return { type: 'return', data: { sweep, started } };
+  }
   const generation = input.generation ?? 0;
   const interval = input.intervalMinutes ?? INBOX_DEFAULT_INTERVAL_MINUTES;
   const max = input.maxItems ?? INBOX_CHECK_MAX_ITEMS;

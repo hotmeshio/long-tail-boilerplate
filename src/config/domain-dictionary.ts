@@ -36,7 +36,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     { term: 'program', kind: 'entity', maps_to: { roles: [ORG_PROGRAMS_ROLE, ...teamRoles] }, idFacet: 'program', guidance: 'One launch, by slug. Every row it parks carries facets.program.' },
     { term: 'deliverable', kind: 'entity', maps_to: { roles: teamRoles }, idFacet: 'deliverable', guidance: 'One piece of work between a producer role and a reviewer role. Rows carry facets.deliverable and facets.round.' },
     { term: 'inboxItem', aliases: ['item workflow'], kind: 'workflow', maps_to: { workflow: 'inboxItem' }, id_convention: 'inbox-<holder>-<source>-<channel>-<thread>', kill_road: 'Cancel its pending row (cancel_escalation). A row in the holder\'s inbox closes the item as cancelled; a cancelled act returns to the inbox as an outcome row, and cancelling that closes it. Never terminate the sweep to stop one item.', guidance: 'Rounds of one row: a decision in the holder\'s inbox or an act in the agent queue.' },
-    { term: 'inboxSweep', aliases: ['sweep', 'check'], kind: 'workflow', maps_to: { workflow: 'inboxSweep' }, id_convention: 'inboxSweep-<id>; one per holder and source', kill_road: 'terminate_workflow on the sweep; its pending check row is then cancelled.', guidance: 'Parks a check act on a schedule; the AI resolves it with the items found since the watermark.' },
+    { term: 'inboxSweep', aliases: ['sweep', 'check'], kind: 'workflow', maps_to: { workflow: 'inboxSweep' }, id_convention: 'inboxSweep-<holder>-<source>, numbered -2, -3 after a stop; one per holder and source, and starting it again while it runs is a no-op', kill_road: 'terminate_workflow on the running sweep (the workflow_id on its pending check row), then cancel that row.', guidance: 'Parks a check act on a schedule; the AI resolves it with the items found since the watermark.' },
     { term: 'deliverable workflow', kind: 'workflow', maps_to: { workflow: 'deliverable' }, id_convention: '<programWfId>-p<phase>-<kind>-g<gateRound>, or the invoke id when standalone', kill_road: 'Cancel its pending row; the deliverable ends cancelled and, inside a program, reports that to the board.', guidance: 'Work, then decide or review, until accepted or the rounds run out.' },
     { term: 'program workflow', kind: 'workflow', maps_to: { workflow: 'program' }, id_convention: 'program-<id>; its board is <id>-board', kill_road: 'terminate_workflow on the program, then close its board row by hand with closing.outcome = cancelled.', guidance: 'Phases of deliverables; one gate row per signing role; a hold goes to the owner role.' },
     { term: 'section', kind: 'facet', maps_to: { facet: 'section' }, values: ['work', 'review', 'decide', 'gate', 'triage', 'act', 'preferences'], guidance: 'Which part of the shared form a row shows; also the row\'s subtype for seats.' },
@@ -55,7 +55,7 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
       name: 'start your day',
       steps: [
         'get_domain_context once, then get_user_personas { user_id: <yours> }: your inbox is the inbox-<holder> role in your persona, your agent queue is inbox-agent-<holder>. You act as the holder; you see nothing else.',
-        'find_escalations { workflow_type: "inboxSweep", status: "pending", role: "inbox-agent-<holder>" }: a pending check row means a sweep is running. None means no sweep; start one per "start a sweep for a holder", naming no holder.',
+        'Start your sweep per "start a sweep for a holder", naming no holder. It is one standing sweep per holder and source, so this is a no-op when it already runs, including while it rests between checks.',
         'Work the agent queue per "work the inbox" until it is empty. Every row there carries the standing rules as its guide lookup.',
         'Report to the holder in the shape the guide names: what landed, filed as, what you skipped and why, what waits under Back to you. Nothing else.',
       ],
@@ -91,9 +91,9 @@ export const DOMAIN_DICTIONARY: DomainDictionary = {
     {
       name: 'start a sweep for a holder',
       steps: [
-        'invoke_workflow { workflow_type: "inboxSweep", data: { source: "slack", intervalMinutes: 30, lookbackHours: 24 } }. With no holder named it sweeps the caller\'s own inbox, so a holder or their agent acting as them names none. An admin adds holder: "<inbox-role>" to sweep someone else\'s.',
+        'invoke_workflow { workflow_type: "inboxSweep", data: { source: "slack", intervalMinutes: 15, lookbackHours: 24 } }. It answers { sweep: "inboxSweep-<holder>-slack" (numbered after a stop), started }; started false means it was already running and nothing changed. The sweep rests intervalMinutes after each check, shorter than your wake cadence, so a check waits for you each time you wake. With no holder named it sweeps the caller\'s own inbox, so a holder or their agent acting as them names none. An admin adds holder: "<inbox-role>" to sweep someone else\'s.',
         'The check row appears in the holder\'s agent queue (inbox-agent-<holder>); work it per "work the inbox".',
-        'Stop it with terminate_workflow on the sweep id.',
+        'Stop it with terminate_workflow on the running sweep (the workflow_id on its pending check row), then cancel that row.',
       ],
     },
     {

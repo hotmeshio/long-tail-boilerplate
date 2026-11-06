@@ -12,7 +12,7 @@ import { getConnection } from '../../../config/connection';
 import { DB_CONFIG } from '../../../config/database';
 import { CLAUDE_WORKBENCH_QUEUE, ORG_DOMAIN } from '../types';
 import { DEFAULT_REACTIONS, reactionSettingsFrom, reactionsKey, type ReactionSettings } from './reactions';
-import { INBOX_CORRECTIONS_KEPT, INBOX_ITEM_EXPIRE_SECONDS, type Correction, type ItemSpec, type Rule, type Vocabulary } from './types';
+import { INBOX_CORRECTIONS_KEPT, INBOX_ITEM_EXPIRE_SECONDS, type Correction, type ItemSpec, type Rule, type SweepInput, type Vocabulary } from './types';
 import { INBOX_EDITION, STARTER_VOCABULARY, editionValues, readRule } from './vocabulary';
 
 function entryData(result: { status: number; data?: any }): unknown {
@@ -71,25 +71,57 @@ export async function holderAccount(input: { holder: string }): Promise<{ userId
 }
 
 /**
- * Start one item under its source id; false when that id is already taken.
+ * Start a workbench run under a fixed id; false when that id is already taken.
  * Started here rather than as a child: a child start on a taken id parks the
  * parent with no reply, while a client start throws. Safe to retry.
  */
-export async function startInboxItem(input: { workflowId: string; item: ItemSpec }): Promise<{ started: boolean }> {
+async function startOnce(workflowName: string, workflowId: string, envelope: { data: unknown; metadata: Record<string, unknown> }, expire?: number): Promise<{ started: boolean }> {
   const client = new Durable.Client({ connection: getConnection() });
   try {
-    await client.workflow.start({
-      taskQueue: CLAUDE_WORKBENCH_QUEUE,
-      workflowName: 'inboxItem',
-      workflowId: input.workflowId,
-      args: [{ data: input.item, metadata: {} }],
-      expire: INBOX_ITEM_EXPIRE_SECONDS,
-    });
+    // entity tags the job so terminate and export resolve it, as Long Tail's own invoke does
+    await client.workflow.start({ taskQueue: CLAUDE_WORKBENCH_QUEUE, workflowName, workflowId, entity: workflowName, args: [envelope], ...(expire ? { expire } : {}) });
     return { started: true };
   } catch (err) {
     if (/duplicate/i.test(String((err as Error)?.message ?? err))) return { started: false };
     throw err;
   }
+}
+
+/** Start one item under its source id; false when that id is already taken. */
+export async function startInboxItem(input: { workflowId: string; item: ItemSpec }): Promise<{ started: boolean }> {
+  return startOnce('inboxItem', input.workflowId, { data: input.item, metadata: {} }, INBOX_ITEM_EXPIRE_SECONDS);
+}
+
+/** How many numbered ids a holder's sweep may use before a start refuses. */
+export const SWEEP_SLOTS = 50;
+
+/** Whether a job runs, ended (its record still holds the id), or was never started. */
+async function jobState(workflowName: string, workflowId: string): Promise<'running' | 'ended' | 'absent'> {
+  const client = new Durable.Client({ connection: getConnection() });
+  try {
+    const status = await (await client.workflow.getHandle(CLAUDE_WORKBENCH_QUEUE, workflowName, workflowId)).status();
+    return status > 0 ? 'running' : 'ended';
+  } catch (err) {
+    if (/not found/i.test(String((err as Error)?.message ?? err))) return 'absent';
+    throw err;
+  }
+}
+
+/**
+ * The holder's one sweep for a source. Ids are numbered from `base`
+ * (`base`, `base-2`, ...): a running one is the sweep and nothing starts; an
+ * ended one still holds its id, so the next number is tried. Two starts at
+ * once race for the same free id and only one wins.
+ */
+export async function startInboxSweep(input: { base: string; sweep: SweepInput; metadata: Record<string, unknown> }): Promise<{ workflowId: string; started: boolean }> {
+  for (let slot = 1; slot <= SWEEP_SLOTS; slot++) {
+    const workflowId = slot === 1 ? input.base : `${input.base}-${slot}`;
+    const state = await jobState('inboxSweep', workflowId);
+    if (state === 'running') return { workflowId, started: false };
+    if (state === 'ended') continue;
+    return { workflowId, ...(await startOnce('inboxSweep', workflowId, { data: input.sweep, metadata: input.metadata })) };
+  }
+  throw new Error(`${input.base}: all ${SWEEP_SLOTS} sweep ids have ended runs; prune them before starting another`);
 }
 
 /** A source timestamp this many hours ago, as the first watermark of a sweep. */
