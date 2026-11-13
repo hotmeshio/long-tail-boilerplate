@@ -210,7 +210,7 @@ async function main() {
       let escalationId: string | null = null;
       for (let tick = 0; tick < 30; tick++) {
         await sleep(500);
-        const resp = await api('GET', '/escalations?status=pending&limit=20', undefined, token);
+        const resp = await api('GET', `/escalations?status=pending&role=${STATIONS[s]}&limit=20`, undefined, token);
         const escs = resp?.escalations || [];
         // Find the one for this job + station
         const match = escs.find((e: any) =>

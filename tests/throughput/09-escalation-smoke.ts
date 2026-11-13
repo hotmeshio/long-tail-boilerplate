@@ -73,7 +73,7 @@ async function main() {
   let escalation: any = null;
 
   while (Date.now() < deadline) {
-    const resp = await api('GET', '/api/escalations/available?limit=100&sort_by=created_at&order=asc');
+    const resp = await api('GET', '/api/escalations/available?limit=100&sort_by=created_at&order=desc');
     const available = resp?.escalations || [];
     escalation = available.find((e: any) => (e.workflow_id || '').startsWith(wfId));
     if (escalation) break;
