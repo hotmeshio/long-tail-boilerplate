@@ -288,14 +288,6 @@ export class ComputeStack extends cdk.Stack {
       enableExecuteCommand: true,
     });
 
-    const apiScaling = apiService.autoScaleTaskCount({
-      minCapacity: 1,
-      maxCapacity: 4,
-    });
-    apiScaling.scaleOnCpuUtilization('ApiCpuScaling', {
-      targetUtilizationPercent: 70,
-    });
-
     httpsListener.addTargets('ApiTarget', {
       port: 3030,
       protocol: elbv2.ApplicationProtocol.HTTP,
@@ -351,21 +343,13 @@ export class ComputeStack extends cdk.Stack {
     const workerService = new ecs.FargateService(this, 'WorkerService', {
       cluster,
       taskDefinition: workerTaskDef,
-      desiredCount: 2,
+      desiredCount: 1,
       securityGroups: [workerSecurityGroup],
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       serviceName: 'worker',
       minHealthyPercent: 100,
       maxHealthyPercent: 200,
       enableExecuteCommand: true,
-    });
-
-    const workerScaling = workerService.autoScaleTaskCount({
-      minCapacity: 2,
-      maxCapacity: 4,
-    });
-    workerScaling.scaleOnCpuUtilization('WorkerCpuScaling', {
-      targetUtilizationPercent: 70,
     });
 
     // --- DNS A Record ---

@@ -607,7 +607,7 @@ The `v*.*.*` tag starts `deploy.yml`: tests, `cdk deploy --all` (which builds th
 ### Database Configuration
 
 - **Engine:** Aurora PostgreSQL 16.4
-- **Capacity:** Serverless v2, 0.5 to 8 ACUs, one writer
+- **Capacity:** Serverless v2, 0.5 to 4 ACUs, one writer
 - **Backups:** 7-day automated retention
 - **Encryption:** at rest; Performance Insights and CloudWatch log export on
 - **Deletion protection:** enabled
